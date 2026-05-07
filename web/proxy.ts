@@ -65,9 +65,17 @@ function getProxiedRequestUrl(req: NextRequest, path: string) {
 // copied from common/src/utils/api. TODO the right thing
 function getApiUrl(path: string) {
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return `http://${process.env.NEXT_PUBLIC_API_URL}/${path}`
+    return `${formatApiBaseUrl(process.env.NEXT_PUBLIC_API_URL)}/${path}`
   } else {
     const { apiEndpoint } = PROD_CONFIG
     return `https://${apiEndpoint}/${path}`
   }
+}
+
+function formatApiBaseUrl(apiUrl: string) {
+  const trimmed = apiUrl.replace(/\/+$/, '')
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed
+  }
+  return `http://${trimmed}`
 }

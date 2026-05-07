@@ -32,7 +32,7 @@ export function pathWithPrefix(path: APIPath) {
 
 export function getWebsocketUrl() {
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return `ws://${process.env.NEXT_PUBLIC_API_URL}/ws`
+    return `${formatWebsocketBaseUrl(process.env.NEXT_PUBLIC_API_URL)}/ws`
   } else {
     const { apiEndpoint } = ENV_CONFIG
     return `wss://${apiEndpoint}/ws`
@@ -46,9 +46,31 @@ export function getApiUrl(path: string) {
   }
 
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return `http://${process.env.NEXT_PUBLIC_API_URL}/${path}`
+    return `${formatApiBaseUrl(process.env.NEXT_PUBLIC_API_URL)}/${path}`
   } else {
     const { apiEndpoint } = ENV_CONFIG
     return `https://${apiEndpoint}/${path}`
   }
+}
+
+export function formatApiBaseUrl(apiUrl: string) {
+  const trimmed = apiUrl.replace(/\/+$/, '')
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed
+  }
+  return `http://${trimmed}`
+}
+
+function formatWebsocketBaseUrl(apiUrl: string) {
+  const trimmed = apiUrl.replace(/\/+$/, '')
+  if (trimmed.startsWith('https://')) {
+    return `wss://${trimmed.slice('https://'.length)}`
+  }
+  if (trimmed.startsWith('http://')) {
+    return `ws://${trimmed.slice('http://'.length)}`
+  }
+  if (trimmed.startsWith('ws://') || trimmed.startsWith('wss://')) {
+    return trimmed
+  }
+  return `ws://${trimmed}`
 }
