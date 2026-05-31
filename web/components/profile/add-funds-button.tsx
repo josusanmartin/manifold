@@ -25,7 +25,7 @@ export function AddFundsButton(props: {
       color="gradient-pink"
       className={className}
     >
-      Get mana <ManaCoin className="ml-1" />
+      Fund MEX <ManaCoin className="ml-1" />
     </Button>
   )
 }

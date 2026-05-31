@@ -252,7 +252,7 @@ const getDesktopNav = (
   const { isLiveTV } = options
   if (loggedIn)
     return buildArray(
-      { name: 'Buy mana', href: '/checkout', icon: CreditCardIcon },
+      { name: 'Fund MEX', href: '/checkout', icon: CreditCardIcon },
       isLiveTV && {
         name: 'TV',
         href: '/tv',
@@ -294,7 +294,7 @@ const getDesktopNav = (
     )
 
   return buildArray(
-    { name: 'Buy mana', href: '/checkout', icon: CreditCardIcon },
+    { name: 'Fund MEX', href: '/checkout', icon: CreditCardIcon },
     { name: 'About', href: '/about', icon: QuestionMarkCircleIcon },
     { name: 'App', onClick: openDownloadApp, icon: DeviceMobileIcon }
   )
@@ -312,7 +312,7 @@ const getMobileNav = (
   const { isAdminOrMod, isLiveTV, showShopNewBadge } = options
 
   return buildArray<NavItem>(
-    { name: 'Buy mana', href: '/checkout', icon: CreditCardIcon },
+    { name: 'Fund MEX', href: '/checkout', icon: CreditCardIcon },
     loggedIn && {
       name: 'Referrals',
       href: '/referrals',

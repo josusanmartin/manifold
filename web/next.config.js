@@ -4,6 +4,7 @@ const API_DOCS_URL = 'https://docs.manifold.markets/api'
 
 const MEXAS_ONLY_REDIRECTS = [
   '/',
+  '/add-funds',
   '/home',
   '/browse',
   '/browse/:path*',

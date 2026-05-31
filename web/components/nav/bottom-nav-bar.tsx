@@ -58,7 +58,7 @@ const NotificationsIconSolid = (props: { className?: string }) => (
 function getNavigation(user: User) {
   return [
     {
-      name: 'Buy',
+      name: 'Fund',
       href: '/checkout',
       icon: CreditCardIcon,
       solidIcon: CreditCardIconSolid,
@@ -78,7 +78,7 @@ function getNavigation(user: User) {
 
 const signedOutNavigation = (privyLogin: () => void) => [
   {
-    name: 'Buy',
+    name: 'Fund',
     href: '/checkout',
     icon: CreditCardIcon,
     solidIcon: CreditCardIconSolid,
