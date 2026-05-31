@@ -4,14 +4,28 @@ import { forEach } from 'lodash'
 import { removeUndefinedProps } from 'common/util/object'
 import { User } from 'firebase/auth'
 
+type AccessTokenProvider = () => Promise<string | null> | string | null
+
 // LOCAL_ONLY mode: set a user ID that will be sent as X-Local-User header.
 // Initialize from env var to avoid race conditions with async auth setup.
 let localOnlyUserId: string | null =
   typeof process !== 'undefined' && process.env.NEXT_PUBLIC_LOCAL_TEST_USER_ID
     ? process.env.NEXT_PUBLIC_LOCAL_TEST_USER_ID
     : null
+let privyAccessTokenProvider: AccessTokenProvider | null = null
+
 export function setLocalOnlyUserId(userId: string | null) {
   localOnlyUserId = userId
+}
+
+export function setPrivyAccessTokenProvider(
+  provider: AccessTokenProvider | null
+) {
+  privyAccessTokenProvider = provider
+}
+
+export function hasPrivyAccessTokenProvider() {
+  return privyAccessTokenProvider != null
 }
 
 export function unauthedApi<P extends APIPath>(path: P, params: APIParams<P>) {
@@ -63,6 +77,12 @@ export async function baseApiCall(
   }
   if (localOnlyUserId) {
     headers['X-Local-User'] = localOnlyUserId
+  } else if (privyAccessTokenProvider) {
+    const token = await privyAccessTokenProvider()
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+      headers['X-Auth-Provider'] = 'privy'
+    }
   } else if (user) {
     const token = await user.getIdToken()
     headers.Authorization = `Bearer ${token}`

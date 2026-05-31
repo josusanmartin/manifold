@@ -1,8 +1,19 @@
 'use client'
 
-import { PrivyProvider } from '@privy-io/react-auth'
-import { usePrivy } from '@privy-io/react-auth'
-import { createContext, ReactNode, useContext } from 'react'
+import {
+  PrivyProvider,
+  useCreateWallet,
+  usePrivy,
+  useWallets,
+  type User as PrivyUser,
+} from '@privy-io/react-auth'
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+} from 'react'
 import { arbitrum } from 'viem/chains'
 
 type PrivyWalletConfig = {
@@ -15,15 +26,32 @@ const PrivyWalletConfigContext = createContext<PrivyWalletConfig>({
   missingEnv: ['NEXT_PUBLIC_PRIVY_APP_ID'],
 })
 
-const PrivyLoginContext = createContext<{
+type PrivyLoginContextValue = {
   configured: boolean
   ready: boolean
+  authenticated: boolean
+  user: PrivyUser | null
   login: () => void
-}>({
+  logout: () => Promise<void>
+  getAccessToken: () => Promise<string | null>
+  walletAddress?: string
+  ensureEmbeddedWallet: () => Promise<string | undefined>
+}
+
+const emptyPrivyLoginContext: PrivyLoginContextValue = {
   configured: false,
   ready: false,
+  authenticated: false,
+  user: null,
   login: () => undefined,
-})
+  logout: async () => undefined,
+  getAccessToken: async () => null,
+  ensureEmbeddedWallet: async () => undefined,
+}
+
+const PrivyLoginContext = createContext<PrivyLoginContextValue>(
+  emptyPrivyLoginContext
+)
 
 export function usePrivyWalletConfig() {
   return useContext(PrivyWalletConfigContext)
@@ -34,12 +62,49 @@ export function usePrivyLogin() {
 }
 
 function PrivyLoginProvider({ children }: { children: ReactNode }) {
-  const { ready, login } = usePrivy()
+  const { ready, authenticated, user, login, logout, getAccessToken } =
+    usePrivy()
+  const { createWallet } = useCreateWallet()
+  const { wallets, ready: walletsReady } = useWallets()
+  const embeddedWallet = wallets.find(
+    (wallet) => wallet.walletClientType === 'privy'
+  )
+  const walletAddress = embeddedWallet?.address
+  const ensureEmbeddedWallet = useCallback(async () => {
+    if (walletAddress) return walletAddress
+    if (!ready || !authenticated || !walletsReady) return undefined
+
+    const wallet = await createWallet()
+    return wallet.address
+  }, [authenticated, createWallet, ready, walletAddress, walletsReady])
+
+  const value = useMemo(
+    () => ({
+      configured: true,
+      ready: ready && walletsReady,
+      authenticated,
+      user,
+      login: () => login(),
+      logout,
+      getAccessToken,
+      walletAddress,
+      ensureEmbeddedWallet,
+    }),
+    [
+      authenticated,
+      ensureEmbeddedWallet,
+      getAccessToken,
+      login,
+      logout,
+      ready,
+      user,
+      walletAddress,
+      walletsReady,
+    ]
+  )
 
   return (
-    <PrivyLoginContext.Provider
-      value={{ configured: true, ready, login: () => login() }}
-    >
+    <PrivyLoginContext.Provider value={value}>
       {children}
     </PrivyLoginContext.Provider>
   )
@@ -56,9 +121,7 @@ export function PrivyWalletProviders({ children }: { children: ReactNode }) {
   if (!appId) {
     return (
       <PrivyWalletConfigContext.Provider value={config}>
-        <PrivyLoginContext.Provider
-          value={{ configured: false, ready: false, login: () => undefined }}
-        >
+        <PrivyLoginContext.Provider value={emptyPrivyLoginContext}>
           {children}
         </PrivyLoginContext.Provider>
       </PrivyWalletConfigContext.Provider>
@@ -75,7 +138,7 @@ export function PrivyWalletProviders({ children }: { children: ReactNode }) {
           loginMethods: ['email', 'wallet'],
           embeddedWallets: {
             ethereum: {
-              createOnLogin: 'users-without-wallets',
+              createOnLogin: 'all-users',
             },
           },
         }}

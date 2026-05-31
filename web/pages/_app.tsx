@@ -224,7 +224,7 @@ function MyApp({ Component, pageProps }: AppProps<ManifoldPageProps>) {
         </ThemeProvider>
       )}
 
-      <GoogleOneTapSetup />
+      {!process.env.NEXT_PUBLIC_PRIVY_APP_ID && <GoogleOneTapSetup />}
 
       {/* Umami, for pageview analytics on https://analytics.umami.is/share/ARwUIC9GWLNyowjq/Manifold%20Markets */}
       <Script

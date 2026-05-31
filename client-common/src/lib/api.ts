@@ -1,5 +1,9 @@
 import { API, APIParams, APIPath, APIResponse } from 'common/api/schema'
-import { baseApiCall, formatApiUrlWithParams } from 'common/util/api'
+import {
+  baseApiCall,
+  formatApiUrlWithParams,
+  hasPrivyAccessTokenProvider,
+} from 'common/util/api'
 import { sleep } from 'common/util/time'
 import { Auth } from 'firebase/auth'
 export { APIError } from 'common/api/utils'
@@ -26,7 +30,8 @@ export async function apiWithAuth<P extends APIPath>(
 ) {
   const pathProps = API[path]
   const preferAuth = 'preferAuth' in pathProps && pathProps.preferAuth
-  if (!auth.currentUser && (preferAuth || pathProps.authed)) {
+  const hasPrivyAuth = hasPrivyAccessTokenProvider()
+  if (!auth.currentUser && !hasPrivyAuth && (preferAuth || pathProps.authed)) {
     // For both preferred and required auth, we need to know if we're still loading
     await new Promise<void>((resolve) => {
       // We only need to wait for the first auth state change to know if we're logged in or not
@@ -36,7 +41,11 @@ export async function apiWithAuth<P extends APIPath>(
       })
     })
 
-    if (!auth.currentUser && pathProps.authed) {
+    if (
+      !auth.currentUser &&
+      !hasPrivyAccessTokenProvider() &&
+      pathProps.authed
+    ) {
       console.error('Authentication required but user is not signed in')
     }
   }

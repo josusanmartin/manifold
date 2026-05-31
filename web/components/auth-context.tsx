@@ -29,7 +29,11 @@ import { ensureDeviceToken } from 'web/lib/util/device-token'
 import { Row } from './layout/row'
 import { TokenNumber } from './widgets/token-number'
 import { updateSupabaseAuth } from 'web/lib/supabase/db'
-import { setLocalOnlyUserId } from 'common/util/api'
+import {
+  setLocalOnlyUserId,
+  setPrivyAccessTokenProvider,
+} from 'common/util/api'
+import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
 
 const IS_LOCAL_ONLY =
   typeof process !== 'undefined' &&
@@ -95,6 +99,8 @@ export function AuthProvider(props: {
     PrivateUser | undefined
   >(serverUser ? serverUser.privateUser : undefined)
   const [authLoaded, setAuthLoaded] = useState(false)
+  const privy = usePrivyLogin()
+  const isPrivyAuthEnabled = privy.configured
 
   const authUser = !user
     ? user
@@ -124,7 +130,8 @@ export function AuthProvider(props: {
           ? 'You have deleted the account associated with this email. To restore your account please email info@manifold.markets'
           : 'You are banned from trading. To learn more please email info@manifold.markets'
 
-        firebaseLogout().then(() => {
+        const logout = isPrivyAuthEnabled ? privy.logout : firebaseLogout
+        logout().then(() => {
           alert(message)
         })
         return
@@ -135,7 +142,7 @@ export function AuthProvider(props: {
     } else if (authUser === null) {
       safeLocalStorage?.removeItem(CACHED_USER_KEY)
     }
-  }, [authUser])
+  }, [authUser, isPrivyAuthEnabled, privy.logout])
 
   const onAuthLoad = (
     fbUser: FirebaseUser,
@@ -190,7 +197,100 @@ export function AuthProvider(props: {
   }, [])
 
   useEffect(() => {
-    if (IS_LOCAL_ONLY) return // Skip Firebase auth in LOCAL_ONLY mode
+    if (!isPrivyAuthEnabled) {
+      setPrivyAccessTokenProvider(null)
+      return
+    }
+
+    setPrivyAccessTokenProvider(() => privy.getAccessToken())
+    return () => setPrivyAccessTokenProvider(null)
+  }, [isPrivyAuthEnabled, privy.getAccessToken])
+
+  useEffect(() => {
+    if (IS_LOCAL_ONLY || !isPrivyAuthEnabled) return
+
+    let cancelled = false
+    const clearPrivyUser = () => {
+      setUserCookie(undefined)
+      setUser(null)
+      setPrivateUser(undefined)
+      setAuthLoaded(true)
+      setLocalOnlyUserId(null)
+      nativeSignOut()
+      if (safeLocalStorage?.getItem(CACHED_USER_KEY)) localStorage.clear()
+    }
+
+    if (!privy.ready) return
+    if (!privy.authenticated || !privy.user) {
+      clearPrivyUser()
+      return
+    }
+
+    const loadPrivyUser = async () => {
+      setAuthLoaded(false)
+      try {
+        const token = await privy.getAccessToken()
+        if (!token) throw new Error('Missing Privy access token.')
+
+        let walletAddress = privy.walletAddress
+        if (!walletAddress) {
+          walletAddress = await privy.ensureEmbeddedWallet().catch((e) => {
+            console.error('Error creating Privy wallet', e)
+            return undefined
+          })
+        }
+
+        const response = await fetch('/api/privy-user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            deviceToken: ensureDeviceToken(),
+            visitedContractIds: getSavedContractVisitsLocally(),
+            walletAddress,
+          }),
+        })
+
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}))
+          throw new Error(body.message ?? 'Could not load Privy user.')
+        }
+
+        const privyUser = (await response.json()) as UserAndPrivateUser
+        if (cancelled) return
+
+        setUserCookie(undefined)
+        setUser(privyUser.user)
+        setPrivateUser(privyUser.privateUser)
+        setAuthLoaded(true)
+      } catch (e) {
+        console.error('Error loading Privy user', e)
+        if (!cancelled) {
+          setUser(null)
+          setPrivateUser(undefined)
+          setAuthLoaded(true)
+        }
+      }
+    }
+
+    loadPrivyUser()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    isPrivyAuthEnabled,
+    privy.authenticated,
+    privy.ensureEmbeddedWallet,
+    privy.getAccessToken,
+    privy.ready,
+    privy.user?.id,
+    privy.walletAddress,
+  ])
+
+  useEffect(() => {
+    if (IS_LOCAL_ONLY || isPrivyAuthEnabled) return // Skip Firebase auth in LOCAL_ONLY/Privy mode
 
     return onIdTokenChanged(
       auth,
@@ -237,7 +337,7 @@ export function AuthProvider(props: {
         console.error(e)
       }
     )
-  }, [])
+  }, [isPrivyAuthEnabled])
 
   const uid = authUser ? authUser.user.id : authUser
 

@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express'
 import * as admin from 'firebase-admin'
+import { PrivyClient } from '@privy-io/node'
 import { z } from 'zod'
 
 import { APIError } from 'common//api/utils'
@@ -38,6 +39,42 @@ type JwtCredentials = { kind: 'jwt'; data: admin.auth.DecodedIdToken }
 type KeyCredentials = { kind: 'key'; data: string }
 type Credentials = JwtCredentials | KeyCredentials
 
+let privyClient: PrivyClient | undefined
+
+const getPrivyClient = () => {
+  const appId = process.env.PRIVY_APP_ID || process.env.NEXT_PUBLIC_PRIVY_APP_ID
+  const appSecret = process.env.PRIVY_APP_SECRET
+  if (!appId || !appSecret) return undefined
+
+  privyClient ??= new PrivyClient({ appId, appSecret })
+  return privyClient
+}
+
+const verifyPrivyAccessToken = async (
+  payload: string
+): Promise<JwtCredentials | undefined> => {
+  const client = getPrivyClient()
+  if (!client) return undefined
+
+  const verified = await client.utils().auth().verifyAccessToken(payload)
+  return {
+    kind: 'jwt',
+    data: {
+      user_id: verified.user_id,
+      uid: verified.user_id,
+      sub: verified.user_id,
+      aud: verified.app_id,
+      iss: verified.issuer,
+      iat: verified.issued_at,
+      exp: verified.expiration,
+      firebase: {
+        sign_in_provider: 'privy',
+        identities: {},
+      },
+    } as unknown as admin.auth.DecodedIdToken,
+  }
+}
+
 export const parseCredentials = async (req: Request): Promise<Credentials> => {
   // LOCAL_ONLY mode: accept X-Local-User header as trusted auth
   // Never fall through to Firebase — it isn't initialized.
@@ -70,10 +107,24 @@ export const parseCredentials = async (req: Request): Promise<Credentials> => {
       }
       try {
         return { kind: 'jwt', data: await auth.verifyIdToken(payload) }
-      } catch (err) {
-        // This is somewhat suspicious, so get it into the firebase console
-        log.error('Error verifying Firebase JWT: ', { err, scheme, payload })
-        throw new APIError(500, 'Error validating token.')
+      } catch (firebaseErr) {
+        try {
+          const privyCreds = await verifyPrivyAccessToken(payload)
+          if (privyCreds) return privyCreds
+        } catch (privyErr) {
+          log.error('Error verifying auth bearer token: ', {
+            firebaseErr,
+            privyErr,
+            scheme,
+          })
+          throw new APIError(401, 'Error validating token.')
+        }
+
+        log.error('Error verifying Firebase JWT: ', {
+          err: firebaseErr,
+          scheme,
+        })
+        throw new APIError(401, 'Error validating token.')
       }
     case 'Key':
       return { kind: 'key', data: payload }
@@ -94,7 +145,10 @@ export const lookupUser = async (creds: Credentials): Promise<AuthedUser> => {
       const key = creds.data
       const privateUser = await getUnbannedPrivateUserByKey(key)
       if (!privateUser) {
-        throw new APIError(401, 'No private user exists with the provided API key.')
+        throw new APIError(
+          401,
+          'No private user exists with the provided API key.'
+        )
       }
       return { uid: privateUser.id, creds: { privateUser, ...creds } }
     }
