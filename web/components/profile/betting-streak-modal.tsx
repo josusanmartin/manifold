@@ -11,7 +11,6 @@ import dayjs from 'dayjs'
 import timezone from 'dayjs/plugin/timezone'
 import utc from 'dayjs/plugin/utc'
 import clsx from 'clsx'
-import { VerifyPhoneNumberBanner } from 'web/components/user/verify-phone-number-banner'
 
 // Initialize dayjs plugins
 dayjs.extend(utc)
@@ -78,7 +77,6 @@ export function BettingStreakModal(props: {
           </Col>
         )}
         <span className="text-xl">Daily prediction streaks</span>
-        <VerifyPhoneNumberBanner user={currentUser} />
         <Col className={'gap-2'}>
           <span className={'text-primary-700'}>• What are they?</span>
           <span className={'ml-2'}>

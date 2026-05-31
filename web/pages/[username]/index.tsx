@@ -50,7 +50,6 @@ import { UserLikedContractsButton } from 'web/components/profile/user-liked-cont
 import { UserWatchedContractsButton } from 'web/components/notifications/watched-markets'
 import { SEO } from 'web/components/SEO'
 import { UserHandles } from 'web/components/user/user-handles'
-import { VerifyPhoneNumberBanner } from 'web/components/user/verify-phone-number-banner'
 import { Avatar } from 'web/components/widgets/avatar'
 import { FullscreenConfetti } from 'web/components/widgets/fullscreen-confetti'
 import ImageWithBlurredShadow from 'web/components/widgets/image-with-blurred-shadow'
@@ -394,12 +393,6 @@ function UserProfile(props: {
             className="m-2 w-48"
             redeemableCash={user.cashBalance}
           />
-        )}
-
-        {isCurrentUser && (
-          <Col className="mx-4 mt-2">
-            <VerifyPhoneNumberBanner user={currentUser} />
-          </Col>
         )}
 
         <Col className="mx-4">

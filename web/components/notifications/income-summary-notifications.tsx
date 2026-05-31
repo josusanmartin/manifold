@@ -309,18 +309,10 @@ export function BettingStreakBonusIncomeNotification(props: {
       setHighlighted={setHighlighted}
       isChildOfGroup={true}
       subtitle={
-        noBonus && user && !canReceiveBonuses(user) ? (
-          <span>
-            Verify your identity to get up to{' '}
-            <TokenNumber amount={maxBonus} className={'font-bold'} isInline />{' '}
-            per streak day!
-          </span>
-        ) : (
-          noBonus &&
-          user &&
-          canReceiveBonuses(user) && (
-            <span>Come back and predict again tomorrow for a bonus!</span>
-          )
+        noBonus &&
+        user &&
+        canReceiveBonuses(user) && (
+          <span>Come back and predict again tomorrow for a bonus!</span>
         )
       }
       icon={
