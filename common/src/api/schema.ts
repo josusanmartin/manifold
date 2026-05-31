@@ -3306,10 +3306,7 @@ export const API = (_apiTypeCheck = {
       status: 'credited' | 'already-processed'
       txHash: string
       mexasAmount: number
-      manaAmount: number
-      bonusAmount: number
-      isFirstCryptoPurchase: boolean
-      isBulkPurchase: boolean
+      creditAmount: number
     },
   },
   'admin-create-charity-giveaway': {

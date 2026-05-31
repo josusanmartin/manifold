@@ -2,22 +2,16 @@ import { APIError, APIHandler } from 'api/helpers/endpoint'
 import { getActiveUserBans } from 'api/helpers/rate-limit'
 import { isUserBanned } from 'common/ban-utils'
 import {
-  CRYPTO_BULK_PURCHASE_BONUS_PCT,
-  CRYPTO_BULK_THRESHOLD_INTERNAL,
-  CRYPTO_FIRST_PURCHASE_BONUS_PCT,
-} from 'common/economy'
-import {
   getMexasPurchaseMessage,
-  MEXAS_MANA_PER_TOKEN,
+  MEXAS_ACCOUNT_CREDIT_PER_TOKEN,
   MEXAS_PUBLIC_RPC_URL,
   MEXAS_TOKEN,
 } from 'common/crypto/mexas'
 import { trackPublicEvent } from 'shared/analytics'
-import { sendThankYouEmail } from 'shared/emails'
 import { createSupabaseDirectClient } from 'shared/supabase/init'
 import { updateUser } from 'shared/supabase/users'
 import { runTxnInBetQueue } from 'shared/txn/run-txn'
-import { getPrivateUser, getUser, log } from 'shared/utils'
+import { getUser, log } from 'shared/utils'
 import { verifyMessage, type Address, type Hex } from 'viem'
 
 const TRANSFER_TOPIC =
@@ -187,10 +181,7 @@ export const recordMexasPurchase: APIHandler<'record-mexas-purchase'> = async (
   }
 
   let mexasAmount = unitsToTokenAmount(mexasUnits)
-  let finalManaAmount = 0
-  let bonusAmount = 0
-  let isFirstCryptoPurchase = false
-  let isBulkPurchase = false
+  let creditAmount = 0
   let alreadyProcessed = false
 
   const paidInCents = Math.round(mexasAmount * 100)
@@ -207,35 +198,24 @@ export const recordMexasPurchase: APIHandler<'record-mexas-purchase'> = async (
 
     if (existingIntent) {
       alreadyProcessed = true
-      finalManaAmount = existingIntent.mana_amount ?? 0
+      creditAmount = existingIntent.mana_amount ?? 0
       mexasAmount = existingIntent.usdc_amount
         ? Number(existingIntent.usdc_amount)
         : mexasAmount
       return
     }
 
-    const existingPurchase = await tx.oneOrNone<{ count: string }>(
-      `SELECT COUNT(*) as count FROM crypto_payment_intents WHERE user_id = $1`,
-      [userId]
-    )
-    isFirstCryptoPurchase =
-      !existingPurchase || parseInt(existingPurchase.count) === 0
-    isBulkPurchase = mexasAmount >= CRYPTO_BULK_THRESHOLD_INTERNAL
-
-    let bonusPct = 0
-    if (isFirstCryptoPurchase) bonusPct += CRYPTO_FIRST_PURCHASE_BONUS_PCT
-    if (isBulkPurchase) bonusPct += CRYPTO_BULK_PURCHASE_BONUS_PCT
-
-    const baseAmount = Math.floor(mexasAmount * MEXAS_MANA_PER_TOKEN)
-    bonusAmount = Math.floor(baseAmount * bonusPct)
-    finalManaAmount = baseAmount + bonusAmount
+    creditAmount = Math.floor(mexasAmount * MEXAS_ACCOUNT_CREDIT_PER_TOKEN)
+    if (creditAmount <= 0) {
+      throw new APIError(400, 'MEXAS transfer must be at least 1 MEX')
+    }
 
     const insertResult = await tx.oneOrNone(
       `INSERT INTO crypto_payment_intents (intent_id, user_id, mana_amount, usdc_amount)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (intent_id) DO NOTHING
        RETURNING id`,
-      [intentId, userId, finalManaAmount, mexasAmount]
+      [intentId, userId, creditAmount, mexasAmount]
     )
 
     if (!insertResult) {
@@ -243,12 +223,12 @@ export const recordMexasPurchase: APIHandler<'record-mexas-purchase'> = async (
       return
     }
 
-    const manaPurchaseTxn = {
+    const mexasCreditTxn = {
       fromId: 'EXTERNAL',
       fromType: 'BANK',
       toId: userId,
       toType: 'USER',
-      amount: finalManaAmount,
+      amount: creditAmount,
       token: 'M$',
       category: 'MANA_PURCHASE',
       data: {
@@ -257,44 +237,30 @@ export const recordMexasPurchase: APIHandler<'record-mexas-purchase'> = async (
         tokenAddress: MEXAS_TOKEN.address,
         chainId: MEXAS_TOKEN.chainId,
         mexasAmount,
+        creditAmount,
         type: 'mexas',
         paidInCents,
-        bonusAmount,
-        bonusPct,
-        isFirstCryptoPurchase,
-        isBulkPurchase,
       },
-      description: 'Deposit for mana purchase via MEXAS',
+      description: 'Deposit MEXAS account credit',
     } as const
 
-    await runTxnInBetQueue(tx, manaPurchaseTxn)
+    await runTxnInBetQueue(tx, mexasCreditTxn)
     await updateUser(tx, userId, {
       purchasedMana: true,
     })
   })
 
   if (!alreadyProcessed) {
-    log('MEXAS payment processed:', userId, 'M$', finalManaAmount, {
-      bonusAmount,
-      isFirstCryptoPurchase,
-      isBulkPurchase,
+    log('MEXAS payment processed:', userId, 'MEX', creditAmount, {
       txHash,
       mexasAmount,
     })
 
-    const privateUser = await getPrivateUser(userId)
-    if (privateUser) {
-      await sendThankYouEmail(user, privateUser)
-    }
-
     await trackPublicEvent(
       userId,
-      'M$ purchase',
+      'MEXAS purchase',
       {
-        amount: finalManaAmount,
-        bonusAmount,
-        isFirstCryptoPurchase,
-        isBulkPurchase,
+        amount: creditAmount,
         mexasAmount,
         txHash,
         paymentType: 'mexas',
@@ -307,9 +273,6 @@ export const recordMexasPurchase: APIHandler<'record-mexas-purchase'> = async (
     status: alreadyProcessed ? 'already-processed' : 'credited',
     txHash,
     mexasAmount,
-    manaAmount: finalManaAmount,
-    bonusAmount,
-    isFirstCryptoPurchase,
-    isBulkPurchase,
+    creditAmount,
   }
 }

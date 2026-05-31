@@ -4,16 +4,10 @@ import { ExternalLinkIcon } from '@heroicons/react/solid'
 import { useCreateWallet, usePrivy, useWallets } from '@privy-io/react-auth'
 import clsx from 'clsx'
 import {
+  MEXAS_ACCOUNT_CREDIT_PER_TOKEN,
   getMexasPurchaseMessage,
-  MEXAS_MANA_PER_TOKEN,
   MEXAS_TOKEN,
 } from 'common/crypto/mexas'
-import {
-  CRYPTO_BULK_PURCHASE_BONUS_PCT,
-  CRYPTO_BULK_THRESHOLD_DISPLAY,
-  CRYPTO_FIRST_PURCHASE_BONUS_PCT,
-} from 'common/economy'
-import { formatMoney } from 'common/util/format'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   createWalletClient,
@@ -46,7 +40,7 @@ type CheckoutState =
   | {
       status: 'credited' | 'already-processed'
       txHash: Hex
-      manaAmount: number
+      creditAmount: number
     }
   | { status: 'error'; message: string; txHash?: Hex }
 
@@ -81,6 +75,7 @@ function MexasCheckoutButtonInner(props: {
   onCompleted: () => void
 }) {
   const treasuryAddress = process.env.NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS
+  const apiConfigured = !!process.env.NEXT_PUBLIC_API_URL
   const manifoldUser = useUser()
   const { ready, authenticated, login } = usePrivy()
   const { createWallet } = useCreateWallet()
@@ -96,7 +91,7 @@ function MexasCheckoutButtonInner(props: {
   const walletAddress = wallet?.address as Address | undefined
   const amountUnits = useMemo(() => {
     const value = amount.trim()
-    if (!/^\d+(\.\d{1,6})?$/.test(value)) return null
+    if (!/^\d+$/.test(value)) return null
     try {
       return parseUnits(value, MEXAS_TOKEN.decimals)
     } catch {
@@ -112,21 +107,17 @@ function MexasCheckoutButtonInner(props: {
     checkoutState.status === 'confirming'
   const configuredTreasury =
     typeof treasuryAddress === 'string' && isAddress(treasuryAddress)
-  const disabled =
+  const paymentDisabled =
     props.disabled ||
     loading ||
     !hasValidAmount ||
     !hasEnoughBalance ||
-    !configuredTreasury
+    !configuredTreasury ||
+    !apiConfigured
 
-  const baseMana = hasValidAmount
-    ? Math.floor(Number(amount) * MEXAS_MANA_PER_TOKEN)
+  const displayedCredit = hasValidAmount
+    ? Number(amount) * MEXAS_ACCOUNT_CREDIT_PER_TOKEN
     : 0
-  const bonusPct =
-    Number(amount) >= CRYPTO_BULK_THRESHOLD_DISPLAY
-      ? CRYPTO_BULK_PURCHASE_BONUS_PCT
-      : 0
-  const displayedMana = baseMana + Math.floor(baseMana * bonusPct)
 
   const refreshBalance = useCallback(async () => {
     if (!walletAddress) return
@@ -183,6 +174,14 @@ function MexasCheckoutButtonInner(props: {
       return
     }
 
+    if (!apiConfigured) {
+      setCheckoutState({
+        status: 'error',
+        message: 'MEXAS account API is not configured yet.',
+      })
+      return
+    }
+
     let submittedTxHash: Hex | undefined = undefined
     setCheckoutState({ status: 'submitting' })
     try {
@@ -220,7 +219,7 @@ function MexasCheckoutButtonInner(props: {
       setCheckoutState({
         status: result.status,
         txHash,
-        manaAmount: result.manaAmount,
+        creditAmount: result.creditAmount,
       })
       await refreshBalance()
       props.onCompleted()
@@ -276,7 +275,7 @@ function MexasCheckoutButtonInner(props: {
           size="lg"
           className="min-w-[132px]"
           loading={loading}
-          disabled={disabled}
+          disabled={wallet ? paymentDisabled : props.disabled || loading}
           onClick={submitPayment}
         >
           {wallet ? `Pay ${MEXAS_TOKEN.symbol}` : 'Create wallet'}
@@ -305,12 +304,18 @@ function MexasCheckoutButtonInner(props: {
           Set NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS before taking payments.
         </div>
       )}
+      {!apiConfigured && (
+        <div className="text-scarlet-600 text-xs">
+          Set NEXT_PUBLIC_API_URL to your fork API before taking live MEX
+          payments.
+        </div>
+      )}
       {balanceError && (
         <div className="text-scarlet-600 text-xs">{balanceError}</div>
       )}
       {!hasValidAmount && (
         <div className="text-scarlet-600 text-xs">
-          Enter a positive amount with up to {MEXAS_TOKEN.decimals} decimals.
+          Enter a positive whole {MEXAS_TOKEN.symbol} amount.
         </div>
       )}
       {!hasEnoughBalance && (
@@ -320,21 +325,8 @@ function MexasCheckoutButtonInner(props: {
       )}
 
       <div className="text-ink-600 text-xs">
-        Estimated credit: {formatMoney(displayedMana)}
-        {Number(amount) >= CRYPTO_BULK_THRESHOLD_DISPLAY && (
-          <span className="text-amber-600">
-            {' '}
-            including {Math.round(CRYPTO_BULK_PURCHASE_BONUS_PCT * 100)}% bulk
-            bonus
-          </span>
-        )}
-        {Number(amount) < CRYPTO_BULK_THRESHOLD_DISPLAY && (
-          <span>
-            . First MEX purchase may receive an additional{' '}
-            {Math.round(CRYPTO_FIRST_PURCHASE_BONUS_PCT * 100)}% after
-            verification.
-          </span>
-        )}
+        Estimated account credit: {displayedCredit.toLocaleString()}{' '}
+        {MEXAS_TOKEN.symbol}
       </div>
 
       {checkoutState.status === 'confirming' && (
@@ -353,7 +345,9 @@ function MexasCheckoutButtonInner(props: {
             checkoutState.status === 'already-processed'
               ? 'Already credited'
               : 'Credited',
-            formatMoney(checkoutState.manaAmount)
+            `${checkoutState.creditAmount.toLocaleString()} ${
+              MEXAS_TOKEN.symbol
+            }`
           )}
         />
       )}

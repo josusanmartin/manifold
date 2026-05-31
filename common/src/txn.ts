@@ -223,12 +223,17 @@ type ManaPurchase = {
         tokenAddress: string
         chainId: number
         mexasAmount: number
+        creditAmount: number
         type: 'mexas'
         paidInCents: number
-        bonusAmount: number
-        bonusPct: number
-        isFirstCryptoPurchase: boolean
-        isBulkPurchase: boolean
+        /** @deprecated Legacy Manifold bonus fields are not used for MEXAS. */
+        bonusAmount?: number
+        /** @deprecated Legacy Manifold bonus fields are not used for MEXAS. */
+        bonusPct?: number
+        /** @deprecated Legacy Manifold bonus fields are not used for MEXAS. */
+        isFirstCryptoPurchase?: boolean
+        /** @deprecated Legacy Manifold bonus fields are not used for MEXAS. */
+        isBulkPurchase?: boolean
       }
 }
 
