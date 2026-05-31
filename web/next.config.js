@@ -1,7 +1,10 @@
+const path = require('path')
+
 const API_DOCS_URL = 'https://docs.manifold.markets/api'
 
 /** @type {import('next').NextConfig} */
 module.exports = {
+  outputFileTracingRoot: path.join(__dirname, '..'),
   productionBrowserSourceMaps: true,
   reactStrictMode: true,
   // eslint config moved - run `next lint` separately in CI
@@ -36,6 +39,7 @@ module.exports = {
     ],
   },
   turbopack: {
+    root: path.join(__dirname, '..'),
     rules: {
       '*.svg': {
         loaders: ['@svgr/webpack'],
