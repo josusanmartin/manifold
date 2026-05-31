@@ -7,7 +7,7 @@ import SquiggleVertical from 'web/lib/icons/squiggle-vertical.svg'
 import { useIsMobile } from 'web/hooks/use-is-mobile'
 import { useUser } from 'web/hooks/use-user'
 import { withTracking } from 'web/lib/service/analytics'
-import { firebaseLogin } from 'web/lib/firebase/users'
+import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
 import { SweepiesFlatCoin } from 'web/public/custom-components/sweepiesFlatCoin'
 
 export function PromotionalPanel(props: {
@@ -21,6 +21,7 @@ export function PromotionalPanel(props: {
   const { darkModeImg, lightModeImg, header, description, loginTrackingText } =
     props
   const isMobile = useIsMobile()
+  const privy = usePrivyLogin()
   return (
     <div
       className={`mx-1 mb-6 flex select-none flex-col overflow-hidden rounded-lg bg-indigo-700 sm:mx-2 sm:flex-row`}
@@ -86,7 +87,8 @@ export function PromotionalPanel(props: {
                     buttonClass('2xl', 'gradient-pink'),
                     'absolute -left-1.5 bottom-1.5 z-10 mt-8 transition-all ease-in-out focus:-left-0.5 focus:bottom-0.5 group-hover:-left-2 group-hover:bottom-2 focus:group-hover:-left-0.5 focus:group-hover:bottom-0.5'
                   )}
-                  onClick={withTracking(firebaseLogin, loginTrackingText)}
+                  onClick={withTracking(privy.login, loginTrackingText)}
+                  disabled={!privy.configured || !privy.ready}
                   color="gradient-pink"
                 >
                   Sign up!

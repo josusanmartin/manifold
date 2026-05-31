@@ -1,14 +1,11 @@
 import {
   ChatIcon,
+  CreditCardIcon,
   DeviceMobileIcon,
-  GiftIcon,
-  HeartIcon,
   LoginIcon,
   LogoutIcon,
   MoonIcon,
   QuestionMarkCircleIcon,
-  SearchIcon,
-  SparklesIcon,
   StarIcon,
   SunIcon,
 } from '@heroicons/react/outline'
@@ -19,21 +16,18 @@ import TrophyIcon from 'web/lib/icons/trophy-icon.svg'
 
 import { buildArray } from 'common/util/array'
 import { SHOP_ITEMS } from 'common/shop/items'
-import { getTotalPrizePool, SweepstakesPrize } from 'common/sweepstakes'
 import { DAY_MS, isAprilFools } from 'common/util/time'
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LuGem } from 'react-icons/lu'
-import { IoCompassOutline } from 'react-icons/io5'
 import { AppBadgesOrGetAppButton } from 'web/components/buttons/app-badges-or-get-app-button'
-import { CreateQuestionButton } from 'web/components/buttons/create-question-button'
 import { NotificationsIcon } from 'web/components/notifications-icon'
+import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
 import { useAdminOrMod } from 'web/hooks/use-admin'
-import { useAPIGetter } from 'web/hooks/use-api-getter'
 import { useTheme } from 'web/hooks/use-theme'
 import { useUser } from 'web/hooks/use-user'
-import { firebaseLogin, firebaseLogout } from 'web/lib/firebase/users'
+import { firebaseLogout } from 'web/lib/firebase/users'
 import { withTracking } from 'web/lib/service/analytics'
 import { MobileAppsQRCodeDialog } from '../buttons/mobile-apps-qr-code-button'
 import { SidebarSignUpButton } from '../buttons/sign-up-button'
@@ -45,19 +39,6 @@ import { useTVIsLive } from '../tv/tv-schedule'
 import { ManifoldLogo } from './manifold-logo'
 import { ProfileSummary } from './profile-summary'
 import { NavItem, SidebarItem } from './sidebar-item'
-
-function formatPrizePoolLabel(
-  prizes: SweepstakesPrize[] | undefined
-): string | undefined {
-  if (!prizes) return undefined
-  const total = getTotalPrizePool(prizes)
-  if (!Number.isFinite(total) || total <= 0) return undefined
-  if (total < 1000) return `$${total}`
-  const thousands = total / 1000
-  return `$${thousands.toLocaleString(undefined, {
-    maximumFractionDigits: 1,
-  })}k`
-}
 
 export const SPEND_MANA_ENABLED = true
 
@@ -149,6 +130,7 @@ export default function Sidebar(props: {
   const user = useUser()
   const isAdminOrMod = useAdminOrMod()
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const privy = usePrivyLogin()
 
   const { theme, setTheme } = useTheme()
 
@@ -166,27 +148,18 @@ export default function Sidebar(props: {
   const lastShopVisit = user?.lastShopVisitTime ?? user?.createdTime ?? 0
   const showShopNewBadge = !!user && NEWEST_SHOP_ITEM_TIME > lastShopVisit
 
-  const { data: sweepstakesData } = useAPIGetter('get-sweepstakes', {})
-  const prizeCloseTime = sweepstakesData?.sweepstakes?.closeTime
-  const prizePoolLabel =
-    prizeCloseTime && prizeCloseTime > Date.now()
-      ? formatPrizePoolLabel(sweepstakesData?.sweepstakes?.prizes)
-      : undefined
-
   const navOptions = isMobile
     ? getMobileNav(!!user, {
         isNewUser,
         isLiveTV,
         isAdminOrMod: isAdminOrMod,
         showShopNewBadge,
-        prizePoolLabel,
       })
     : getDesktopNav(!!user, () => setIsModalOpen(true), {
         isNewUser,
         isLiveTV,
         isAdminOrMod: isAdminOrMod,
         showShopNewBadge,
-        prizePoolLabel,
       })
 
   const bottomNavOptions = bottomNav(
@@ -194,14 +167,8 @@ export default function Sidebar(props: {
     theme,
     toggleTheme,
     router,
-    isMobile
-  )
-
-  const createMarketButton = user && !user.isBannedFromPosting && (
-    <CreateQuestionButton
-      key="create-market-button"
-      className={'mt-4 w-full'}
-    />
+    isMobile,
+    privy.login
   )
 
   const addFundsButton = user && (
@@ -244,12 +211,9 @@ export default function Sidebar(props: {
             <SidebarSignUpButton />
           </li>
         )}
-        {(createMarketButton || addFundsButton) && (
+        {addFundsButton && (
           <li>
-            <Col className="gap-2">
-              {createMarketButton}
-              {addFundsButton}
-            </Col>
+            <Col className="gap-2">{addFundsButton}</Col>
           </li>
         )}
       </ul>
@@ -283,19 +247,12 @@ const getDesktopNav = (
     showShopNewBadge: boolean
     isLiveTV?: boolean
     isAdminOrMod: boolean
-    prizePoolLabel?: string
   }
 ) => {
   const { isLiveTV } = options
   if (loggedIn)
     return buildArray(
-      { name: 'Browse', href: '/home', icon: SearchIcon },
-      {
-        name: 'Explore',
-        href: '/explore',
-        icon: IoCompassOutline,
-        iconClassName: '!h-[1.6rem] !w-[1.6rem] !mr-[0.65rem]',
-      },
+      { name: 'Buy mana', href: '/checkout', icon: CreditCardIcon },
       isLiveTV && {
         name: 'TV',
         href: '/tv',
@@ -305,12 +262,6 @@ const getDesktopNav = (
         name: 'Notifications',
         href: `/notifications`,
         icon: NotificationsIcon,
-      },
-      { name: 'Leagues', href: '/leagues', icon: TrophyIcon },
-      {
-        name: 'Forum',
-        href: '/posts',
-        icon: ChatIcon,
       },
       // Show shop when enabled OR for admins (testing)
       (SPEND_MANA_ENABLED || options.isAdminOrMod) && {
@@ -326,10 +277,6 @@ const getDesktopNav = (
               {options.showShopNewBadge ? (
                 <span className="ml-2 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
                   NEW
-                </span>
-              ) : SHOW_SHOP_EVENT_BADGE && options.prizePoolLabel ? (
-                <span className="ml-2 rounded-full bg-blue-500 px-2 py-0.5 text-xs font-medium text-white">
-                  Prize {options.prizePoolLabel}
                 </span>
               ) : (
                 <span className="ml-2 rounded-full bg-blue-500 px-2 py-0.5 text-xs font-medium text-white">
@@ -347,21 +294,7 @@ const getDesktopNav = (
     )
 
   return buildArray(
-    { name: 'Browse', href: '/', icon: SearchIcon },
-    {
-      name: 'Prize Drawing',
-      href: '/prize',
-      icon: GiftIcon,
-      children: options.prizePoolLabel ? (
-        <>
-          Prize Drawing
-          <span className="ml-2 rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-            {options.prizePoolLabel}
-          </span>
-        </>
-      ) : undefined,
-    },
-    { name: 'Predictle', href: '/predictle', icon: SparklesIcon },
+    { name: 'Buy mana', href: '/checkout', icon: CreditCardIcon },
     { name: 'About', href: '/about', icon: QuestionMarkCircleIcon },
     { name: 'App', onClick: openDownloadApp, icon: DeviceMobileIcon }
   )
@@ -374,28 +307,12 @@ const getMobileNav = (
     showShopNewBadge: boolean
     isLiveTV?: boolean
     isAdminOrMod: boolean
-    prizePoolLabel?: string
   }
 ) => {
-  const { isAdminOrMod, isLiveTV, showShopNewBadge, prizePoolLabel } = options
+  const { isAdminOrMod, isLiveTV, showShopNewBadge } = options
 
   return buildArray<NavItem>(
-    {
-      name: 'Prize Drawing',
-      href: '/prize',
-      icon: GiftIcon,
-      children: prizePoolLabel ? (
-        <>
-          Prize Drawing
-          <span className="ml-2 rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-            {prizePoolLabel}
-          </span>
-        </>
-      ) : undefined,
-    },
-    { name: 'Leagues', href: '/leagues', icon: TrophyIcon },
-    { name: 'Forum', href: '/posts', icon: ChatIcon },
-    { name: 'Charity', href: '/charity', icon: HeartIcon },
+    { name: 'Buy mana', href: '/checkout', icon: CreditCardIcon },
     loggedIn && {
       name: 'Referrals',
       href: '/referrals',
@@ -435,7 +352,8 @@ const bottomNav = (
   theme: 'light' | 'dark' | 'auto',
   toggleTheme: () => void,
   router: AppRouterInstance,
-  isMobile: boolean | undefined
+  isMobile: boolean | undefined,
+  privyLogin: () => void
 ) =>
   buildArray<NavItem>(
     loggedIn && { name: 'About', href: '/about', icon: QuestionMarkCircleIcon },
@@ -480,5 +398,5 @@ const bottomNav = (
         await router.refresh()
       },
     },
-    !loggedIn && { name: 'Sign in', icon: LoginIcon, onClick: firebaseLogin }
+    !loggedIn && { name: 'Sign in', icon: LoginIcon, onClick: privyLogin }
   )

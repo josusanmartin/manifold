@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 
-import { firebaseLogin } from 'web/lib/firebase/users'
+import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
 import { Button } from './button'
 import { PlayMoneyDisclaimer } from '../play-money-disclaimer'
 import { Col } from '../layout/col'
@@ -8,13 +8,15 @@ import { Row } from 'web/components/layout/row'
 
 export const SidebarSignUpButton = (props: { className?: string }) => {
   const { className } = props
+  const privy = usePrivyLogin()
 
   return (
     <Col className={clsx('mt-4', className)}>
       <Button
         color="gradient"
         size="xl"
-        onClick={firebaseLogin}
+        onClick={privy.login}
+        disabled={!privy.configured || !privy.ready}
         className="w-full"
       >
         Sign up
@@ -26,12 +28,14 @@ export const SidebarSignUpButton = (props: { className?: string }) => {
 
 export const SignUpButton = (props: { className?: string }) => {
   const { className } = props
+  const privy = usePrivyLogin()
 
   return (
     <Button
       color="gradient"
       size="md"
-      onClick={firebaseLogin}
+      onClick={privy.login}
+      disabled={!privy.configured || !privy.ready}
       className={className}
     >
       Sign up

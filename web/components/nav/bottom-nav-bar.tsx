@@ -7,16 +7,14 @@ import {
   TransitionChild,
 } from '@headlessui/react'
 import {
-  GiftIcon,
+  CreditCardIcon,
   QuestionMarkCircleIcon,
-  SearchIcon,
   UserCircleIcon,
 } from '@heroicons/react/outline'
 import {
-  GiftIcon as GiftIconSolid,
+  CreditCardIcon as CreditCardIconSolid,
   MenuAlt3Icon,
   QuestionMarkCircleIcon as QuestionMarkCircleIconSolid,
-  // SearchIcon as SearchIconSolid,
   UserCircleIcon as UserCircleIconSolid,
   XIcon,
 } from '@heroicons/react/solid'
@@ -25,18 +23,14 @@ import { User } from 'common/user'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Fragment, useState } from 'react'
-import { FaSearch as SearchIconSolid } from 'react-icons/fa'
-import { IoCompass, IoCompassOutline } from 'react-icons/io5'
 import { NotificationsIcon } from 'web/components/notifications-icon'
-import { useAPIGetter } from 'web/hooks/use-api-getter'
+import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
 import { useIsIframe } from 'web/hooks/use-is-iframe'
 import {
   mergeEntitlements,
   useOptimisticEntitlements,
 } from 'web/hooks/use-optimistic-entitlements'
 import { useUser } from 'web/hooks/use-user'
-import { getTotalPrizePool, SweepstakesPrize } from 'common/sweepstakes'
-import { firebaseLogin } from 'web/lib/firebase/users'
 import { trackCallback } from 'web/lib/service/analytics'
 import { Col } from '../layout/col'
 import { Row } from '../layout/row'
@@ -52,8 +46,6 @@ const itemClass =
 const selectedItemClass = 'text-primary-700'
 const touchItemClass = 'touch-press-effect'
 const iconClassName = 'mx-auto my-1 h-[1.6rem] w-[1.6rem]'
-const exploreIconClassName =
-  ' h-[1.8rem] w-[1.8rem] !mb-[0.19rem] !mt-[0.135rem]'
 
 // Wrapper components for NotificationsIcon to work with the navigation system
 const NotificationsIconOutline = (props: { className?: string }) => (
@@ -66,17 +58,10 @@ const NotificationsIconSolid = (props: { className?: string }) => (
 function getNavigation(user: User) {
   return [
     {
-      name: 'Browse',
-      href: '/home',
-      icon: SearchIcon,
-      solidIcon: SearchIconSolid,
-    },
-    {
-      name: 'Explore',
-      href: '/explore',
-      icon: IoCompassOutline,
-      solidIcon: IoCompass,
-      iconClassName: exploreIconClassName,
+      name: 'Buy',
+      href: '/checkout',
+      icon: CreditCardIcon,
+      solidIcon: CreditCardIconSolid,
     },
     {
       name: 'Profile',
@@ -91,41 +76,13 @@ function getNavigation(user: User) {
   ]
 }
 
-function formatPrizePoolLabel(
-  prizes: SweepstakesPrize[] | undefined
-): string | undefined {
-  if (!prizes) return undefined
-  const total = getTotalPrizePool(prizes)
-  if (!Number.isFinite(total) || total <= 0) return undefined
-  if (total < 1000) return `$${total}`
-  const thousands = total / 1000
-  return `$${thousands.toLocaleString(undefined, {
-    maximumFractionDigits: 1,
-  })}k`
-}
-
-const signedOutNavigation = (prizePoolLabel: string | undefined) => [
+const signedOutNavigation = (privyLogin: () => void) => [
   {
-    name: 'Browse',
-    href: '/browse',
-    icon: SearchIcon,
-    solidIcon: SearchIconSolid,
+    name: 'Buy',
+    href: '/checkout',
+    icon: CreditCardIcon,
+    solidIcon: CreditCardIconSolid,
     alwaysShowName: true,
-  },
-  {
-    name: 'Prize',
-    subLabel: prizePoolLabel,
-    href: '/prize',
-    icon: GiftIcon,
-    solidIcon: GiftIconSolid,
-    itemClassName: '!px-1',
-  },
-  {
-    name: 'Explore',
-    href: '/explore',
-    icon: IoCompassOutline,
-    solidIcon: IoCompass,
-    iconClassName: exploreIconClassName,
   },
   {
     name: 'About',
@@ -135,7 +92,7 @@ const signedOutNavigation = (prizePoolLabel: string | undefined) => [
   },
   {
     name: 'Sign in',
-    onClick: firebaseLogin,
+    onClick: privyLogin,
     icon: UserCircleIcon,
     solidIcon: UserCircleIconSolid,
   },
@@ -148,13 +105,7 @@ export function BottomNavBar() {
   const currentPage = usePathname() ?? ''
 
   const user = useUser()
-
-  const { data: sweepstakesData } = useAPIGetter('get-sweepstakes', {})
-  const prizeCloseTime = sweepstakesData?.sweepstakes?.closeTime
-  const prizePoolLabel =
-    prizeCloseTime && prizeCloseTime > Date.now()
-      ? formatPrizePoolLabel(sweepstakesData?.sweepstakes?.prizes)
-      : undefined
+  const privy = usePrivyLogin()
 
   const isIframe = useIsIframe()
   if (isIframe) {
@@ -163,7 +114,7 @@ export function BottomNavBar() {
 
   const navigationOptions = user
     ? getNavigation(user)
-    : signedOutNavigation(prizePoolLabel)
+    : signedOutNavigation(privy.login)
 
   return (
     <nav

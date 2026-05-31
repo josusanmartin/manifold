@@ -1,6 +1,7 @@
 'use client'
 
 import { PrivyProvider } from '@privy-io/react-auth'
+import { usePrivy } from '@privy-io/react-auth'
 import { createContext, ReactNode, useContext } from 'react'
 import { arbitrum } from 'viem/chains'
 
@@ -14,8 +15,34 @@ const PrivyWalletConfigContext = createContext<PrivyWalletConfig>({
   missingEnv: ['NEXT_PUBLIC_PRIVY_APP_ID'],
 })
 
+const PrivyLoginContext = createContext<{
+  configured: boolean
+  ready: boolean
+  login: () => void
+}>({
+  configured: false,
+  ready: false,
+  login: () => undefined,
+})
+
 export function usePrivyWalletConfig() {
   return useContext(PrivyWalletConfigContext)
+}
+
+export function usePrivyLogin() {
+  return useContext(PrivyLoginContext)
+}
+
+function PrivyLoginProvider({ children }: { children: ReactNode }) {
+  const { ready, login } = usePrivy()
+
+  return (
+    <PrivyLoginContext.Provider
+      value={{ configured: true, ready, login: () => login() }}
+    >
+      {children}
+    </PrivyLoginContext.Provider>
+  )
 }
 
 export function PrivyWalletProviders({ children }: { children: ReactNode }) {
@@ -29,7 +56,11 @@ export function PrivyWalletProviders({ children }: { children: ReactNode }) {
   if (!appId) {
     return (
       <PrivyWalletConfigContext.Provider value={config}>
-        {children}
+        <PrivyLoginContext.Provider
+          value={{ configured: false, ready: false, login: () => undefined }}
+        >
+          {children}
+        </PrivyLoginContext.Provider>
       </PrivyWalletConfigContext.Provider>
     )
   }
@@ -49,7 +80,7 @@ export function PrivyWalletProviders({ children }: { children: ReactNode }) {
           },
         }}
       >
-        {children}
+        <PrivyLoginProvider>{children}</PrivyLoginProvider>
       </PrivyProvider>
     </PrivyWalletConfigContext.Provider>
   )

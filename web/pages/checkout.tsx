@@ -5,10 +5,8 @@ import { isUserBanned } from 'common/ban-utils'
 import { canReceiveBonuses } from 'common/user'
 import { Col } from 'web/components/layout/col'
 import { Page } from 'web/components/layout/page'
-import { PrivyWalletProviders } from 'web/components/crypto/privy-wallet-providers'
 import { MexasCheckoutButton } from 'web/components/crypto/mexas-checkout-button'
 import { SEO } from 'web/components/SEO'
-import { useRedirectIfSignedOut } from 'web/hooks/use-redirect-if-signed-out'
 import { useUser } from 'web/hooks/use-user'
 import { useAPIGetter } from 'web/hooks/use-api-getter'
 import { useState } from 'react'
@@ -400,8 +398,6 @@ function CheckoutContent() {
 }
 
 export default function CheckoutPage() {
-  useRedirectIfSignedOut()
-
   return (
     <Page trackPageView="checkout page">
       <SEO
@@ -411,9 +407,7 @@ export default function CheckoutPage() {
         image="/buy-mana-graphics/100k.png"
       />
 
-      <PrivyWalletProviders>
-        <CheckoutContent />
-      </PrivyWalletProviders>
+      <CheckoutContent />
     </Page>
   )
 }

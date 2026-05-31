@@ -2,6 +2,34 @@ const path = require('path')
 
 const API_DOCS_URL = 'https://docs.manifold.markets/api'
 
+const MEXAS_ONLY_REDIRECTS = [
+  '/',
+  '/home',
+  '/browse',
+  '/browse/:path*',
+  '/explore',
+  '/predictle',
+  '/prize',
+  '/prize/:path*',
+  '/election',
+  '/election/:path*',
+  '/leagues',
+  '/leagues/:path*',
+  '/live',
+  '/news',
+  '/news/:path*',
+  '/post/:path*',
+  '/posts',
+  '/sports',
+  '/topic/:path*',
+  '/tv',
+  '/tv/:path*',
+].map((source) => ({
+  source,
+  destination: '/checkout',
+  permanent: false,
+}))
+
 /** @type {import('next').NextConfig} */
 module.exports = {
   outputFileTracingRoot: path.join(__dirname, '..'),
@@ -67,6 +95,7 @@ module.exports = {
   },
   async redirects() {
     return [
+      ...MEXAS_ONLY_REDIRECTS,
       {
         source: '/supporter',
         destination: '/membership',

@@ -7,6 +7,7 @@ import { useRouter } from 'next/router'
 import Script from 'next/script'
 import { useEffect, useState } from 'react'
 import { AuthProvider, AuthUser } from 'web/components/auth-context'
+import { PrivyWalletProviders } from 'web/components/crypto/privy-wallet-providers'
 import { NativeMessageProvider } from 'web/components/native-message-provider'
 import { Sweepstakes } from 'web/components/sweepstakes-provider'
 import { OptimisticEntitlementsProvider } from 'web/hooks/use-optimistic-entitlements'
@@ -209,15 +210,17 @@ function MyApp({ Component, pageProps }: AppProps<ManifoldPageProps>) {
           >
             Skip to main content
           </a>
-          <AuthProvider serverUser={pageProps.auth}>
-            <OptimisticEntitlementsProvider>
-              <Sweepstakes>
-                <NativeMessageProvider>
-                  <Component {...pageProps} />
-                </NativeMessageProvider>
-              </Sweepstakes>
-            </OptimisticEntitlementsProvider>
-          </AuthProvider>
+          <PrivyWalletProviders>
+            <AuthProvider serverUser={pageProps.auth}>
+              <OptimisticEntitlementsProvider>
+                <Sweepstakes>
+                  <NativeMessageProvider>
+                    <Component {...pageProps} />
+                  </NativeMessageProvider>
+                </Sweepstakes>
+              </OptimisticEntitlementsProvider>
+            </AuthProvider>
+          </PrivyWalletProviders>
         </ThemeProvider>
       )}
 
