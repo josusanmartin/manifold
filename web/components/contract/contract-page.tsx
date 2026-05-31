@@ -76,7 +76,6 @@ import { track } from 'web/lib/service/analytics'
 import { scrollIntoViewCentered } from 'web/lib/util/scroll'
 import { SpiceCoin } from 'web/public/custom-components/spiceCoin'
 import { FollowMarketButton } from '../buttons/follow-market-button'
-import { LogoIcon } from '../icons/logo-icon'
 import { CreatorSharePanel, NonCreatorSharePanel } from './creator-share-panel'
 import { MarketContext } from './market-context'
 import { YourTrades } from './your-trades'
@@ -202,21 +201,23 @@ export function ContractPageContent(props: ContractParams) {
     <>
       {/* Mobile header for signed-out users */}
       {!user && (
-        <Row className="bg-canvas-0 sticky top-0 z-50 flex items-center justify-between px-4 py-2 md:hidden">
+        <Row className="border-ink-200 bg-canvas-0 sticky top-0 z-50 flex items-center justify-between border-b px-4 py-2 md:hidden">
           <Link
-            href="/"
-            className="flex items-center gap-1 text-indigo-700 dark:text-white"
+            href="/checkout"
+            className="text-ink-1000 flex items-center gap-2"
           >
-            <LogoIcon className="h-8 w-8 stroke-indigo-700 dark:stroke-white" />
-            <span className="text-lg font-thin">MANIFOLD</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-xs font-bold text-white dark:bg-white dark:text-slate-950">
+              M
+            </span>
+            <span className="text-sm font-semibold">MEXAS</span>
           </Link>
           <SignUpButton />
         </Row>
       )}
-      <Row className="w-full items-start justify-center gap-8">
+      <Row className="min-h-screen w-full items-start justify-center gap-4 bg-[#f7f8fa] px-0 dark:bg-slate-950 lg:px-4">
         <Col
           className={clsx(
-            'bg-canvas-0 dark:border-canvas-50 w-full max-w-3xl rounded-b-md lg:border lg:border-t-0  xl:w-[70%] ',
+            'border-ink-200 bg-canvas-0 w-full max-w-4xl border-x xl:w-[72%] ',
             // Keep content in view when scrolling related questions on desktop.
             'sticky bottom-0 min-h-screen self-end',
             // Accommodate scroll to top button at bottom of page.
@@ -317,7 +318,11 @@ export function ContractPageContent(props: ContractParams) {
             </Row>
           )}
 
-          <Col className={clsx('mb-4 p-4 pt-0 md:pb-8 lg:px-8')}>
+          <Col
+            className={clsx(
+              'border-ink-200 mb-4 border-b p-4 pt-0 md:pb-8 lg:px-8'
+            )}
+          >
             <Col className="w-full gap-3 lg:gap-4">
               <Col>
                 <div ref={titleRef}>

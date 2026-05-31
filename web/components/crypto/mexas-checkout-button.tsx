@@ -51,7 +51,7 @@ function getErrorMessage(error: unknown) {
 
 function MissingPrivyConfig(props: { missingEnv: string[] }) {
   return (
-    <Col className="border-ink-200 bg-canvas-50 text-ink-600 gap-2 rounded-lg border p-3 text-sm">
+    <Col className="border-ink-200 bg-canvas-50 text-ink-600 gap-2 rounded-md border p-3 text-sm">
       <div className="font-semibold">Privy wallet is not configured.</div>
       <div>Set {props.missingEnv.join(', ')} before deploying this rail.</div>
     </Col>
@@ -156,7 +156,7 @@ function MexasCheckoutButtonInner(props: {
     if (!manifoldUser?.id) {
       setCheckoutState({
         status: 'error',
-        message: 'Sign in to Manifold before paying with MEXAS.',
+        message: 'Sign in to MEXAS Markets before paying with MEXAS.',
       })
       return
     }
@@ -234,7 +234,12 @@ function MexasCheckoutButtonInner(props: {
 
   if (!ready || !walletsReady) {
     return (
-      <Button className="w-full" color="indigo" size="lg" disabled>
+      <Button
+        className="disabled:bg-ink-300 w-full bg-slate-950 text-white"
+        color="none"
+        size="lg"
+        disabled
+      >
         <LoadingIndicator size="sm" className="mr-2 !text-white" />
         Loading wallet...
       </Button>
@@ -244,8 +249,8 @@ function MexasCheckoutButtonInner(props: {
   if (!authenticated) {
     return (
       <Button
-        className="w-full"
-        color="indigo"
+        className="disabled:bg-ink-300 w-full bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+        color="none"
         size="lg"
         disabled={props.disabled}
         onClick={() => login()}
@@ -256,7 +261,7 @@ function MexasCheckoutButtonInner(props: {
   }
 
   return (
-    <Col className="border-ink-200 gap-3 rounded-lg border p-3">
+    <Col className="border-ink-200 gap-3 rounded-md border p-3">
       <Row className="items-end gap-3">
         <label className="min-w-0 flex-1">
           <span className="text-ink-600 mb-1 block text-xs font-medium">
@@ -271,9 +276,9 @@ function MexasCheckoutButtonInner(props: {
           />
         </label>
         <Button
-          color="indigo"
+          color="none"
           size="lg"
-          className="min-w-[132px]"
+          className="disabled:bg-ink-300 min-w-[132px] bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
           loading={loading}
           disabled={wallet ? paymentDisabled : props.disabled || loading}
           onClick={submitPayment}

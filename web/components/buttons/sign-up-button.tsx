@@ -2,7 +2,6 @@ import clsx from 'clsx'
 
 import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
 import { Button } from './button'
-import { PlayMoneyDisclaimer } from '../play-money-disclaimer'
 import { Col } from '../layout/col'
 import { Row } from 'web/components/layout/row'
 
@@ -13,15 +12,14 @@ export const SidebarSignUpButton = (props: { className?: string }) => {
   return (
     <Col className={clsx('mt-4', className)}>
       <Button
-        color="gradient"
+        color="none"
         size="xl"
         onClick={privy.login}
         disabled={!privy.configured || !privy.ready}
-        className="w-full"
+        className="disabled:bg-ink-300 w-full bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
       >
-        Sign up
+        Sign up with Privy
       </Button>
-      <PlayMoneyDisclaimer />
     </Col>
   )
 }
@@ -32,11 +30,14 @@ export const SignUpButton = (props: { className?: string }) => {
 
   return (
     <Button
-      color="gradient"
+      color="none"
       size="md"
       onClick={privy.login}
       disabled={!privy.configured || !privy.ready}
-      className={className}
+      className={clsx(
+        'disabled:bg-ink-300 bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100',
+        className
+      )}
     >
       Sign up
     </Button>
@@ -47,9 +48,9 @@ export const GoogleSignInButton = (props: { onClick: () => any }) => {
   return (
     <Button
       onClick={props.onClick}
-      color={'gradient-pink'}
+      color="none"
       size={'lg'}
-      className=" whitespace-nowrap  shadow-sm outline-2 "
+      className="whitespace-nowrap bg-slate-950 text-white shadow-sm outline-2 hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
     >
       <Row className={'items-center gap-2 p-2'}>
         <img

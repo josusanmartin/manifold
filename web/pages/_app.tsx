@@ -1,5 +1,4 @@
-import { ENV_CONFIG, TRADE_TERM } from 'common/envs/constants'
-import { capitalize } from 'lodash'
+import { ENV_CONFIG } from 'common/envs/constants'
 import type { AppProps } from 'next/app'
 import { Figtree } from 'next/font/google'
 import Head from 'next/head'
@@ -17,6 +16,11 @@ import { useMobileScrollRestoration } from 'web/hooks/use-mobile-scroll-restorat
 import { useRefreshAllClients } from 'web/hooks/use-refresh-all-clients'
 import { ThemeProvider } from 'web/hooks/use-theme'
 import { GoogleOneTapSetup } from 'web/lib/firebase/google-onetap-login'
+import {
+  MEXAS_SITE_DESCRIPTION,
+  MEXAS_SITE_NAME,
+  MEXAS_SITE_URL,
+} from 'web/lib/mexas-brand'
 import { getIsNative } from 'web/lib/native/is-native'
 import { postMessageToNative } from 'web/lib/native/post-message'
 import { DevtoolsDetector, setupDevtoolsDetector } from 'web/lib/util/devtools'
@@ -125,10 +129,8 @@ function MyApp({ Component, pageProps }: AppProps<ManifoldPageProps>) {
     }
   }, [router.events])
 
-  const title = 'Manifold'
-  const description = `Manifold is a social prediction game. ${capitalize(
-    TRADE_TERM
-  )} on news, politics, tech, & AI with play money. Or create your own prediction market.`
+  const title = MEXAS_SITE_NAME
+  const description = MEXAS_SITE_DESCRIPTION
 
   return (
     <>
@@ -148,25 +150,13 @@ function MyApp({ Component, pageProps }: AppProps<ManifoldPageProps>) {
           content={description}
           key="description2"
         />
-        <meta property="og:url" content="https://manifold.markets" key="url" />
-        <meta property="og:site_name" content="Manifold" />
+        <meta property="og:url" content={MEXAS_SITE_URL} key="url" />
+        <meta property="og:site_name" content={MEXAS_SITE_NAME} />
         <meta name="twitter:card" content="summary" key="card" />
-        <meta name="twitter:site" content="@manifoldmarkets" />
-        <meta
-          name="twitter:image"
-          content="https://manifold.markets/logo.png"
-          key="image2"
-        />
-        <meta
-          property="og:image"
-          content="https://manifold.markets/logo-cover.png"
-          key="image1"
-        />
         <meta
           name="viewport"
           content="width=device-width, initial-scale=1, viewport-fit=cover"
         />
-        <meta name="apple-itunes-app" content="app-id=6444136749" />
         {/* set safari overscroll/address bar to canvas-0. TODO: change based on site theme preference */}
         <meta
           name="theme-color"
@@ -177,12 +167,6 @@ function MyApp({ Component, pageProps }: AppProps<ManifoldPageProps>) {
           name="theme-color"
           content="#fdfeff"
           media="(prefers-color-scheme: light)"
-        />
-        <link
-          rel="search"
-          type="application/opensearchdescription+xml"
-          href="https://manifold.markets/opensearch.xml"
-          title="Manifold"
         />
       </Head>
       <style>

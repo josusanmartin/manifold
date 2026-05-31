@@ -1,27 +1,16 @@
 import {
-  ChatIcon,
-  CreditCardIcon,
-  DeviceMobileIcon,
+  ChartBarIcon,
   LoginIcon,
   LogoutIcon,
   MoonIcon,
   QuestionMarkCircleIcon,
-  StarIcon,
   SunIcon,
 } from '@heroicons/react/outline'
-// import { PiTelevisionSimple } from 'react-icons/pi'
 import clsx from 'clsx'
-import { useState } from 'react'
-import TrophyIcon from 'web/lib/icons/trophy-icon.svg'
 
 import { buildArray } from 'common/util/array'
-import { SHOP_ITEMS } from 'common/shop/items'
-import { DAY_MS, isAprilFools } from 'common/util/time'
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime'
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LuGem } from 'react-icons/lu'
-import { AppBadgesOrGetAppButton } from 'web/components/buttons/app-badges-or-get-app-button'
 import { NotificationsIcon } from 'web/components/notifications-icon'
 import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
 import { useAdminOrMod } from 'web/hooks/use-admin'
@@ -29,96 +18,16 @@ import { useTheme } from 'web/hooks/use-theme'
 import { useUser } from 'web/hooks/use-user'
 import { firebaseLogout } from 'web/lib/firebase/users'
 import { withTracking } from 'web/lib/service/analytics'
-import { MobileAppsQRCodeDialog } from '../buttons/mobile-apps-qr-code-button'
 import { SidebarSignUpButton } from '../buttons/sign-up-button'
 import { Col } from '../layout/col'
+import { Row } from '../layout/row'
 import { AddFundsButton } from '../profile/add-funds-button'
 import { ReportsIcon } from '../reports-icon'
-import { LiveTVIcon } from '../tv-icon'
-import { useTVIsLive } from '../tv/tv-schedule'
 import { ManifoldLogo } from './manifold-logo'
 import { ProfileSummary } from './profile-summary'
 import { NavItem, SidebarItem } from './sidebar-item'
 
-export const SPEND_MANA_ENABLED = true
-
-// Set to true to show a current event badge on the Shop nav item
-const SHOW_SHOP_EVENT_BADGE = true
-
-// Newest visibleSinceTime across all visible items. The sidebar NEW badge
-// fires when this exceeds the current user's lastShopVisitTime.
-const NEWEST_SHOP_ITEM_TIME = Math.max(
-  0,
-  ...SHOP_ITEMS.filter((i) => !i.hidden).map((i) => i.visibleSinceTime ?? 0)
-)
-
-const BADGE_COLORS = [
-  'bg-red-500 text-white',
-  'bg-amber-400 text-amber-900',
-  'bg-green-500 text-white',
-  'bg-blue-500 text-white',
-  'bg-purple-500 text-white',
-  'bg-pink-500 text-white',
-  'bg-cyan-400 text-cyan-900',
-  'bg-orange-500 text-white',
-  'bg-indigo-500 text-white',
-  'bg-emerald-500 text-white',
-  'bg-rose-500 text-white',
-  'bg-yellow-300 text-yellow-900',
-  'bg-lime-400 text-lime-900',
-  'bg-fuchsia-500 text-white',
-  'bg-teal-500 text-white',
-  'bg-sky-400 text-sky-900',
-  'bg-violet-500 text-white',
-  'bg-red-400 text-white',
-  'bg-amber-500 text-white',
-  'bg-green-400 text-white',
-]
-
-// Deterministic pseudo-random from seed
-function seededRandom(seed: number) {
-  const x = Math.sin(seed) * 10000
-  return x - Math.floor(x)
-}
-
-function AprilFoolsBadgeExplosion() {
-  // Distribute badges in an elliptical spread around the button center,
-  // evenly spaced by angle with some randomized jitter for personality.
-  const cx = 70 // approx center of Shop button
-  const cy = 16
-  const count = BADGE_COLORS.length
-  return (
-    <>
-      {BADGE_COLORS.map((color, i) => {
-        const r = (n: number) => seededRandom(i * 7 + n)
-        const angle = (i / count) * Math.PI * 2 + (r(1) - 0.5) * 0.5
-        const radiusX = 55 + r(2) * 40
-        const radiusY = 22 + r(3) * 16
-        const x = cx + Math.cos(angle) * radiusX
-        const y = cy + Math.sin(angle) * radiusY
-        const rotation = r(4) * 40 - 20
-        const scale = 0.65 + r(5) * 0.5
-        return (
-          <span
-            key={i}
-            className={clsx(
-              'pointer-events-none absolute whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-bold',
-              color
-            )}
-            style={{
-              left: `${x}px`,
-              top: `${y}px`,
-              transform: `rotate(${rotation}deg) scale(${scale})`,
-              zIndex: i,
-            }}
-          >
-            NEW
-          </span>
-        )
-      })}
-    </>
-  )
-}
+export const SPEND_MANA_ENABLED = false
 
 export default function Sidebar(props: {
   className?: string
@@ -129,7 +38,6 @@ export default function Sidebar(props: {
   const currentPage = usePathname() ?? undefined
   const user = useUser()
   const isAdminOrMod = useAdminOrMod()
-  const [isModalOpen, setIsModalOpen] = useState(false)
   const privy = usePrivyLogin()
 
   const { theme, setTheme } = useTheme()
@@ -138,37 +46,17 @@ export default function Sidebar(props: {
     setTheme(theme === 'auto' ? 'dark' : theme === 'dark' ? 'light' : 'auto')
   }
 
-  const isNewUser = !!user && user.createdTime > Date.now() - DAY_MS
-
-  const isLiveTV = useTVIsLive(10)
-
-  // Per-user NEW badge: shows once user data is loaded AND any visible shop
-  // item became visible since the user last visited /shop. Default-to-hide
-  // while user is loading prevents the badge from flashing in then out.
-  const lastShopVisit = user?.lastShopVisitTime ?? user?.createdTime ?? 0
-  const showShopNewBadge = !!user && NEWEST_SHOP_ITEM_TIME > lastShopVisit
-
   const navOptions = isMobile
-    ? getMobileNav(!!user, {
-        isNewUser,
-        isLiveTV,
-        isAdminOrMod: isAdminOrMod,
-        showShopNewBadge,
-      })
-    : getDesktopNav(!!user, () => setIsModalOpen(true), {
-        isNewUser,
-        isLiveTV,
-        isAdminOrMod: isAdminOrMod,
-        showShopNewBadge,
-      })
+    ? getMobileNav(!!user, isAdminOrMod)
+    : getDesktopNav(!!user, isAdminOrMod)
 
   const bottomNavOptions = bottomNav(
     !!user,
     theme,
     toggleTheme,
     router,
-    isMobile,
-    privy.login
+    privy.login,
+    privy.logout
   )
 
   const addFundsButton = user && (
@@ -182,28 +70,28 @@ export default function Sidebar(props: {
   return (
     <nav
       aria-label="Sidebar"
-      className={clsx('flex h-screen flex-col', className)}
+      className={clsx(
+        'border-ink-200 bg-canvas-0 flex h-screen flex-col border-r pr-2',
+        className
+      )}
     >
       <ManifoldLogo className="pb-3 pt-6" />
 
+      {!isMobile && (
+        <Row className="border-ink-200 mx-1 mb-3 items-center justify-between rounded-md border px-3 py-2 text-xs">
+          <span className="text-ink-500 font-medium">Network</span>
+          <span className="font-semibold text-teal-700 dark:text-teal-300">
+            Arbitrum MEX
+          </span>
+        </Row>
+      )}
+
       {user && !isMobile && <ProfileSummary user={user} className="mb-3" />}
 
-      <MobileAppsQRCodeDialog
-        key="mobile-apps-qr-code"
-        isModalOpen={isModalOpen}
-        setIsModalOpen={setIsModalOpen}
-      />
       <ul role="list" className="m-0 mb-4 flex list-none flex-col gap-1 p-0">
         {navOptions.map((item) => (
           <li key={item.name}>
-            {item.name === 'Shop' && isAprilFools() ? (
-              <div className="relative">
-                <SidebarItem item={item} currentPage={currentPage} />
-                <AprilFoolsBadgeExplosion />
-              </div>
-            ) : (
-              <SidebarItem item={item} currentPage={currentPage} />
-            )}
+            <SidebarItem item={item} currentPage={currentPage} />
           </li>
         ))}
         {!user && (
@@ -224,11 +112,6 @@ export default function Sidebar(props: {
           isMobile && 'pb-8'
         )}
       >
-        {!!user && (
-          <li className="list-none">
-            <AppBadgesOrGetAppButton hideOnDesktop className="mb-2" />
-          </li>
-        )}
         {bottomNavOptions.map((item) => (
           <li key={item.name}>
             <SidebarItem item={item} currentPage={currentPage} />
@@ -239,54 +122,16 @@ export default function Sidebar(props: {
   )
 }
 
-const getDesktopNav = (
-  loggedIn: boolean,
-  openDownloadApp: () => void,
-  options: {
-    isNewUser: boolean
-    showShopNewBadge: boolean
-    isLiveTV?: boolean
-    isAdminOrMod: boolean
-  }
-) => {
-  const { isLiveTV } = options
+const getDesktopNav = (loggedIn: boolean, isAdminOrMod: boolean) => {
   if (loggedIn)
     return buildArray(
-      { name: 'Fund MEX', href: '/checkout', icon: CreditCardIcon },
-      isLiveTV && {
-        name: 'TV',
-        href: '/tv',
-        icon: LiveTVIcon,
-      },
+      { name: 'Markets', href: '/checkout', icon: ChartBarIcon },
       {
-        name: 'Notifications',
+        name: 'Inbox',
         href: `/notifications`,
         icon: NotificationsIcon,
       },
-      // Show shop when enabled OR for admins (testing)
-      (SPEND_MANA_ENABLED || options.isAdminOrMod) && {
-        name: 'Shop',
-        href: '/shop',
-        icon: LuGem,
-        children:
-          options.showShopNewBadge || SHOW_SHOP_EVENT_BADGE ? (
-            <>
-              Shop
-              {/* NEW takes priority over Event — Event reappears once
-                  the user has cleared the NEW badge by visiting /shop. */}
-              {options.showShopNewBadge ? (
-                <span className="ml-2 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-                  NEW
-                </span>
-              ) : (
-                <span className="ml-2 rounded-full bg-blue-500 px-2 py-0.5 text-xs font-medium text-white">
-                  Manifest
-                </span>
-              )}
-            </>
-          ) : undefined,
-      },
-      options.isAdminOrMod && {
+      isAdminOrMod && {
         name: 'Reports',
         href: '/reports',
         icon: ReportsIcon,
@@ -294,55 +139,23 @@ const getDesktopNav = (
     )
 
   return buildArray(
-    { name: 'Fund MEX', href: '/checkout', icon: CreditCardIcon },
-    { name: 'About', href: '/about', icon: QuestionMarkCircleIcon },
-    { name: 'App', onClick: openDownloadApp, icon: DeviceMobileIcon }
+    { name: 'Markets', href: '/checkout', icon: ChartBarIcon },
+    { name: 'About', href: '/about', icon: QuestionMarkCircleIcon }
   )
 }
 
-const getMobileNav = (
-  loggedIn: boolean,
-  options: {
-    isNewUser: boolean
-    showShopNewBadge: boolean
-    isLiveTV?: boolean
-    isAdminOrMod: boolean
-  }
-) => {
-  const { isAdminOrMod, isLiveTV, showShopNewBadge } = options
-
+const getMobileNav = (loggedIn: boolean, isAdminOrMod: boolean) => {
   return buildArray<NavItem>(
-    { name: 'Fund MEX', href: '/checkout', icon: CreditCardIcon },
+    { name: 'Markets', href: '/checkout', icon: ChartBarIcon },
     loggedIn && {
-      name: 'Referrals',
-      href: '/referrals',
-      icon: StarIcon,
-    },
-    isLiveTV && {
-      name: 'TV',
-      href: '/tv',
-      icon: LiveTVIcon,
+      name: 'Inbox',
+      href: `/notifications`,
+      icon: NotificationsIcon,
     },
     isAdminOrMod && {
       name: 'Reports',
       href: '/reports',
       icon: ReportsIcon,
-    },
-    // Show shop when enabled OR for admins (testing). On mobile we omit the
-    // "$10k prize" pill because the Prize Drawing tab above already advertises
-    // it — the duplicate is redundant in the vertical mobile nav.
-    (SPEND_MANA_ENABLED || isAdminOrMod) && {
-      name: 'Shop',
-      href: '/shop',
-      icon: LuGem,
-      children: showShopNewBadge ? (
-        <>
-          Shop
-          <span className="ml-2 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-            NEW
-          </span>
-        </>
-      ) : undefined,
     }
   )
 }
@@ -352,17 +165,11 @@ const bottomNav = (
   theme: 'light' | 'dark' | 'auto',
   toggleTheme: () => void,
   router: AppRouterInstance,
-  isMobile: boolean | undefined,
-  privyLogin: () => void
+  privyLogin: () => void,
+  privyLogout: () => Promise<void>
 ) =>
   buildArray<NavItem>(
     loggedIn && { name: 'About', href: '/about', icon: QuestionMarkCircleIcon },
-    loggedIn &&
-      !isMobile && {
-        name: 'Referrals',
-        href: '/referrals',
-        icon: StarIcon,
-      },
     {
       name: theme ?? 'auto',
       children:
@@ -395,6 +202,7 @@ const bottomNav = (
       icon: LogoutIcon,
       onClick: async () => {
         await withTracking(firebaseLogout, 'sign out')()
+        await privyLogout()
         await router.refresh()
       },
     },

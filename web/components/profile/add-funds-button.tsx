@@ -1,7 +1,6 @@
 import { useRouter } from 'next/router'
 import { useUser } from 'web/hooks/use-user'
 import { Button, SizeType } from '../buttons/button'
-import { ManaCoin } from 'web/public/custom-components/manaCoin'
 
 export function AddFundsButton(props: {
   userId?: string
@@ -22,10 +21,12 @@ export function AddFundsButton(props: {
           : router.push('/checkout')
       }
       size={size ?? 'md'}
-      color="gradient-pink"
-      className={className}
+      color="none"
+      className={`disabled:bg-ink-300 bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 ${
+        className ?? ''
+      }`}
     >
-      Fund MEX <ManaCoin className="ml-1" />
+      Fund MEX
     </Button>
   )
 }

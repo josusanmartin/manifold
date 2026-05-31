@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import { track } from 'web/lib/service/analytics'
+import { MEXAS_SITE_NAME } from 'web/lib/mexas-brand'
 
 export const Footer = ({ showAbout = false }: { showAbout?: boolean }) => (
   <footer
     role="contentinfo"
     className="text-ink-400 mb-4 mt-8 w-full text-center text-sm"
   >
-    © Manifold Markets, Inc.
+    © {MEXAS_SITE_NAME}
     <span className="mx-2">&bull;</span>
     {showAbout && (
       <>

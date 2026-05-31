@@ -7,7 +7,7 @@
 export type MarketJsonLdInput = {
   question: string
   description: string // Pre-converted to plain text by caller
-  url: string // Full URL: https://manifold.markets/user/slug
+  url: string // Full URL: https://mexas-manifold.vercel.app/user/slug
   creatorName: string
   creatorUsername: string
   createdTime: number // Epoch ms
@@ -105,10 +105,12 @@ function isValidHttpsUrl(url: string): boolean {
   }
 }
 
-const MANIFOLD_ORG = {
+const MEXAS_SITE_URL = 'https://mexas-manifold.vercel.app'
+
+const MEXAS_ORG = {
   '@type': 'Organization',
-  name: 'Manifold Markets',
-  url: 'https://manifold.markets',
+  name: 'MEXAS Markets',
+  url: MEXAS_SITE_URL,
 }
 
 const EXCLUDED_OUTCOME_TYPES = new Set([
@@ -145,7 +147,7 @@ export function buildMarketQAPage(
     author: {
       '@type': 'Person',
       name: input.creatorName,
-      url: `https://manifold.markets/${input.creatorUsername}`,
+      url: `${MEXAS_SITE_URL}/${input.creatorUsername}`,
     },
     answerCount: 1,
     [answerResult.key]: answerResult.answer,
@@ -189,9 +191,9 @@ function formatMarketAnswer(input: MarketJsonLdInput): {
         '@type': 'Answer',
         text: `${
           resolution === 'YES' ? 'Yes' : 'No'
-        } — resolved on ${resolvedDate} by Manifold Markets prediction market.`,
+        } — resolved on ${resolvedDate} by MEXAS Markets prediction market.`,
         datePublished: isoDate,
-        author: MANIFOLD_ORG,
+        author: MEXAS_ORG,
       },
     }
   }
@@ -206,10 +208,10 @@ function formatMarketAnswer(input: MarketJsonLdInput): {
       key: 'suggestedAnswer',
       answer: {
         '@type': 'Answer',
-        text: `${label} — Manifold Markets prediction market estimates a ${pct}% chance (${input.uniqueBettorCount.toLocaleString()} traders, as of ${dateLabel}).`,
+        text: `${label} — MEXAS Markets prediction market estimates a ${pct}% chance (${input.uniqueBettorCount.toLocaleString()} traders, as of ${dateLabel}).`,
         url: input.url,
         dateModified: isoDate,
-        author: MANIFOLD_ORG,
+        author: MEXAS_ORG,
       },
     }
   }
@@ -225,9 +227,9 @@ function formatMarketAnswer(input: MarketJsonLdInput): {
       key: 'acceptedAnswer',
       answer: {
         '@type': 'Answer',
-        text: `${winner.text} — resolved on ${resolvedDate} by Manifold Markets prediction market.`,
+        text: `${winner.text} — resolved on ${resolvedDate} by MEXAS Markets prediction market.`,
         datePublished: isoDate,
-        author: MANIFOLD_ORG,
+        author: MEXAS_ORG,
       },
     }
   }
@@ -249,12 +251,12 @@ function formatMarketAnswer(input: MarketJsonLdInput): {
       key: 'suggestedAnswer',
       answer: {
         '@type': 'Answer',
-        text: `Per Manifold Markets prediction market, ${names} ${
+        text: `Per MEXAS Markets prediction market, ${names} ${
           top3.length === 1 ? 'is' : 'are'
         } most likely. See the market for live updates (${input.uniqueBettorCount.toLocaleString()} traders, as of ${dateLabel}).`,
         url: input.url,
         dateModified: isoDate,
-        author: MANIFOLD_ORG,
+        author: MEXAS_ORG,
       },
     }
   }
@@ -269,10 +271,10 @@ function formatMarketAnswer(input: MarketJsonLdInput): {
       key: 'suggestedAnswer',
       answer: {
         '@type': 'Answer',
-        text: `The current median estimate is ${input.probability} according to Manifold Markets prediction market (as of ${dateLabel}).`,
+        text: `The current median estimate is ${input.probability} according to MEXAS Markets prediction market (as of ${dateLabel}).`,
         url: input.url,
         dateModified: isoDate,
-        author: MANIFOLD_ORG,
+        author: MEXAS_ORG,
       },
     }
   }
@@ -293,7 +295,7 @@ export function buildPostDiscussion(
     author: {
       '@type': 'Person',
       name: c.authorName,
-      url: `https://manifold.markets/${c.authorUsername}`,
+      url: `${MEXAS_SITE_URL}/${c.authorUsername}`,
     },
   }))
 
@@ -307,7 +309,7 @@ export function buildPostDiscussion(
     author: {
       '@type': 'Person',
       name: input.creatorName,
-      url: `https://manifold.markets/${input.creatorUsername}`,
+      url: `${MEXAS_SITE_URL}/${input.creatorUsername}`,
     },
     interactionStatistic: {
       '@type': 'InteractionCounter',
@@ -332,7 +334,7 @@ export function buildPersonProfile(
   const person: Record<string, unknown> = {
     '@type': 'Person',
     name: input.name,
-    url: `https://manifold.markets/${input.username}`,
+    url: `${MEXAS_SITE_URL}/${input.username}`,
     identifier: input.username,
     alternateName: `@${input.username}`,
   }

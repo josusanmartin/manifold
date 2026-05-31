@@ -1,6 +1,7 @@
 import { removeUndefinedProps } from 'common/util/object'
 import { buildOgUrl } from 'common/util/og'
 import Head from 'next/head'
+import { MEXAS_SITE_NAME, MEXAS_SITE_URL } from 'web/lib/mexas-brand'
 
 export function SEO<
   P extends Record<string, string | string[] | undefined>
@@ -17,13 +18,21 @@ export function SEO<
   const imageUrl =
     image ??
     (ogProps &&
-      buildOgUrl(removeUndefinedProps(ogProps.props) as any, ogProps.endpoint))
+      buildOgUrl(
+        removeUndefinedProps(ogProps.props) as any,
+        ogProps.endpoint,
+        MEXAS_SITE_URL
+      ))
 
-  const absUrl = 'https://manifold.markets' + url
+  const absUrl = MEXAS_SITE_URL + url
+  const pageTitle =
+    title === MEXAS_SITE_NAME
+      ? MEXAS_SITE_NAME
+      : `${title} | ${MEXAS_SITE_NAME}`
 
   return (
     <Head>
-      <title>{`${title} | Manifold`}</title>
+      <title>{pageTitle}</title>
 
       <meta
         property="og:title"
@@ -43,13 +52,6 @@ export function SEO<
       {url && <link rel="canonical" href={absUrl} />}
 
       {url && <meta property="og:url" content={absUrl} key="url" />}
-
-      {url && (
-        <meta
-          name="apple-itunes-app"
-          content={'app-id=6444136749, app-argument=' + absUrl}
-        />
-      )}
 
       {imageUrl && (
         <>

@@ -19,6 +19,7 @@ import {
   XIcon,
 } from '@heroicons/react/solid'
 import clsx from 'clsx'
+import { shortenNumber } from 'common/util/formatNumber'
 import { User } from 'common/user'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -35,7 +36,6 @@ import { trackCallback } from 'web/lib/service/analytics'
 import { Col } from '../layout/col'
 import { Row } from '../layout/row'
 import { Avatar } from '../widgets/avatar'
-import { TokenNumber } from '../widgets/token-number'
 import Sidebar from './sidebar'
 import { NavItem } from './sidebar-item'
 
@@ -58,7 +58,7 @@ const NotificationsIconSolid = (props: { className?: string }) => (
 function getNavigation(user: User) {
   return [
     {
-      name: 'Fund',
+      name: 'Markets',
       href: '/checkout',
       icon: CreditCardIcon,
       solidIcon: CreditCardIconSolid,
@@ -78,7 +78,7 @@ function getNavigation(user: User) {
 
 const signedOutNavigation = (privyLogin: () => void) => [
   {
-    name: 'Fund',
+    name: 'Markets',
     href: '/checkout',
     icon: CreditCardIcon,
     solidIcon: CreditCardIconSolid,
@@ -207,7 +207,7 @@ function NavBarItem(props: {
           <div
             className={clsx(
               'rounded-full',
-              isOnUserProfile && 'ring-2 ring-violet-600'
+              isOnUserProfile && 'ring-2 ring-teal-600'
             )}
           >
             <Avatar
@@ -218,14 +218,8 @@ function NavBarItem(props: {
               displayContext="profile_sidebar"
             />
           </div>
-          <Row className="mt-0.5 gap-1">
-            <TokenNumber
-              amount={user?.balance}
-              className="text-violet-600 dark:text-violet-400"
-              numberType="short"
-              isInline
-              coinClassName="!top-[0.1rem]"
-            />
+          <Row className="text-ink-700 mt-0.5 gap-1 text-[11px] font-semibold">
+            {shortenNumber(user.balance ?? 0)} MEX
           </Row>
         </Col>
       </Link>

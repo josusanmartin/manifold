@@ -6,6 +6,7 @@ import { parseJsonContentToText } from 'common/util/parse'
 import { JsonLd } from 'web/components/JsonLd'
 import { SEO } from 'web/components/SEO'
 import { buildMarketQAPage, buildBreadcrumbs } from 'web/lib/json-ld'
+import { MEXAS_SITE_URL } from 'web/lib/mexas-brand'
 
 export function ContractSEO(props: {
   contract: Contract
@@ -45,7 +46,7 @@ export function ContractSEO(props: {
   const jsonLd = buildMarketQAPage({
     question: contract.question,
     description: descriptionText,
-    url: `https://manifold.markets${contractPath(contract)}`,
+    url: `${MEXAS_SITE_URL}${contractPath(contract)}`,
     creatorName: contract.creatorName,
     creatorUsername: contract.creatorUsername,
     createdTime: contract.createdTime,
@@ -64,10 +65,10 @@ export function ContractSEO(props: {
 
   const breadcrumbs = jsonLd
     ? buildBreadcrumbs([
-        { name: 'Home', url: 'https://manifold.markets' },
+        { name: 'Home', url: MEXAS_SITE_URL },
         {
           name: contract.creatorName,
-          url: `https://manifold.markets/${contract.creatorUsername}`,
+          url: `${MEXAS_SITE_URL}/${contract.creatorUsername}`,
         },
         { name: contract.question }, // Last item omits URL per Google docs
       ])
