@@ -4,7 +4,13 @@ import { ENV_CONFIG } from 'common/envs/constants'
 let currentToken: string | undefined
 
 export function getSupabaseInstanceId() {
-  return ENV_CONFIG.supabaseInstanceId
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_INSTANCE_ID ||
+    process.env.SUPABASE_INSTANCE_ID ||
+    ENV_CONFIG.supabaseInstanceId
+  )
 }
 
 export function initSupabaseClient() {
@@ -12,7 +18,9 @@ export function initSupabaseClient() {
   const localUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
   const localKey =
-    process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY
+    process.env.NEXT_PUBLIC_SUPABASE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_KEY
   if (
     process.env.LOCAL_ONLY === 'true' ||
     process.env.NEXT_PUBLIC_LOCAL_ONLY === 'true'
@@ -27,7 +35,12 @@ export function initSupabaseClient() {
   }
 
   const instanceId = getSupabaseInstanceId()
-  return createClient(instanceId, ENV_CONFIG.supabaseAnonKey)
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_KEY ||
+    ENV_CONFIG.supabaseAnonKey
+  return createClient(instanceId, key)
 }
 
 export function updateSupabaseAuth(token?: string) {
