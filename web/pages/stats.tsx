@@ -166,8 +166,20 @@ export default function Analytics(props: {
     idenfyStats,
   } = props
 
-  if (!stats) {
-    return null
+  if (!stats?.length) {
+    return (
+      <Page trackPageView={'site stats page'}>
+        <SEO
+          title="Stats"
+          description="See site-wide usage statistics."
+          url="/stats"
+        />
+        <Col className="px-4 sm:pl-6 sm:pr-16">
+          <Title>Stats</Title>
+          <p className="text-ink-500">No site stats are available yet.</p>
+        </Col>
+      </Page>
+    )
   }
 
   return (

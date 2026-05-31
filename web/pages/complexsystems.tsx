@@ -38,7 +38,7 @@ export async function getStaticProps() {
 }
 
 export default function ComplexSystems(
-  props: ElectionsPageProps & { complexSystemsContract: Contract }
+  props: ElectionsPageProps & { complexSystemsContract: Contract | null }
 ) {
   useTracking('complex systems page view')
 
@@ -64,10 +64,12 @@ export default function ComplexSystems(
         loginTrackingText="Sign up from /complexsystems"
       />
 
-      <FeedContractCard
-        contract={props.complexSystemsContract}
-        className="mx-1 mb-6 w-[calc(100%-0.5rem)] sm:mx-2 sm:w-[calc(100%-1rem)]"
-      />
+      {props.complexSystemsContract && (
+        <FeedContractCard
+          contract={props.complexSystemsContract}
+          className="mx-1 mb-6 w-[calc(100%-0.5rem)] sm:mx-2 sm:w-[calc(100%-1rem)]"
+        />
+      )}
       <USElectionsPage {...props} hideTitle />
     </Page>
   )

@@ -31,7 +31,8 @@ export const getStaticProps = async () => {
       .order('created_time', { ascending: false })
       .limit(1)
 
-    const { points, score, n } = result.data?.[0]?.data as any
+    const calibration = result.data?.[0]?.data as any
+    const { points = [], score = 0, n = 0 } = calibration ?? {}
     const trumpMarket = await getContract(db, 'AiEh38dIYVV5tOs1RmN3')
     const gazaMarket = await getContract(db, 'KmWz1wvC8AmNX3a1iiUF')
     const sbfMarket = await getContract(db, 'dRdXZtj8UXiXxkoF2rXE')

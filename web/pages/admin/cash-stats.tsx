@@ -28,8 +28,20 @@ export const getStaticProps = async () => {
 export default function CashStats(props: { stats: Row<'daily_stats'>[] }) {
   const { stats } = props
 
-  if (!stats) {
-    return null
+  if (!stats?.length) {
+    return (
+      <Page trackPageView={'cash stats page'}>
+        <SEO
+          title="Sweepcash Stats"
+          description="See sweepcash trading statistics."
+          url="/cash-stats"
+        />
+        <Col className="px-4 sm:pl-6 sm:pr-16">
+          <Title>Sweepcash Stats</Title>
+          <p className="text-ink-500">No sweepcash stats are available yet.</p>
+        </Col>
+      </Page>
+    )
   }
 
   return (
