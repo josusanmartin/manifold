@@ -12,6 +12,8 @@ import Link from 'next/link'
 import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
 
 const FEATURED_MARKET_URL = '/mexas-test/who-will-win-the-2026-fifa-world-cu'
+const UKRAINE_MARKET_URL =
+  '/mexas-test/will-the-russia-ukraine-war-end-by-december-31-2026'
 
 const WORLD_CUP_MARKETS = [
   { name: 'France', yes: 17.1, no: 83.0, volume: '33.0M' },
@@ -55,11 +57,15 @@ function MarketHeader() {
   )
 }
 
-function PriceButton(props: { side: 'yes' | 'no'; price: number }) {
+function PriceButton(props: {
+  side: 'yes' | 'no'
+  price: number
+  href?: string
+}) {
   const yes = props.side === 'yes'
   return (
     <Link
-      href={FEATURED_MARKET_URL}
+      href={props.href ?? FEATURED_MARKET_URL}
       className={clsx(
         'min-w-[90px] rounded px-3 py-2 text-center text-xs font-semibold transition-colors',
         yes
@@ -69,6 +75,50 @@ function PriceButton(props: { side: 'yes' | 'no'; price: number }) {
     >
       Buy {yes ? 'Yes' : 'No'} {props.price.toFixed(1)}c
     </Link>
+  )
+}
+
+function SimpleMarketCard() {
+  return (
+    <section className="border-ink-200 bg-canvas-0 overflow-hidden rounded-md border">
+      <div className="border-ink-200 border-b px-4 py-3 sm:px-5">
+        <Row className="flex-wrap items-center justify-between gap-3">
+          <Col className="gap-1">
+            <Row className="text-ink-500 flex-wrap items-center gap-2 text-xs font-medium uppercase">
+              <span>Geopolitics</span>
+              <span>/</span>
+              <span>Ukraine</span>
+              <span className="rounded bg-teal-50 px-2 py-0.5 text-teal-700 dark:bg-teal-950 dark:text-teal-200">
+                YES/NO
+              </span>
+            </Row>
+            <h2 className="text-ink-1000 text-lg font-semibold sm:text-xl">
+              Will the Russia-Ukraine war end by December 31, 2026?
+            </h2>
+          </Col>
+          <div className="text-ink-900 text-2xl font-semibold">30%</div>
+        </Row>
+      </div>
+
+      <Col className="gap-3 p-4 sm:p-5">
+        <Row className="text-ink-500 flex-wrap items-center gap-3 text-xs font-medium">
+          <span>MEX 0 Vol.</span>
+          <span>Closes Dec 31, 2026</span>
+          <span>Order book enabled</span>
+        </Row>
+        <Row className="flex-wrap gap-2">
+          <PriceButton side="yes" price={30} href={UKRAINE_MARKET_URL} />
+          <PriceButton side="no" price={70} href={UKRAINE_MARKET_URL} />
+        </Row>
+        <Link
+          href={UKRAINE_MARKET_URL}
+          className="text-ink-900 inline-flex items-center gap-1 text-sm font-semibold hover:text-teal-700"
+        >
+          Open YES/NO market
+          <ExternalLinkIcon className="h-4 w-4" />
+        </Link>
+      </Col>
+    </section>
   )
 }
 
@@ -198,7 +248,10 @@ function CheckoutContent() {
       </Row>
 
       <div className="grid w-full gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <FeaturedMarketTable />
+        <Col className="gap-4">
+          <SimpleMarketCard />
+          <FeaturedMarketTable />
+        </Col>
         <MexasRail />
       </div>
     </Col>

@@ -562,6 +562,9 @@ const ChoiceOverview = (props: {
       {!showResolver && !showUnresolver && (
         <>
           {resolutionRating}
+          {tradingAllowed(contract) && (
+            <MarketOrderBookPanel contract={contract} />
+          )}
           <AnswersPanel
             setDefaultAnswerIdsToGraph={setDefaultAnswerIdsToGraph}
             selectedAnswerIds={selectedAnswerIds}
@@ -583,9 +586,6 @@ const ChoiceOverview = (props: {
             showSetDefaultSort={showSetDefaultSort}
             className={hideGraph ? '-mt-4' : ''}
           />
-          {tradingAllowed(contract) && (
-            <MarketOrderBookPanel contract={contract} />
-          )}
         </>
       )}
     </>
