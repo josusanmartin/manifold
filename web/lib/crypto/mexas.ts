@@ -51,3 +51,7 @@ export function formatMexasUnits(units: bigint) {
 export function getArbiscanTxUrl(hash: Hex) {
   return `https://arbiscan.io/tx/${hash}`
 }
+
+export function getArbiscanAddressUrl(address: Address) {
+  return `https://arbiscan.io/address/${address}`
+}

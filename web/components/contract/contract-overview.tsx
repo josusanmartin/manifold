@@ -83,6 +83,7 @@ import { Col } from '../layout/col'
 import { Row } from '../layout/row'
 import { CancelLabel } from '../outcome-label'
 import { PollPanel } from '../poll/poll-panel'
+import { MarketOrderBookPanel } from './order-book-panel'
 import { AlertBox } from '../widgets/alert-box'
 import { GradientContainer } from '../widgets/gradient-container'
 import { LoadingIndicator } from '../widgets/loading-indicator'
@@ -582,6 +583,9 @@ const ChoiceOverview = (props: {
             showSetDefaultSort={showSetDefaultSort}
             className={hideGraph ? '-mt-4' : ''}
           />
+          {tradingAllowed(contract) && (
+            <MarketOrderBookPanel contract={contract} />
+          )}
         </>
       )}
     </>
@@ -1154,6 +1158,7 @@ export function BinaryBetPanel(props: {
   return (
     <Col className="mt-2 w-full">
       <BuyPanel inModal={false} contract={contract} className="bg-canvas-50" />
+      <MarketOrderBookPanel contract={contract} />
     </Col>
   )
 }

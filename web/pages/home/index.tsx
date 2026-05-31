@@ -30,10 +30,10 @@ export default function Home() {
           className="fixed bottom-[64px] right-3 z-20 inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-3 text-white shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 lg:hidden"
           onClick={() => {
             Router.push('/checkout')
-            track('mobile fund mex button')
+            track('mobile wallet button')
           }}
         >
-          <span className="font-semibold">Fund MEX</span>
+          <span className="font-semibold">Wallet</span>
         </button>
       )}
       {/* Preload feed */}

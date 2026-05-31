@@ -26,7 +26,7 @@ export function AddFundsButton(props: {
         className ?? ''
       }`}
     >
-      Fund MEX
+      Wallet
     </Button>
   )
 }
