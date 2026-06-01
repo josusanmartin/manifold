@@ -319,6 +319,8 @@ export const BinaryOverview = (props: {
         </Row>
       </Row>
 
+      {tradingAllowed(contract) && <MarketOrderBookPanel contract={contract} />}
+
       <SizedBinaryChart
         showZoomer={showZoomer}
         showAnnotations={true}
@@ -480,6 +482,9 @@ const ChoiceOverview = (props: {
           </>
         )}
       </Row>
+      {!showResolver && !showUnresolver && tradingAllowed(contract) && (
+        <MarketOrderBookPanel contract={contract} />
+      )}
       {contract.mechanism == 'cpmm-multi-1' && !hideGraph && (
         <SizedContainer
           className={clsx(
@@ -562,9 +567,6 @@ const ChoiceOverview = (props: {
       {!showResolver && !showUnresolver && (
         <>
           {resolutionRating}
-          {tradingAllowed(contract) && (
-            <MarketOrderBookPanel contract={contract} />
-          )}
           <AnswersPanel
             setDefaultAnswerIdsToGraph={setDefaultAnswerIdsToGraph}
             selectedAnswerIds={selectedAnswerIds}
@@ -1102,6 +1104,8 @@ const PseudoNumericOverview = (props: {
         )}
       </SizedContainer>
 
+      {tradingAllowed(contract) && <MarketOrderBookPanel contract={contract} />}
+
       {user && tradingAllowed(contract) && (
         <BinaryBetPanel contract={contract} />
       )}
@@ -1143,6 +1147,8 @@ const StonkOverview = (props: {
         )}
       </SizedContainer>
 
+      {tradingAllowed(contract) && <MarketOrderBookPanel contract={contract} />}
+
       {user && tradingAllowed(contract) && (
         <BinaryBetPanel contract={contract} />
       )}
@@ -1158,7 +1164,6 @@ export function BinaryBetPanel(props: {
   return (
     <Col className="mt-2 w-full">
       <BuyPanel inModal={false} contract={contract} className="bg-canvas-50" />
-      <MarketOrderBookPanel contract={contract} />
     </Col>
   )
 }

@@ -213,10 +213,8 @@ export const canReceiveBonuses = (user: User) =>
   user.bonusEligibility === 'verified' ||
   user.bonusEligibility === 'grandfathered'
 
-// Users who can comment on markets: bonus-eligible (verified/grandfathered)
-// OR anyone who has purchased mana.
-export const canCommentOnMarket = (user: User) =>
-  canReceiveBonuses(user) || user.purchasedMana === true
+// MEXAS markets do not require identity verification or a prior purchase to comment.
+export const canCommentOnMarket = (_user: User) => true
 
 // expires: sep 26th, ~530pm PT
 const LIMITED_TIME_DEAL_END = 1727311753233 + DAY_MS

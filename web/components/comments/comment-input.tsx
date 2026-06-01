@@ -1,4 +1,4 @@
-import { PaperAirplaneIcon, ShieldCheckIcon } from '@heroicons/react/solid'
+import { PaperAirplaneIcon } from '@heroicons/react/solid'
 import { Editor } from '@tiptap/react'
 import { useEvent } from 'client-common/hooks/use-event'
 import clsx from 'clsx'
@@ -7,13 +7,10 @@ import { APIError } from 'common/api/utils'
 import { Bet } from 'common/bet'
 import { ContractComment, MAX_COMMENT_LENGTH } from 'common/comment'
 import { Contract } from 'common/contract'
-import { STARTING_BALANCE } from 'common/economy'
-import { canCommentOnMarket, canReceiveBonuses, User } from 'common/user'
-import { formatMoney } from 'common/util/format'
+import { User } from 'common/user'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { BiRepost } from 'react-icons/bi'
-import { Button } from 'web/components/buttons/button'
 import { Tooltip } from 'web/components/widgets/tooltip'
 import { useAnswer } from 'web/hooks/use-answers'
 import { isBlocked, usePrivateUser, useUser } from 'web/hooks/use-user'
@@ -23,7 +20,6 @@ import { firebaseLogin } from 'web/lib/firebase/users'
 import { track } from 'web/lib/service/analytics'
 import { safeLocalStorage } from 'web/lib/util/local'
 import { CommentOnAnswer } from '../feed/comment-on-answer'
-import { Col } from '../layout/col'
 import { Row } from '../layout/row'
 import { Avatar } from '../widgets/avatar'
 import { TextEditor, useTextEditor } from '../widgets/editor'
@@ -61,7 +57,6 @@ export function CommentInput(props: {
     commentTypes,
     onClearInput,
     priorityUserIds,
-    allowPurchasedMana,
   } = props
   const user = useUser()
 
@@ -111,17 +106,6 @@ export function CommentInput(props: {
   })
 
   if (user?.isBannedFromPosting) return <></>
-
-  const canComment = user
-    ? allowPurchasedMana
-      ? canCommentOnMarket(user)
-      : canReceiveBonuses(user)
-    : true
-  const showVerifyPrompt =
-    user &&
-    !canComment &&
-    (allowPurchasedMana || user.bonusEligibility !== 'ineligible')
-  if (showVerifyPrompt) return <VerifyToCommentPrompt className={className} />
 
   return blocked ? (
     <div className={'text-ink-500 mb-3 text-sm'}>
@@ -276,54 +260,6 @@ export function CommentInputTextArea(props: {
         )}
       </Row>
     </TextEditor>
-  )
-}
-
-function VerifyToCommentPrompt(props: { className?: string }) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleVerify = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      track('comment verification prompt: clicked')
-      const response = await api('create-idenfy-session', {})
-      window.location.href = response.redirectUrl
-    } catch (e) {
-      console.error('Failed to start verification:', e)
-      setError('Failed to start verification. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <Col
-      className={clsx(
-        props.className,
-        'border-primary-300 bg-primary-50 mb-2 w-full rounded-lg border p-3'
-      )}
-    >
-      <Row className="items-center gap-2">
-        <ShieldCheckIcon className="text-primary-500 h-5 w-5 shrink-0" />
-        <span className="text-ink-700 flex-1 text-sm">
-          Verify your identity to comment and get{' '}
-          <span className="font-semibold">
-            {formatMoney(STARTING_BALANCE, 'MANA')}
-          </span>
-        </span>
-        <Button
-          size="xs"
-          onClick={handleVerify}
-          loading={loading}
-          className="shrink-0"
-        >
-          Verify now
-        </Button>
-      </Row>
-      {error && <div className="text-scarlet-500 mt-1 text-xs">{error}</div>}
-    </Col>
   )
 }
 
