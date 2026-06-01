@@ -50,7 +50,12 @@ export const config = {
   ],
 }
 
-const pathsToSkip = ['privy-user', 'v0/deployment-id', 'v0/revalidate']
+const pathsToSkip = [
+  'mexas-order-book',
+  'privy-user',
+  'v0/deployment-id',
+  'v0/revalidate',
+]
 
 function getProxiedRequestUrl(req: NextRequest, path: string) {
   const baseUrl = getApiUrl(path)
