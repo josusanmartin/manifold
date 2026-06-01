@@ -58,7 +58,7 @@ export function BettingStreakProgressModal(props: {
           streak.
         </p>
         <p className="text-ink-700 mb-2">
-          Longer streaks earn bigger mana bonuses:
+          Longer streaks earn bigger MEX bonuses:
         </p>
         <div className="my-4">
           <StreakProgressBar

@@ -41,13 +41,12 @@ export function FundsSelector(props: {
     <Col className="mx-auto max-w-xl">
       <Row className="mb-2 items-center gap-1 text-2xl font-semibold">
         <FaStore className="h-6 w-6" />
-        Buy mana
+        Open MEX wallet
       </Row>
       <div className={clsx('text-ink-700 mb-4 text-sm')}>
         <div>
           <span>
-            Buy mana to trade in your favorite questions. Not redeemable for
-            cash.
+            Deposit MEX to your wallet to trade in your favorite questions.
           </span>
           <CashoutLimitWarning user={user} className="mt-2" />
         </div>
@@ -70,7 +69,7 @@ export function FundsSelector(props: {
       </div>
       {isPurchaseBanned && (
         <AlertBox title="Purchases disabled" className="my-4">
-          Your account has been restricted from purchasing mana.
+          Your account has been restricted from wallet funding.
         </AlertBox>
       )}
       {pastLimit && !isPurchaseBanned && (

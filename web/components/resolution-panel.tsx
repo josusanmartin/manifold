@@ -136,7 +136,7 @@ export function ResolutionPanel(props: {
             <>Pay out {BETTORS} who bought NO.</>
           ) : outcome === 'CANCEL' ? (
             <>
-              Cancel all trades and return mana back to {BETTORS}. You repay
+              Cancel all trades and return MEX back to {BETTORS}. You repay
               earned fees.
             </>
           ) : outcome === 'MKT' ? (
@@ -354,7 +354,7 @@ export function MiniResolutionPanel(props: {
           </Col>
         )}
         {outcome === 'CANCEL' && (
-          <div className="text-warning">Cancel trades and return mana</div>
+          <div className="text-warning">Cancel trades and return MEX</div>
         )}
         {error && (
           <div className="text-scarlet-500 self-start rounded p-1 text-xs">

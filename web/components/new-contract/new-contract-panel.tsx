@@ -1674,8 +1674,8 @@ const TraderPanel = ({
     <div className="pb-2">Our thousands of daily, active traders.</div>
     <div className="pb-2">
       The traders that have insight into your question will push the probability
-      towards the correct answer. The traders that are correct earn more mana
-      (our play-money currency), and influence the probability more.
+      towards the correct answer. The traders that are correct earn more MEX,
+      and influence the probability more.
     </div>
   </ExpandSection>
 )

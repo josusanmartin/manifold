@@ -786,7 +786,7 @@ export default function ShopPage() {
               href="/checkout"
               className="text-primary-600 hover:text-primary-700 font-medium"
             >
-              Buy mana →
+              Open wallet →
             </Link>
           </Row>
         ) : (
@@ -2054,7 +2054,7 @@ function MerchItemCard(props: {
             ) : !canPurchase && user ? (
               <Link href="/checkout" className="w-full">
                 <Button size="sm" color="gradient-pink" className="w-full">
-                  Buy mana
+                  Open wallet
                 </Button>
               </Link>
             ) : (
@@ -6261,7 +6261,7 @@ function ShopItemCard(props: {
                   {!canPurchase && user ? (
                     <Link href="/checkout">
                       <Button size="xs" color="gradient-pink">
-                        Buy mana
+                        Open wallet
                       </Button>
                     </Link>
                   ) : (
@@ -6335,7 +6335,7 @@ function ShopItemCard(props: {
                     ) : !canPurchase && user ? (
                       <Link href="/checkout">
                         <Button size="sm" color="gradient-pink">
-                          Buy mana
+                          Open wallet
                         </Button>
                       </Link>
                     ) : (
@@ -6368,7 +6368,7 @@ function ShopItemCard(props: {
                         color="gradient-pink"
                         className="w-full"
                       >
-                        Buy mana
+                        Open wallet
                       </Button>
                     </Link>
                   ) : (

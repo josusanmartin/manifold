@@ -50,14 +50,14 @@ export function AddFundsModal(props: {
         className="[&_svg]:hidden" // hide carousel switcher
         tabs={buildArray(
           {
-            title: 'Buy mana',
+            title: 'Open MEX wallet',
             content: <BuyManaTab onClose={() => setOpen(false)} />,
           },
           {
-            title: 'Earn free mana',
+            title: 'Earn free MEX',
             content: (
               <>
-                <div className="my-4">Other ways to earn mana:</div>
+                <div className="my-4">Other ways to earn MEX:</div>
                 <OtherWaysToGetMana />
               </>
             ),

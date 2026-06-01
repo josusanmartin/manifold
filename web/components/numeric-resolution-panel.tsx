@@ -115,7 +115,7 @@ export function NumericResolutionPanel(props: {
         <div className="flex items-center gap-2 text-sm">
           {
             outcomeMode === 'CANCEL' ? (
-              <>Cancel all trades and return mana back to {BETTORS}.</>
+              <>Cancel all trades and return MEX back to {BETTORS}.</>
             ) : outcomeMode === 'NUMBER' ? (
               <>
                 Pay out {BETTORS} who brought the market closer to the correct

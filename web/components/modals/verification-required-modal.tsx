@@ -18,7 +18,7 @@ type VerificationRequiredModalProps = {
     | 'claim free loan'
     | 'earn quest rewards'
     | 'receive bonuses'
-    | 'buy mana with a credit card'
+    | 'fund your MEX wallet'
 }
 
 export function VerificationRequiredModal({
