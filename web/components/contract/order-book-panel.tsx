@@ -5,7 +5,7 @@ import {
 } from 'common/contract'
 import { shortFormatNumber } from 'common/util/format'
 import { orderBy, sumBy } from 'lodash'
-import { useAPIGetter } from 'web/hooks/use-api-getter'
+import { useEffect, useState } from 'react'
 import { Col } from '../layout/col'
 import { Row } from '../layout/row'
 
@@ -94,11 +94,7 @@ function sizeLabel(size?: number) {
 export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
   const { contract } = props
   const markets = getMarkets(contract)
-  const { data, loading } = useAPIGetter('bets', {
-    contractId: contract.id,
-    kinds: 'open-limit',
-    limit: 500,
-  })
+  const { data, loading } = useMexasOpenOrders(contract.id)
   const openOrders = (data ?? []).filter(isOpenLimitBet)
 
   if (!markets.length) return null
@@ -139,6 +135,44 @@ export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
       )}
     </Col>
   )
+}
+
+function useMexasOpenOrders(contractId: string) {
+  const [data, setData] = useState<Bet[] | undefined>()
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+
+    fetch(
+      `/api/mexas-order-book?contractId=${encodeURIComponent(
+        contractId
+      )}&limit=500`
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Order book request failed: ${response.status}`)
+        }
+        return (await response.json()) as Bet[]
+      })
+      .then((orders) => {
+        if (!cancelled) setData(orders)
+      })
+      .catch((error) => {
+        console.error(error)
+        if (!cancelled) setData([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [contractId])
+
+  return { data, loading }
 }
 
 function BinaryMarketBook(props: {
