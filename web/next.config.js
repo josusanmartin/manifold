@@ -22,6 +22,7 @@ const MEXAS_ONLY_REDIRECTS = [
   '/calibration',
   '/charity',
   '/charity/:path*',
+  '/complexsystems',
   '/explore',
   '/lab',
   '/predictle',
