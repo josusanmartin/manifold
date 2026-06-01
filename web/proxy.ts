@@ -22,7 +22,7 @@ export async function proxy(req: NextRequest) {
   if (url.pathname.startsWith('/api/')) {
     const path = req.nextUrl.pathname.replace('/api/', '')
 
-    if (pathsToSkip.includes(path)) {
+    if (shouldSkipProxy(path)) {
       return NextResponse.next()
     }
 
@@ -54,9 +54,16 @@ const pathsToSkip = [
   'mexas-order-book',
   'privy-user',
   'v0/bet',
+  'v0/bets',
   'v0/deployment-id',
   'v0/revalidate',
 ]
+
+function shouldSkipProxy(path: string) {
+  return pathsToSkip.some((skipPath) => {
+    return path === skipPath || path.startsWith(`${skipPath}/`)
+  })
+}
 
 function getProxiedRequestUrl(req: NextRequest, path: string) {
   const baseUrl = getApiUrl(path)

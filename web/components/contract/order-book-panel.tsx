@@ -6,6 +6,8 @@ import {
 import { shortFormatNumber } from 'common/util/format'
 import { orderBy, sumBy } from 'lodash'
 import { useEffect, useState } from 'react'
+import { useUser } from 'web/hooks/use-user'
+import { YourOrders } from '../bet/order-book'
 import { Col } from '../layout/col'
 import { Row } from '../layout/row'
 
@@ -93,8 +95,9 @@ function sizeLabel(size?: number) {
 
 export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
   const { contract } = props
+  const user = useUser()
   const markets = getMarkets(contract)
-  const { data, loading } = useMexasOpenOrders(contract.id)
+  const { data, loading, removeOrder } = useMexasOpenOrders(contract.id)
   const openOrders = (data ?? []).filter(isOpenLimitBet)
 
   if (!markets.length) return null
@@ -133,6 +136,19 @@ export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
           limit orders will appear here.
         </div>
       )}
+
+      {user && (
+        <div className="border-ink-200 border-t">
+          <YourOrders
+            contract={contract as any}
+            bets={openOrders}
+            title="Your open orders"
+            showEmptyState
+            deemphasizedHeader
+            onOrderCancelled={(bet) => removeOrder(bet.id)}
+          />
+        </div>
+      )}
     </Col>
   )
 }
@@ -143,36 +159,43 @@ function useMexasOpenOrders(contractId: string) {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
 
-    fetch(
-      `/api/mexas-order-book?contractId=${encodeURIComponent(
-        contractId
-      )}&limit=500`
-    )
-      .then(async (response) => {
+    const loadOrders = async (showLoading: boolean) => {
+      if (showLoading) setLoading(true)
+
+      try {
+        const response = await fetch(
+          `/api/mexas-order-book?contractId=${encodeURIComponent(
+            contractId
+          )}&limit=500`
+        )
         if (!response.ok) {
           throw new Error(`Order book request failed: ${response.status}`)
         }
-        return (await response.json()) as Bet[]
-      })
-      .then((orders) => {
+        const orders = (await response.json()) as Bet[]
         if (!cancelled) setData(orders)
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error(error)
         if (!cancelled) setData([])
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false)
-      })
+      }
+    }
+
+    loadOrders(true)
+    const interval = setInterval(() => loadOrders(false), 10_000)
 
     return () => {
       cancelled = true
+      clearInterval(interval)
     }
   }, [contractId])
 
-  return { data, loading }
+  const removeOrder = (betId: string) => {
+    setData((orders) => orders?.filter((order) => order.id !== betId))
+  }
+
+  return { data, loading, removeOrder }
 }
 
 function BinaryMarketBook(props: {

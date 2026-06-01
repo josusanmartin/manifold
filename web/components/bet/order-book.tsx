@@ -54,8 +54,19 @@ export function YourOrders(props: {
   bets: LimitBet[]
   deemphasizedHeader?: boolean
   className?: string
+  title?: string
+  showEmptyState?: boolean
+  onOrderCancelled?: (bet: LimitBet) => void
 }) {
-  const { contract, bets, deemphasizedHeader, className } = props
+  const {
+    contract,
+    bets,
+    deemphasizedHeader,
+    className,
+    title = 'Your orders',
+    showEmptyState,
+    onOrderCancelled,
+  } = props
   const user = useUser()
 
   const yourBets = sortBy(
@@ -64,13 +75,28 @@ export function YourOrders(props: {
     (bet) => -1 * bet.createdTime
   )
 
+  if (!user) return null
+
   const maxShownNotExpanded = 3
   const [isExpanded, setIsExpanded] = usePersistentInMemoryState(
     false,
     `${contract.id}-your-orderbook-expanded`
   )
 
-  if (yourBets.length === 0) return null
+  if (yourBets.length === 0) {
+    if (!showEmptyState) return null
+
+    return (
+      <Col className={clsx(className, 'bg-canvas-0 overflow-hidden')}>
+        <div className="px-4 pb-1 pt-3">
+          <span className="text-ink-900 text-base font-semibold">{title}</span>
+        </div>
+        <div className="text-ink-500 px-4 pb-4 text-sm">
+          No open orders on this market.
+        </div>
+      </Col>
+    )
+  }
 
   const moreOrders = yourBets.length - maxShownNotExpanded
 
@@ -80,11 +106,11 @@ export function YourOrders(props: {
       <div className="px-4 pb-1 pt-3">
         {deemphasizedHeader ? (
           <span className="text-ink-700 text-base font-medium">
-            Your orders
+            {title}
           </span>
         ) : (
           <span className="text-ink-900 text-base font-semibold">
-            Your orders
+            {title}
           </span>
         )}
       </div>
@@ -98,6 +124,7 @@ export function YourOrders(props: {
           )}
           contract={contract}
           isYou
+          onOrderCancelled={onOrderCancelled}
         />
       </div>
 
@@ -132,8 +159,9 @@ export function OrderTable(props: {
     | MultiContract
   isYou?: boolean
   showAnswers?: boolean
+  onOrderCancelled?: (bet: LimitBet) => void
 }) {
-  const { limitBets, contract, isYou, showAnswers } = props
+  const { limitBets, contract, isYou, showAnswers, onOrderCancelled } = props
   const answers =
     showAnswers && contract.mechanism === 'cpmm-multi-1'
       ? contract.answers.filter((a) =>
@@ -144,12 +172,16 @@ export function OrderTable(props: {
   const [isCancelling, setIsCancelling] = useState(false)
   const onCancel = async () => {
     setIsCancelling(true)
-    await Promise.all(
-      limitBets
-        .filter((b) => !b.isCancelled)
-        .map((bet) => api('bet/cancel/:betId', { betId: bet.id }))
-    )
-    setIsCancelling(false)
+    try {
+      const cancelledBets = await Promise.all(
+        limitBets
+          .filter((b) => !b.isCancelled)
+          .map((bet) => api('bet/cancel/:betId', { betId: bet.id }))
+      )
+      cancelledBets.forEach((bet) => onOrderCancelled?.(bet))
+    } finally {
+      setIsCancelling(false)
+    }
   }
 
   // If showAnswers is true and we have answers, group bets by answerId
@@ -210,6 +242,7 @@ export function OrderTable(props: {
                         bet={bet}
                         contract={contract}
                         isYou={!!isYou}
+                        onOrderCancelled={onOrderCancelled}
                       />
                     ))}
                   </tbody>
@@ -261,6 +294,7 @@ export function OrderTable(props: {
             bet={bet}
             contract={contract}
             isYou={!!isYou}
+            onOrderCancelled={onOrderCancelled}
           />
         ))}
       </tbody>
@@ -277,8 +311,9 @@ function OrderRow(props: {
     | MultiContract
   bet: LimitBet
   isYou: boolean
+  onOrderCancelled?: (bet: LimitBet) => void
 }) {
-  const { contract, bet, isYou } = props
+  const { contract, bet, isYou, onOrderCancelled } = props
   const { orderAmount, amount, limitProb, outcome } = bet
   const isPseudoNumeric = contract.outcomeType === 'PSEUDO_NUMERIC'
   const isBinaryMC = isBinaryMulti(contract)
@@ -288,8 +323,12 @@ function OrderRow(props: {
 
   const onCancel = async () => {
     setIsCancelling(true)
-    await api('bet/cancel/:betId', { betId: bet.id })
-    setIsCancelling(false)
+    try {
+      const cancelledBet = await api('bet/cancel/:betId', { betId: bet.id })
+      onOrderCancelled?.(cancelledBet)
+    } finally {
+      setIsCancelling(false)
+    }
   }
   const isCashContract = contract.token === 'CASH'
   const expired = bet.expiresAt && bet.expiresAt < Date.now()
