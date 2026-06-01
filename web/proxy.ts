@@ -53,6 +53,7 @@ export const config = {
 const pathsToSkip = [
   'mexas-order-book',
   'privy-user',
+  'v0/bet',
   'v0/deployment-id',
   'v0/revalidate',
 ]

@@ -47,10 +47,19 @@ export function getApiUrl(path: string) {
 
   if (process.env.NEXT_PUBLIC_API_URL) {
     return `${formatApiBaseUrl(process.env.NEXT_PUBLIC_API_URL)}/${path}`
+  } else if (isMexasBrowserHost()) {
+    return `${window.location.origin}/api/${path}`
   } else {
     const { apiEndpoint } = ENV_CONFIG
     return `https://${apiEndpoint}/${path}`
   }
+}
+
+function isMexasBrowserHost() {
+  return (
+    typeof window !== 'undefined' &&
+    window.location.hostname === 'mexas-manifold.vercel.app'
+  )
 }
 
 export function formatApiBaseUrl(apiUrl: string) {
