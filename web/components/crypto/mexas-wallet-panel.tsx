@@ -80,7 +80,6 @@ function MexasWalletPanelInner() {
   const { wallets, ready: walletsReady } = useWallets()
   const [loadingWallet, setLoadingWallet] = useState(false)
   const [copiedAddress, setCopiedAddress] = useState(false)
-  const [copiedToken, setCopiedToken] = useState(false)
   const [balanceUnits, setBalanceUnits] = useState<bigint | null>(null)
   const [balanceError, setBalanceError] = useState<string | null>(null)
   const [withdrawAddress, setWithdrawAddress] = useState('')
@@ -93,7 +92,6 @@ function MexasWalletPanelInner() {
     (wallet) => wallet.walletClientType === 'privy'
   ) as ConnectedWallet | undefined
   const walletAddress = wallet?.address as Address | undefined
-  const depositQrValue = walletAddress ?? MEXAS_TOKEN.address
 
   const refreshBalance = useCallback(async () => {
     if (!walletAddress) return
@@ -267,7 +265,7 @@ function MexasWalletPanelInner() {
             Deposit QR
           </Row>
           <QRCode
-            url={depositQrValue}
+            url={walletAddress}
             width={180}
             height={180}
             className="rounded-md"
@@ -303,36 +301,6 @@ function MexasWalletPanelInner() {
                 className="border-ink-300 bg-canvas-0 text-ink-700 hover:bg-canvas-50 inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium"
               >
                 Arbiscan
-                <ExternalLinkIcon className="ml-1 h-4 w-4" />
-              </a>
-            </Row>
-          </Col>
-
-          <Col className="border-ink-200 bg-canvas-50 gap-2 rounded-md border p-3">
-            <div className="text-ink-500 text-xs font-medium uppercase">
-              Token contract
-            </div>
-            <div className="text-ink-900 break-all font-mono text-xs">
-              {MEXAS_TOKEN.address}
-            </div>
-            <Row className="flex-wrap gap-2">
-              <Button
-                color="gray-white"
-                size="sm"
-                onClick={() =>
-                  copyToClipboard(MEXAS_TOKEN.address, setCopiedToken)
-                }
-              >
-                <ClipboardCopyIcon className="mr-1 h-4 w-4" />
-                {copiedToken ? 'Copied' : 'Copy token'}
-              </Button>
-              <a
-                href={MEXAS_TOKEN.arbiscanUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="border-ink-300 bg-canvas-0 text-ink-700 hover:bg-canvas-50 inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium"
-              >
-                Token page
                 <ExternalLinkIcon className="ml-1 h-4 w-4" />
               </a>
             </Row>
