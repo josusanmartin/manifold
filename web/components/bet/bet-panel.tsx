@@ -812,7 +812,7 @@ export const BuyPanelBody = (
                           onClick={() => {
                             toast.success(
                               `Slippage protection on ${
-                                isCashContract ? 'cash' : 'mana'
+                                isCashContract ? 'cash' : 'MEX'
                               } questions ${
                                 !slippageProtection ? 'enabled' : 'disabled'
                               }!`
@@ -831,7 +831,7 @@ export const BuyPanelBody = (
                               slippageProtection
                                 ? `Your trades won't move the question probability more than 10 percentage points from displayed probability.`
                                 : `Slippage protection on ${
-                                    isCashContract ? 'cash' : 'mana'
+                                    isCashContract ? 'cash' : 'MEX'
                                   } questions is off.`
                             }
                           >
@@ -1067,7 +1067,7 @@ export const BuyPanelBody = (
           <Row className="mt-5 items-start justify-between text-sm">
             <Row className={''}>
               <span className={clsx('text-ink-600 mr-1 whitespace-nowrap ')}>
-                Your mana balance
+                Your MEX balance
               </span>
               <span className="text-ink-600 font-semibold">
                 <MoneyDisplay

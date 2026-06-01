@@ -752,9 +752,7 @@ export function BlueCapSvg({ style = 0 }: { style?: number }) {
             fontSize="7"
             fill="#ffffff"
             textAnchor="middle"
-          >
-            MANA
-          </text>
+          >MEX</text>
         )}
         {/* Button on top */}
         <circle cx="25" cy="1" r="2.2" fill={c.dark} />
@@ -831,9 +829,7 @@ export function BlueCapSvg({ style = 0 }: { style?: number }) {
           fontSize="7"
           fill="#ffffff"
           textAnchor="middle"
-        >
-          MANA
-        </text>
+        >MEX</text>
       )}
     </svg>
   )
@@ -923,9 +919,7 @@ export function RedCapSvg({ style = 0 }: { style?: number }) {
             fontSize="7"
             fill="#ffffff"
             textAnchor="middle"
-          >
-            MANA
-          </text>
+          >MEX</text>
         )}
         {/* Button on top */}
         <circle cx="25" cy="1" r="2.2" fill={c.dark} />
@@ -1002,9 +996,7 @@ export function RedCapSvg({ style = 0 }: { style?: number }) {
           fontSize="7"
           fill="#ffffff"
           textAnchor="middle"
-        >
-          MANA
-        </text>
+        >MEX</text>
       )}
     </svg>
   )
@@ -1094,9 +1086,7 @@ export function GreenCapSvg({ style = 0 }: { style?: number }) {
             fontSize="7"
             fill="#ffffff"
             textAnchor="middle"
-          >
-            MANA
-          </text>
+          >MEX</text>
         )}
         {/* Button on top */}
         <circle cx="25" cy="1" r="2.2" fill={c.dark} />
@@ -1173,9 +1163,7 @@ export function GreenCapSvg({ style = 0 }: { style?: number }) {
           fontSize="7"
           fill="#ffffff"
           textAnchor="middle"
-        >
-          MANA
-        </text>
+        >MEX</text>
       )}
     </svg>
   )
@@ -1265,9 +1253,7 @@ export function BlackCapSvg({ style = 0 }: { style?: number }) {
             fontSize="7"
             fill="#ffffff"
             textAnchor="middle"
-          >
-            MANA
-          </text>
+          >MEX</text>
         )}
         {/* Button on top */}
         <circle cx="25" cy="1" r="2.2" fill={c.dark} />
@@ -1344,9 +1330,7 @@ export function BlackCapSvg({ style = 0 }: { style?: number }) {
           fontSize="7"
           fill="#ffffff"
           textAnchor="middle"
-        >
-          MANA
-        </text>
+        >MEX</text>
       )}
     </svg>
   )

@@ -12,7 +12,7 @@ import { useRedirectIfSignedIn } from 'web/hooks/use-redirect-if-signed-in'
 
 export default function LoginPage() {
   const privy = usePrivyLogin()
-  useRedirectIfSignedIn('/checkout')
+  useRedirectIfSignedIn('/payments')
 
   return (
     <Page

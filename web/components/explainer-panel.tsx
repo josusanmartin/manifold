@@ -1,6 +1,6 @@
 import { ChevronDoubleDownIcon } from '@heroicons/react/solid'
 import clsx from 'clsx'
-import { ENV_CONFIG, TRADING_TERM } from 'common/envs/constants'
+import { ENV_CONFIG } from 'common/envs/constants'
 import Link from 'next/link'
 import React from 'react'
 import { FaGift } from 'react-icons/fa6'
@@ -13,7 +13,6 @@ import { Row } from './layout/row'
 import { Card } from './widgets/card'
 
 import { ManaCoin } from 'web/public/custom-components/manaCoin'
-import { formatMoney } from 'common/util/format'
 
 export const ExplainerPanel = (props: {
   className?: string
@@ -68,10 +67,10 @@ const WhatIsManifold = ({
   <ExpandSection
     title={
       <>
-        <GoGraph className="mr-2  " /> What is Manifold?
+        <GoGraph className="mr-2  " /> What is MEXAS?
       </>
     }
-    onClick={() => onClick('What is Manifold?')}
+    onClick={() => onClick('What is MEXAS?')}
   >
     <AboutManifold />
   </ExpandSection>
@@ -87,29 +86,18 @@ const Accuracy = ({ onClick }: { onClick: (sectionTitle: string) => void }) => (
     onClick={() => onClick('Are our forecasts accurate?')}
   >
     <div className="pb-2">
-      Yes! Manifold is{' '}
+      Yes! MEXAS markets are designed to stay calibrated through open trading.
       <a
-        className="text-primary-700 hover:underline"
-        target="_blank"
-        href="https://manifold.markets/calibration"
+        className="text-primary-700 ml-1 hover:underline"
+        href="/checkout"
       >
-        very well calibrated
+        Explore live markets
       </a>
-      , with forecasts on average within <strong>4 percentage points</strong> of
-      the true probability. Our probabilities are created by users buying and
-      selling shares of a market.
+      .
     </div>
     <div className="pb-2">
-      In the 2022 US midterm elections, we {''}
-      <a
-        className="text-primary-700 hover:underline"
-        target="_blank"
-        href="https://firstsigma.substack.com/p/midterm-elections-forecast-comparison-analysis"
-      >
-        outperformed all other prediction market platforms {''}
-      </a>
-      and were in line with FiveThirtyEight’s performance. Many people who don't
-      like {TRADING_TERM} still use Manifold to get reliable news.
+      Prices move as traders buy and sell outcomes, so the market price becomes
+      the current crowd estimate.
     </div>
     <div></div>
   </ExpandSection>
@@ -124,20 +112,18 @@ const PlayMoney = ({
     title={
       <>
         <ManaCoin className="!mr-2 h-4 w-4 grayscale" />
-        Why use play money?
+        Why use MEX?
       </>
     }
-    onClick={() => onClick('Why play money?')}
+    onClick={() => onClick('Why use MEX?')}
   >
     <div className="pb-2">
-      Mana ({ENV_CONFIG.moneyMoniker}) is the play-money currency used to bet on
-      Manifold. It cannot be converted to cash. All users start with{' '}
-      {formatMoney(1000)} for free.
+      MEX ({ENV_CONFIG.moneyMoniker}) is the Arbitrum token used to trade on
+      MEXAS markets.
     </div>
     <div className="pb-2">
-      Play money means it's much easier for anyone anywhere in the world to get
-      started and try out forecasting without any risk. It also means there's
-      more freedom to create and bet on any type of question.
+      Deposits stay in your Privy wallet, and withdrawals send tokens directly
+      on-chain.
     </div>
   </ExpandSection>
 )
@@ -157,15 +143,14 @@ const CashPrizes = ({
     onClick={() => onClick('How do I win cash prizes?')}
   >
     <div className="pb-2">
-      Manifold runs regular prize drawings where you can win real USDC.
+      MEXAS can settle rewards and withdrawals through your connected wallet.
     </div>
     <div className="pb-2">
-      No purchase necessary—you can claim a free entry once per drawing. Winners
-      will need a crypto wallet to receive their winnings.
+      Keep enough Arbitrum ETH in the wallet to pay gas for token transfers.
     </div>
     <div className="pb-2">
-      <Link href="/prize" className="text-primary-700 hover:underline">
-        Enter the current prize drawing →
+      <Link href="/payments" className="text-primary-700 hover:underline">
+        Open MEX wallet →
       </Link>
     </div>
   </ExpandSection>

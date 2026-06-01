@@ -2,13 +2,27 @@ const path = require('path')
 
 const API_DOCS_URL = 'https://docs.manifold.markets/api'
 
+const MEXAS_WALLET_REDIRECTS = [
+  '/add-funds',
+  '/link/:path*',
+  '/links',
+].map((source) => ({
+  source,
+  destination: '/payments',
+  permanent: false,
+}))
+
 const MEXAS_ONLY_REDIRECTS = [
   '/',
-  '/add-funds',
   '/home',
   '/browse',
   '/browse/:path*',
+  '/about',
+  '/calibration',
+  '/charity',
+  '/charity/:path*',
   '/explore',
+  '/lab',
   '/predictle',
   '/prize',
   '/prize/:path*',
@@ -17,14 +31,26 @@ const MEXAS_ONLY_REDIRECTS = [
   '/leagues',
   '/leagues/:path*',
   '/live',
+  '/mana-auction',
+  '/manachan',
+  '/membership',
   '/news',
   '/news/:path*',
   '/post/:path*',
   '/posts',
+  '/press',
+  '/redeem',
+  '/referrals',
+  '/shop',
+  '/shop/:path*',
+  '/sitemap',
   '/sports',
+  '/stats',
   '/topic/:path*',
+  '/twitch',
   '/tv',
   '/tv/:path*',
+  '/wrapped',
 ].map((source) => ({
   source,
   destination: '/checkout',
@@ -96,6 +122,7 @@ module.exports = {
   },
   async redirects() {
     return [
+      ...MEXAS_WALLET_REDIRECTS,
       ...MEXAS_ONLY_REDIRECTS,
       {
         source: '/supporter',

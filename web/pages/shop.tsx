@@ -772,7 +772,7 @@ export default function ShopPage() {
       <Col className="mx-auto w-full max-w-3xl p-4">
         <Row className="mb-2 items-center gap-2 text-2xl font-semibold">
           <FaGem className="h-6 w-6 text-violet-500" />
-          Mana Shop
+          MEX Shop
         </Row>
         {user ? (
           <Row className="text-ink-700 mb-6 items-center gap-4 text-sm">

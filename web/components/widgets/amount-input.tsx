@@ -346,10 +346,10 @@ const BuyMoreFunds = (_props: { user: User | null | undefined }) => {
     <>
       Not enough funds.
       <Link
-        href="/checkout"
+        href="/payments"
         className="text-primary-500 hover:decoration-primary-400 ml-1 hover:underline"
       >
-        Buy more?
+        Open wallet
       </Link>
     </>
   )

@@ -88,19 +88,19 @@ export function SweepsCoinsPage() {
   return (
     <>
       <div className="text-primary-700 text-center text-2xl font-normal">
-        How Manifold works
+        How MEXAS works
       </div>
 
       <span className="mt-4 md:mt-6">
-        Manifold has 2 coins that you can {TRADE_TERM} with:
+        MEXAS uses MEX for market trading:
       </span>
       <span className="coin-offset relative ml-[1.1em] mt-4 inline-flex items-center md:mt-6">
         <ManaCoin className="absolute -left-[var(--coin-offset)] top-[var(--coin-top-offset)] min-h-[1em] min-w-[1em]" />
         <span className="text-primary-700 mr-1.5 font-semibold">
           {' '}
-          Mana ({ENV_CONFIG.moneyMoniker})
+          MEX ({ENV_CONFIG.moneyMoniker})
         </span>
-        is play money
+        runs on Arbitrum
       </span>
       <div className="mt-4 md:mt-6">
         <SweepiesCoin className="mr-1 inline-block h-[1em] w-[1em] translate-y-[-0.1em] align-middle" />
@@ -129,8 +129,8 @@ export function SweepsCoinsPage() {
         <PlaceholderGraph className="text-ink-300 h-28" />
       </Col>
       <div className="text-ink-500 my-2 text-xs">
-        You must be 18+ to participate. Manifold is free to play, no purchase
-        required.
+        You must be 18+ to participate. MEX deposits stay in your connected
+        wallet.
       </div>
     </>
   )

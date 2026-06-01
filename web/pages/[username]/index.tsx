@@ -480,7 +480,8 @@ function UserProfile(props: {
                 ),
               },
               {
-                title: 'Payments',
+                title: 'Wallet',
+                queryString: 'payments',
                 stackedTabIcon: <CashIcon className="h-5" />,
                 content: (
                   <>
@@ -627,19 +628,19 @@ function AchievementsSection(props: { userId: string }) {
       id: 'totalVolumeMana',
       title: 'Any Whales?',
       desc: 'Total trading volume.',
-      fmt: () => formatMoney(data.totalVolumeMana, 'MANA'),
+      fmt: () => formatMoney(data.totalVolumeMana),
     },
     {
       id: 'totalReferrals',
-      title: 'Manifold Hype Man',
-      desc: 'Friends you brought to Manifold.',
+      title: 'MEXAS Hype',
+      desc: 'Friends you brought to MEXAS.',
       fmt: () => formatWithCommas(data.totalReferrals),
     },
     {
       id: 'totalReferredProfitMana',
       title: 'Proud Parent',
       desc: 'Profit earned by your referrals.',
-      fmt: () => formatMoney(data.totalReferredProfitMana, 'MANA'),
+      fmt: () => formatMoney(data.totalReferredProfitMana),
     },
     {
       id: 'creatorTraders',
@@ -651,7 +652,7 @@ function AchievementsSection(props: { userId: string }) {
       id: 'totalLiquidityCreatedMarkets',
       title: 'No Slippage Here',
       desc: 'Total liquidity across all your created markets.',
-      fmt: () => formatMoney(data.totalLiquidityCreatedMarkets, 'MANA'),
+      fmt: () => formatMoney(data.totalLiquidityCreatedMarkets),
     },
     {
       id: 'profitableMarketsCount',
@@ -662,20 +663,20 @@ function AchievementsSection(props: { userId: string }) {
     {
       id: 'unprofitableMarketsCount',
       title: 'Ineffective Altruism',
-      desc: 'Number of markets you lost mana on.',
+      desc: 'Number of markets you lost MEX on.',
       fmt: () => formatWithCommas(data.unprofitableMarketsCount),
     },
     {
       id: 'largestProfitableTradeValue',
       title: 'Biggest Win',
       desc: 'Largest profit made on a single market.',
-      fmt: () => formatMoney(data.largestProfitableTradeValue, 'MANA'),
+      fmt: () => formatMoney(data.largestProfitableTradeValue),
     },
     {
       id: 'largestUnprofitableTradeValue',
       title: 'Wealth Redistributor',
       desc: 'Largest loss made on a single market.',
-      fmt: () => formatMoney(data.largestUnprofitableTradeValue, 'MANA'),
+      fmt: () => formatMoney(data.largestUnprofitableTradeValue),
     },
     {
       id: 'seasonsPlatinumOrHigher',
@@ -699,7 +700,7 @@ function AchievementsSection(props: { userId: string }) {
       id: 'largestLeagueSeasonEarnings',
       title: 'Sensational Season',
       desc: 'Largest earnings in a single season.',
-      fmt: () => formatMoney(data.largestLeagueSeasonEarnings, 'MANA'),
+      fmt: () => formatMoney(data.largestLeagueSeasonEarnings),
     },
 
     {

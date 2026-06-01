@@ -6,7 +6,7 @@ export default function AddFundsPage() {
 
 export const getServerSideProps: GetServerSideProps = async () => ({
   redirect: {
-    destination: '/checkout',
+    destination: '/payments',
     permanent: false,
   },
 })

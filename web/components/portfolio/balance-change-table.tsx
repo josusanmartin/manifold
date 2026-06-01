@@ -702,7 +702,7 @@ const txnTitle = (change: TxnBalanceChange) => {
     case 'LEAGUE_PRIZE':
       return 'League prize'
     case 'MANA_PURCHASE':
-      return 'Mana purchase'
+      return 'MEX deposit'
     case 'MARKET_BOOST_REDEEM':
       return 'Claim boost'
     case 'SIGNUP_BONUS':
@@ -711,7 +711,7 @@ const txnTitle = (change: TxnBalanceChange) => {
       return 'Referral bonus'
     case 'CONSUME_SPICE':
     case 'CONSUME_SPICE_DONE':
-      return `Redeem prize points for mana`
+      return `Redeem prize points for MEX`
     case 'CONVERT_CASH':
     case 'CONVERT_CASH_DONE':
       return 'Redeem sweepcash for mana'
