@@ -143,7 +143,7 @@ export const QuickLimitOrderButtons = (props: {
         <Row className="items-center gap-2 text-red-500">
           {error}
           {showBuyMore && (
-            <Link href="/payments" className="text-primary-500 hover:underline">
+            <Link href="/wallet" className="text-primary-500 hover:underline">
               Open wallet
             </Link>
           )}

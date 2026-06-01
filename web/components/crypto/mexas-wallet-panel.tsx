@@ -14,6 +14,7 @@ import {
   type ConnectedWallet,
 } from '@privy-io/react-auth'
 import { MEXAS_TOKEN } from 'common/crypto/mexas'
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   encodeFunctionData,
@@ -23,7 +24,10 @@ import {
   type Hex,
 } from 'viem'
 import { Button } from 'web/components/buttons/button'
-import { usePrivyWalletConfig } from 'web/components/crypto/privy-wallet-providers'
+import {
+  usePrivyLogin,
+  usePrivyWalletConfig,
+} from 'web/components/crypto/privy-wallet-providers'
 import { Col } from 'web/components/layout/col'
 import { Row } from 'web/components/layout/row'
 import { LoadingIndicator } from 'web/components/widgets/loading-indicator'
@@ -72,6 +76,91 @@ export function MexasWalletPanel() {
   }
 
   return <MexasWalletPanelInner />
+}
+
+export function MexasWalletSummary(props: { className?: string }) {
+  const config = usePrivyWalletConfig()
+  const privy = usePrivyLogin()
+  const [creatingWallet, setCreatingWallet] = useState(false)
+  const [walletError, setWalletError] = useState<string | null>(null)
+
+  if (!config.configured) {
+    return <MissingPrivyConfig missingEnv={config.missingEnv} />
+  }
+
+  const createWallet = async () => {
+    setCreatingWallet(true)
+    setWalletError(null)
+    try {
+      await privy.ensureEmbeddedWallet()
+    } catch (error) {
+      console.error('Failed to create Privy wallet', error)
+      setWalletError('Could not create wallet. Please try again.')
+    } finally {
+      setCreatingWallet(false)
+    }
+  }
+
+  return (
+    <Col
+      className={`border-ink-200 bg-canvas-0 gap-3 rounded-md border p-4 ${
+        props.className ?? ''
+      }`}
+    >
+      <Col className="gap-1">
+        <div className="text-ink-500 text-xs font-medium uppercase">
+          Wallet address
+        </div>
+        <div className="text-ink-900 break-all font-mono text-xs">
+          {!privy.ready
+            ? 'Loading wallet...'
+            : privy.walletAddress ?? 'Not connected'}
+        </div>
+      </Col>
+
+      {!privy.ready ? (
+        <Button
+          className="disabled:bg-ink-300 w-full bg-slate-950 text-white"
+          color="none"
+          size="md"
+          disabled
+        >
+          <LoadingIndicator size="sm" className="mr-2 !text-white" />
+          Loading wallet...
+        </Button>
+      ) : !privy.authenticated ? (
+        <Button
+          className="disabled:bg-ink-300 w-full bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+          color="none"
+          size="md"
+          onClick={privy.login}
+        >
+          Connect wallet
+        </Button>
+      ) : !privy.walletAddress ? (
+        <Button
+          className="disabled:bg-ink-300 w-full bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+          color="none"
+          size="md"
+          loading={creatingWallet}
+          onClick={createWallet}
+        >
+          Create wallet
+        </Button>
+      ) : (
+        <Link
+          href="/wallet"
+          className="inline-flex w-full items-center justify-center rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+        >
+          Deposit
+        </Link>
+      )}
+
+      {walletError && (
+        <div className="text-scarlet-600 text-xs">{walletError}</div>
+      )}
+    </Col>
+  )
 }
 
 function MexasWalletPanelInner() {

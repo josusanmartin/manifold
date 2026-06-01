@@ -29,7 +29,7 @@ export default function Home() {
           type="button"
           className="fixed bottom-[64px] right-3 z-20 inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-3 text-white shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 lg:hidden"
           onClick={() => {
-            Router.push('/payments')
+            Router.push('/wallet')
             track('mobile wallet button')
           }}
         >

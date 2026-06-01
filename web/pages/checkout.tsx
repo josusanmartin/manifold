@@ -4,12 +4,11 @@ import clsx from 'clsx'
 import { MEXAS_TOKEN } from 'common/crypto/mexas'
 import { Col } from 'web/components/layout/col'
 import { Page } from 'web/components/layout/page'
-import { MexasWalletPanel } from 'web/components/crypto/mexas-wallet-panel'
+import { MexasWalletSummary } from 'web/components/crypto/mexas-wallet-panel'
 import { SEO } from 'web/components/SEO'
 import { Row } from 'web/components/layout/row'
 import { ExternalLinkIcon } from '@heroicons/react/solid'
 import Link from 'next/link'
-import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
 
 const FEATURED_MARKET_URL = '/mexas-test/who-will-win-the-2026-fifa-world-cu'
 const UKRAINE_MARKET_URL =
@@ -173,28 +172,7 @@ function FeaturedMarketTable() {
   )
 }
 
-function WalletStatus(props: {
-  walletAddress?: string
-  authenticated: boolean
-}) {
-  const { walletAddress, authenticated } = props
-  const label = walletAddress
-    ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-    : authenticated
-    ? 'Wallet pending'
-    : 'Not connected'
-
-  return (
-    <Row className="border-ink-200 items-center justify-between rounded-md border px-3 py-2 text-sm">
-      <span className="text-ink-500">Privy wallet</span>
-      <span className="text-ink-900 font-semibold">{label}</span>
-    </Row>
-  )
-}
-
 function MexasRail() {
-  const privy = usePrivyLogin()
-
   return (
     <aside className="border-ink-200 bg-canvas-0 h-fit rounded-md border">
       <Col className="gap-4 p-4">
@@ -206,22 +184,7 @@ function MexasRail() {
           </p>
         </Col>
 
-        <WalletStatus
-          authenticated={privy.authenticated}
-          walletAddress={privy.walletAddress}
-        />
-
-        <MexasWalletPanel />
-
-        <a
-          href={MEXAS_TOKEN.arbiscanUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="text-ink-600 hover:text-ink-900 inline-flex items-center gap-1 text-xs font-medium"
-        >
-          Token contract
-          <ExternalLinkIcon className="h-3.5 w-3.5" />
-        </a>
+        <MexasWalletSummary />
       </Col>
     </aside>
   )

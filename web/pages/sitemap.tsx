@@ -96,7 +96,7 @@ export default function SitemapPage() {
               <SitemapLink
                 title="MEX wallet"
                 description="Deposit and withdraw MEX"
-                href="/payments"
+                href="/wallet"
                 icon={CurrencyDollarIcon}
               />
             )}

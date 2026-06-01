@@ -1,47 +1,23 @@
 import { MEXAS_TOKEN } from 'common/crypto/mexas'
 import { DisplayUser } from 'common/api/user-types'
+import { GetServerSideProps } from 'next'
 import { Button } from 'web/components/buttons/button'
-import { MexasWalletPanel } from 'web/components/crypto/mexas-wallet-panel'
+import { MexasWalletSummary } from 'web/components/crypto/mexas-wallet-panel'
 import { Col } from 'web/components/layout/col'
 import { Modal } from 'web/components/layout/modal'
-import { Page } from 'web/components/layout/page'
-import { SEO } from 'web/components/SEO'
 import { useUser } from 'web/hooks/use-user'
 import { User } from 'web/lib/firebase/users'
 
-function WalletHeader() {
-  return (
-    <Col className="gap-1">
-      <div className="text-ink-500 text-xs font-semibold uppercase">
-        Arbitrum One
-      </div>
-      <h1 className="text-ink-1000 text-3xl font-semibold tracking-normal">
-        MEX Wallet
-      </h1>
-      <p className="text-ink-600 max-w-2xl text-sm">
-        Deposit, hold, and withdraw {MEXAS_TOKEN.symbol} directly from your
-        Privy wallet. Deposited tokens remain on-chain and available in this
-        wallet.
-      </p>
-    </Col>
-  )
+export default function Payments() {
+  return null
 }
 
-export default function Payments() {
-  return (
-    <Page trackPageView="mex wallet page">
-      <SEO
-        title="MEX Wallet"
-        description="Deposit and withdraw MEXAS on Arbitrum."
-        url="/payments"
-      />
-      <Col className="mx-auto w-full max-w-3xl gap-6 px-2 py-6">
-        <WalletHeader />
-        <MexasWalletPanel />
-      </Col>
-    </Page>
-  )
-}
+export const getServerSideProps: GetServerSideProps = async () => ({
+  redirect: {
+    destination: '/wallet',
+    permanent: false,
+  },
+})
 
 export const UserPayments = (props: { userId: string }) => {
   const { userId } = props
@@ -58,10 +34,7 @@ export const UserPayments = (props: { userId: string }) => {
   }
 
   return (
-    <Col className="w-full gap-4">
-      <WalletHeader />
-      <MexasWalletPanel />
-    </Col>
+    <MexasWalletSummary className="w-full" />
   )
 }
 
@@ -84,11 +57,11 @@ export const PaymentsModal = (props: {
         <Col className="gap-1">
           <h2 className="text-ink-1000 text-xl font-semibold">MEX Wallet</h2>
           <p className="text-ink-600 text-sm">
-            Use your wallet to deposit or withdraw {MEXAS_TOKEN.symbol} on{' '}
+            Deposit {MEXAS_TOKEN.symbol} to your Privy wallet on{' '}
             {MEXAS_TOKEN.chainName}.
           </p>
         </Col>
-        <MexasWalletPanel />
+        <MexasWalletSummary />
         <Button
           color="gray-white"
           size="md"

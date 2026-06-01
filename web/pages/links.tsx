@@ -10,7 +10,7 @@ export default function LinksPage() {
 
 export const getServerSideProps: GetServerSideProps = async () => ({
   redirect: {
-    destination: '/payments',
+    destination: '/wallet',
     permanent: false,
   },
 })

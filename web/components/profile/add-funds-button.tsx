@@ -16,9 +16,9 @@ export function AddFundsButton(props: {
   return (
     <Button
       onClick={() =>
-        router.asPath.includes('/payments')
+        router.asPath.includes('/wallet')
           ? router.reload()
-          : router.push('/payments')
+          : router.push('/wallet')
       }
       size={size ?? 'md'}
       color="none"

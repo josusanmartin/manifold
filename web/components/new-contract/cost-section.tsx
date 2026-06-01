@@ -37,7 +37,7 @@ export const CostSection = (props: {
         <div className="mb-2 mr-auto mt-2 self-center whitespace-nowrap text-xs font-medium tracking-wide">
           <span className="text-scarlet-500 mr-2">Insufficient balance</span>
           <Link
-            href="/payments"
+            href="/wallet"
             className="rounded bg-teal-500 px-2 py-1 text-white hover:bg-teal-600"
           >
             Open wallet

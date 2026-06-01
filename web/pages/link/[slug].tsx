@@ -6,7 +6,7 @@ export default function ClaimLinkPage() {
 
 export const getServerSideProps: GetServerSideProps = async () => ({
   redirect: {
-    destination: '/payments',
+    destination: '/wallet',
     permanent: false,
   },
 })

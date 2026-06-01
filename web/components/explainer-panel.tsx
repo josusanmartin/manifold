@@ -149,7 +149,7 @@ const CashPrizes = ({
       Keep enough Arbitrum ETH in the wallet to pay gas for token transfers.
     </div>
     <div className="pb-2">
-      <Link href="/payments" className="text-primary-700 hover:underline">
+      <Link href="/wallet" className="text-primary-700 hover:underline">
         Open MEX wallet →
       </Link>
     </div>

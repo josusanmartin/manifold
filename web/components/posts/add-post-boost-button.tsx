@@ -178,7 +178,7 @@ function PostBoostPurchaseModal(props: {
             <div className="text-ink-600 flex items-center gap-2 text-sm">
               <span className="text-error">Insufficient balance</span>
               <Link
-                href="/payments"
+                href="/wallet"
                 className="bg-primary-500 hover:bg-primary-600 rounded px-2 py-1 text-sm text-white"
               >
                 Open wallet

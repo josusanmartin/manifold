@@ -3,12 +3,13 @@ const path = require('path')
 const API_DOCS_URL = 'https://docs.manifold.markets/api'
 
 const MEXAS_WALLET_REDIRECTS = [
+  '/payments',
   '/add-funds',
   '/link/:path*',
   '/links',
 ].map((source) => ({
   source,
-  destination: '/payments',
+  destination: '/wallet',
   permanent: false,
 }))
 
