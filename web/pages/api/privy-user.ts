@@ -14,10 +14,16 @@ import {
   type SupabaseClient,
   type Row,
 } from 'common/supabase/utils'
+import { isAddress, type Address } from 'viem'
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
 
 type ErrorResponse = { message: string }
+type JsonObject = Record<string, unknown>
+
+const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
+const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
 
 const bodySchema = z
   .object({
@@ -109,6 +115,73 @@ function getFallbackName(
   return `MEX ${randomString(4)}`
 }
 
+function getUserData(row: Row<'users'> | null): JsonObject {
+  const data = row?.data
+  return data && typeof data === 'object' && !Array.isArray(data)
+    ? (data as JsonObject)
+    : {}
+}
+
+function parseSyncedMexasUnits(data: JsonObject) {
+  const raw = data[MEXAS_WALLET_SYNC_UNITS_KEY]
+  if (typeof raw === 'string' && /^\d+$/.test(raw)) return BigInt(raw)
+  if (typeof raw === 'number' && Number.isSafeInteger(raw) && raw >= 0) {
+    return BigInt(raw)
+  }
+  return 0n
+}
+
+function mexasUnitsToAmount(units: bigint) {
+  return Number(formatMexasUnits(units))
+}
+
+function mexasUnitsDeltaToAmount(deltaUnits: bigint) {
+  if (deltaUnits === 0n) return 0
+  const sign = deltaUnits < 0n ? -1 : 1
+  const absUnits = deltaUnits < 0n ? -deltaUnits : deltaUnits
+  return sign * mexasUnitsToAmount(absUnits)
+}
+
+async function getMexasWalletSync(row: Row<'users'>, walletAddress?: string) {
+  if (!walletAddress || !isAddress(walletAddress)) return undefined
+
+  try {
+    const data = getUserData(row)
+    const currentUnits = await getMexasBalanceUnits(walletAddress as Address)
+    const previousUnits = parseSyncedMexasUnits(data)
+    const deltaAmount = mexasUnitsDeltaToAmount(currentUnits - previousUnits)
+    const balance = Math.max(0, row.balance + deltaAmount)
+    const totalDeposits =
+      deltaAmount > 0 ? row.total_deposits + deltaAmount : row.total_deposits
+
+    return {
+      data: {
+        ...data,
+        [MEXAS_WALLET_SYNC_UNITS_KEY]: currentUnits.toString(),
+        [MEXAS_WALLET_SYNC_TIME_KEY]: Date.now(),
+      },
+      balance,
+      totalDeposits,
+    }
+  } catch (error) {
+    console.error('Failed to sync MEXAS wallet balance', error)
+    return undefined
+  }
+}
+
+async function getNewUserMexasWalletBalance(walletAddress?: string) {
+  if (!walletAddress || !isAddress(walletAddress)) return undefined
+
+  try {
+    const units = await getMexasBalanceUnits(walletAddress as Address)
+    const amount = mexasUnitsToAmount(units)
+    return { units, amount }
+  } catch (error) {
+    console.error('Failed to load MEXAS wallet balance for new user', error)
+    return undefined
+  }
+}
+
 async function getAvailableUsername(db: SupabaseClient, name: string) {
   const fallback = `mex${randomString(8)}`
   const base = cleanUsername(name) || fallback
@@ -164,8 +237,10 @@ async function updateExistingUser(params: {
   deviceToken?: string
 }) {
   const { db, email, walletAddress, userRow } = params
+  const walletSync = await getMexasWalletSync(userRow, walletAddress)
   const userData = {
-    ...(userRow.data as Record<string, unknown>),
+    ...getUserData(userRow),
+    ...(walletSync?.data ?? {}),
     privyUserId: userRow.id,
     ...(walletAddress ? { privyWalletAddress: walletAddress } : {}),
   }
@@ -201,7 +276,15 @@ async function updateExistingUser(params: {
   ] = await Promise.all([
     db
       .from('users')
-      .update({ data: userData })
+      .update({
+        data: userData,
+        ...(walletSync
+          ? {
+              balance: walletSync.balance,
+              total_deposits: walletSync.totalDeposits,
+            }
+          : {}),
+      })
       .eq('id', userRow.id)
       .select()
       .single(),
@@ -244,6 +327,7 @@ async function createPrivyManifoldUser(params: {
     cleanDisplayName(getFallbackName(email, walletAddress)) || 'MEX User'
   const username = await getAvailableUsername(db, name)
   const now = Date.now()
+  const walletBalance = await getNewUserMexasWalletBalance(walletAddress)
   const userData = {
     id,
     avatarUrl: '',
@@ -253,6 +337,12 @@ async function createPrivyManifoldUser(params: {
     signupBonusPaid: 0,
     privyUserId: id,
     privyWalletAddress: walletAddress,
+    ...(walletBalance
+      ? {
+          [MEXAS_WALLET_SYNC_UNITS_KEY]: walletBalance.units.toString(),
+          [MEXAS_WALLET_SYNC_TIME_KEY]: now,
+        }
+      : {}),
   }
   const privateUser = buildPrivateUser({
     id,
@@ -268,10 +358,10 @@ async function createPrivyManifoldUser(params: {
       id,
       name,
       username,
-      balance: 0,
+      balance: walletBalance?.amount ?? 0,
       cash_balance: 0,
       spice_balance: 0,
-      total_deposits: 0,
+      total_deposits: walletBalance?.amount ?? 0,
       total_cash_deposits: 0,
       created_time: new Date(now).toISOString(),
       data: userData,
