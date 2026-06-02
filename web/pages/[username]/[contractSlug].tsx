@@ -8,6 +8,7 @@ import { ContractSEO } from 'web/components/contract/contract-seo'
 import { Page } from 'web/components/layout/page'
 import { Title } from 'web/components/widgets/title'
 import { useIsIframe } from 'web/hooks/use-is-iframe'
+import { toPublicMexasContractParams } from 'web/lib/mexas-public-contract'
 import { initSupabaseAdmin } from 'web/lib/supabase/admin-db'
 import Custom404 from '../404'
 import ContractEmbedPage from '../embed/[username]/[contractSlug]'
@@ -53,7 +54,7 @@ export async function getStaticProps(ctx: {
   return {
     props: {
       state: 'authed',
-      params: removeUndefinedProps(props),
+      params: removeUndefinedProps(toPublicMexasContractParams(props)),
     },
   }
 }

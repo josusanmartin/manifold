@@ -4,10 +4,10 @@ import { APIError } from 'common/api/utils'
 import { LimitBet, type Bet } from 'common/bet'
 import { type resolution } from 'common/contract'
 import {
-  getMexasRemainingReservedAmount,
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
+import { getMexasResolutionCreditEvents } from 'common/mexas-resolution'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import {
@@ -109,22 +109,6 @@ function getResolutionLockOutcome(data: Record<string, unknown>) {
   return outcome === 'YES' || outcome === 'NO' || outcome === 'CANCEL'
     ? outcome
     : undefined
-}
-
-function getResolvedBetPayout(bet: Bet, outcome: resolution) {
-  if (outcome === 'CANCEL') return Math.max(0, bet.amount ?? 0)
-  return bet.outcome === outcome ? Math.max(0, bet.shares ?? 0) : 0
-}
-
-function getOpenReservationRefund(bet: Bet) {
-  if (bet.limitProb === undefined || bet.orderAmount === undefined) return 0
-
-  const order = bet as LimitBet & MexasReservedOrderData
-  if (order.mexasFundsReserved !== true || order.mexasFundsReleased === true) {
-    return 0
-  }
-
-  return getMexasRemainingReservedAmount(order)
 }
 
 async function loadContractRows(db: SupabaseClient, contractId: string) {
@@ -276,23 +260,14 @@ async function resolveMexasMarket(
     outcome
   )
   const bets = await loadContractBets(db, contractId)
-  const payoutsByUser = new Map<string, number>()
+  const creditEvents = getMexasResolutionCreditEvents(
+    bets.map((entry) => entry.bet),
+    outcome
+  )
 
-  for (const entry of bets) {
-    const payout =
-      getOpenReservationRefund(entry.bet) +
-      getResolvedBetPayout(entry.bet, outcome)
-    if (payout > 0) {
-      payoutsByUser.set(
-        entry.bet.userId,
-        (payoutsByUser.get(entry.bet.userId) ?? 0) + payout
-      )
-    }
-  }
-
-  for (const [payUserId, payout] of payoutsByUser) {
-    await updateMexasUserBalanceCas(db, payUserId, payout, {
-      creditKey: `mexas-resolution:${contractId}:${outcome}`,
+  for (const event of creditEvents) {
+    await updateMexasUserBalanceCas(db, event.userId, event.amount, {
+      creditKey: event.creditKey,
     })
   }
 

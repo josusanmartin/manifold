@@ -7,6 +7,7 @@ import {
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
+import { getMexasOrderReleaseCreditKey } from 'common/mexas-resolution'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import { createClient, type Row } from 'common/supabase/utils'
@@ -14,6 +15,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
 
 type ErrorResponse = { message: string }
+const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
 
 let privyClient: PrivyClient | undefined
 
@@ -73,6 +75,21 @@ function getSingleQueryValue(value: string | string[] | undefined) {
 function getBetData(row: Row<'contract_bets'>) {
   const data = row.data
   return data && typeof data === 'object' && !Array.isArray(data) ? data : {}
+}
+
+function getContractData(row: Row<'contracts'>) {
+  const data = row.data
+  return data && typeof data === 'object' && !Array.isArray(data)
+    ? (data as Record<string, unknown>)
+    : {}
+}
+
+function hasFreshMexasResolutionLock(data: Record<string, unknown>) {
+  const locked = data.mexasResolving === true
+  const since =
+    typeof data.mexasResolvingSince === 'number' ? data.mexasResolvingSince : 0
+
+  return locked && Date.now() - since < RESOLUTION_LOCK_TIMEOUT_MS
 }
 
 async function releaseMexasCancelledOrderFunds(
@@ -148,9 +165,13 @@ export default async function handler(
     if (contractError) throw contractError
     if (!contractRow) throw new APIError(404, 'Contract not found.')
 
-    const contract = convertContract(contractRow) as MarketContract
+    const typedContractRow = contractRow as Row<'contracts'>
+    const contract = convertContract(typedContractRow) as MarketContract
     if (contract.isResolved) {
       throw new APIError(403, 'Market is resolved.')
+    }
+    if (hasFreshMexasResolutionLock(getContractData(typedContractRow))) {
+      throw new APIError(503, 'Market resolution is in progress.')
     }
     const betData = getBetData(typedBetRow) as MexasReservedOrderData &
       Record<string, unknown>
@@ -165,7 +186,7 @@ export default async function handler(
           mexasReservedAmount: betData.mexasReservedAmount,
         })
       : 0
-    const creditKey = `mexas-cancel:${bet.id}`
+    const creditKey = getMexasOrderReleaseCreditKey(bet.id)
 
     if (bet.isCancelled) {
       if (shouldReleaseMexasFunds) {

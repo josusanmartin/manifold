@@ -440,6 +440,7 @@ async function releaseMexasOrderLock(
       last_updated_time: millisToTs(now),
     })
     .eq('id', contractId)
+    .eq('data->>mexasOrderLockOwner', lockOwner)
 }
 
 function getContractUpdate(

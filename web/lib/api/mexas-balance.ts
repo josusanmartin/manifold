@@ -4,7 +4,6 @@ import type { SupabaseClient } from 'common/supabase/utils'
 const BALANCE_UPDATE_ATTEMPTS = 5
 const EPSILON = 1e-9
 const MEXAS_BALANCE_CREDIT_KEYS = 'mexasBalanceCreditKeys'
-const MAX_BALANCE_CREDIT_KEYS = 500
 
 function getUserData(row: { data: unknown } | null) {
   const data = row?.data
@@ -55,10 +54,7 @@ export async function updateMexasUserBalanceCas(
       ...(options?.dataPatch ?? {}),
     }
     if (options?.creditKey) {
-      nextData[MEXAS_BALANCE_CREDIT_KEYS] = [
-        ...creditKeys.slice(-(MAX_BALANCE_CREDIT_KEYS - 1)),
-        options.creditKey,
-      ]
+      nextData[MEXAS_BALANCE_CREDIT_KEYS] = [...creditKeys, options.creditKey]
     }
 
     const { data: updatedUserRow, error: updateError } = await db

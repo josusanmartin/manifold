@@ -214,7 +214,7 @@ export function UserBetsTable(props: { user: User }) {
         })
         .filter((c) => {
           if (!prefersPlay) return c.token === 'CASH'
-          else return c.token === 'MANA' || !c.token
+          else return c.token !== 'CASH'
         })
     : []
 

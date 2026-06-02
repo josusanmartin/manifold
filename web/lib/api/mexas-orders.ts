@@ -3,6 +3,7 @@ import {
   getMexasRemainingReservedAmount,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
+import { getMexasOrderReleaseCreditKey } from 'common/mexas-resolution'
 import { convertBet } from 'common/supabase/bets'
 import type { Row, SupabaseClient } from 'common/supabase/utils'
 import { updateMexasUserBalanceCas } from './mexas-balance'
@@ -27,7 +28,7 @@ async function releaseExpiredMexasOrder(
   const shouldRefund =
     bet.mexasFundsReserved === true && bet.mexasFundsReleased !== true
   const refundAmount = shouldRefund ? getMexasRemainingReservedAmount(bet) : 0
-  const creditKey = `mexas-expire:${bet.id}`
+  const creditKey = getMexasOrderReleaseCreditKey(bet.id)
 
   if (refundAmount > 0) {
     await updateMexasUserBalanceCas(db, bet.userId, refundAmount, {
@@ -61,7 +62,7 @@ export async function releaseExpiredMexasOrders(
   const now = new Date().toISOString()
   let released = 0
 
-  for (let from = 0; ; from += EXPIRED_ORDER_PAGE_SIZE) {
+  for (;;) {
     let query = db
       .from('contract_bets')
       .select('*')
@@ -69,7 +70,7 @@ export async function releaseExpiredMexasOrders(
       .eq('is_cancelled', false)
       .lt('expires_at', now)
       .eq('data->>mexasFundsReserved', 'true')
-      .range(from, from + EXPIRED_ORDER_PAGE_SIZE - 1)
+      .range(0, EXPIRED_ORDER_PAGE_SIZE - 1)
 
     if (options.contractId) query = query.eq('contract_id', options.contractId)
     if (options.userId) query = query.eq('user_id', options.userId)
