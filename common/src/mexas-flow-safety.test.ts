@@ -1346,21 +1346,22 @@ describe('MEXAS flow safety guardrails', () => {
     expect(settlementSource).toContain('payoutResolvedPositions: false')
   })
 
-  test('MEXAS deposit receipt verification uses the shared ERC20 transfer parser', () => {
+  test('legacy MEXAS treasury purchase endpoint fails closed', () => {
     const source = readRepoFile('backend/api/src/record-mexas-purchase.ts')
+    const tokenSource = readRepoFile('common/src/crypto/mexas.ts')
 
-    expect(source).toContain(
-      "from 'common/crypto/mexas-transfer'"
-    )
     expectMarkersInOrder(source, [
-      'getConfirmedMexasTransferUnits',
-      'mexasUnitsToTokenAmount',
-      'normalizeEvmAddress',
-      'function getConfirmedMexasTreasuryTransferUnits',
-      'return getConfirmedMexasTransferUnits',
+      "export const recordMexasPurchase: APIHandler<'record-mexas-purchase'>",
+      'throw new APIError(',
+      '404',
+      'Deposit MEX directly to your Privy Wallet.',
     ])
-    expect(source).not.toContain('const TRANSFER_TOPIC')
-    expect(source).not.toContain('function addressTopic')
-    expect(source).not.toContain('function parseTokenUnits')
+    expect(source).not.toContain('runTxnInBetQueue')
+    expect(source).not.toContain('MANA_PURCHASE')
+    expect(source).not.toContain('purchasedMana')
+    expect(source).not.toContain('crypto_payment_intents')
+    expect(tokenSource).not.toContain('MEXAS_ACCOUNT_CREDIT_PER_TOKEN')
+    expect(tokenSource).not.toContain('getMexasPurchaseMessage')
+    expect(tokenSource).not.toContain('Authorize MEXAS account credit')
   })
 })

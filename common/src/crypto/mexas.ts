@@ -10,19 +10,3 @@ export const MEXAS_TOKEN = {
 } as const
 
 export const MEXAS_PUBLIC_RPC_URL = 'https://arb1.arbitrum.io/rpc'
-export const MEXAS_ACCOUNT_CREDIT_PER_TOKEN = 1
-
-export function getMexasPurchaseMessage(
-  userId: string,
-  txHash: string,
-  payerAddress: string
-) {
-  return [
-    'Authorize MEXAS account credit.',
-    `User ID: ${userId}`,
-    `Transaction: ${txHash.toLowerCase()}`,
-    `Wallet: ${payerAddress.toLowerCase()}`,
-    `Chain: ${MEXAS_TOKEN.chainName} (${MEXAS_TOKEN.chainId})`,
-    `Token: ${MEXAS_TOKEN.address.toLowerCase()}`,
-  ].join('\n')
-}

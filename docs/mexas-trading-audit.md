@@ -37,7 +37,8 @@ Para no crear saldos internos no respaldados, el API bloquea:
   settlement; los flags de entorno no deben poder activar el matcher local
   porque actualiza filas maker/taker fuera de una unica transaccion;
 - resoluciones con posiciones llenadas si no existe `MEXAS_SETTLEMENT_MODE=escrow`,
-  salvo que se active explicitamente `MEXAS_ALLOW_UNESCROWED_RESOLUTION=true`.
+  `MEXAS_ESCROW_IMPLEMENTATION=onchain-transfer` y capacidades reales de escrow
+  implementadas. Los flags de override no deben permitir launch sin escrow.
 
 Abrir ordenes limite que no cruzan sigue permitido, porque esas ordenes pueden
 cancelarse si el balance on-chain deja de respaldarlas.
@@ -50,9 +51,11 @@ manalinks, Mana stats, cashout/checkout GIDX, iDenfy, loans, liquidez/bounties,
 MCP, Predictle, sweepstakes, charity giveaways, shop/merch/tickets y compra
 MEXAS por Daimo/tesoreria.
 
-La superficie que queda disponible para el frontend MEXAS es trading local
-MEXAS, consulta de ordenes, busqueda/lectura de mercados, usuarios, txns,
-revalidacion y resolucion de mercados MEXAS por el creador.
+La superficie que queda disponible para el frontend MEXAS es local al sitio:
+wallet Privy, consulta de libro de ordenes, colocacion/cancelacion de ordenes,
+consulta de ordenes MEXAS, revalidacion local, readiness de resolucion y
+resolucion de mercados MEXAS por el creador. No hay allowlist de proxy externo
+Manifold para launch.
 
 ## Requisito para produccion real
 
