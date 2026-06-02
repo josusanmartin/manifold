@@ -300,4 +300,19 @@ describe('MEXAS flow safety guardrails', () => {
       "return new Response('Permanent Redirect'",
     ])
   })
+
+  test('requires readable public Vercel production env values for launch readiness', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('getRequiredProductionEnvPresenceFailures')
+    expect(source).toContain('getRequiredReadableProductionEnvFailures')
+    expect(source).toContain('is empty in Vercel production')
+    expect(source).toContain(
+      'public env vars must be added with --no-sensitive'
+    )
+    expect(source).toContain('is only set locally, not in Vercel production')
+    expect(source).not.toContain('hasEnvOrVercelEnv')
+  })
 })

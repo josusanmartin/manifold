@@ -95,6 +95,43 @@ function hasEnv(name: string) {
   return !!process.env[name]?.trim()
 }
 
+function getRequiredProductionEnvPresenceFailures(
+  keys: string[],
+  vercelEnvNames: Set<string>
+) {
+  return keys.flatMap((key) => {
+    if (vercelEnvNames.has(key)) return []
+    if (hasEnv(key))
+      return [`${key} is only set locally, not in Vercel production`]
+    return [`${key} is missing from Vercel production`]
+  })
+}
+
+function getRequiredReadableProductionEnvFailures(
+  keys: string[],
+  vercelEnvNames: Set<string>,
+  vercelEnvValues: Map<string, string>
+) {
+  return keys.flatMap((key) => {
+    const pulledValue = vercelEnvValues.get(key)
+    if (pulledValue !== undefined) {
+      return pulledValue.trim() ? [] : [`${key} is empty in Vercel production`]
+    }
+
+    if (hasEnv(key)) {
+      return [`${key} is only set locally, not in Vercel production`]
+    }
+
+    if (vercelEnvNames.has(key)) {
+      return [
+        `${key} exists in Vercel production but is not readable; public env vars must be added with --no-sensitive`,
+      ]
+    }
+
+    return [`${key} is missing from Vercel production`]
+  })
+}
+
 function getVercelProductionEnvNames() {
   try {
     const output = execFileSync('vercel', ['env', 'ls', 'production'], {
@@ -187,10 +224,6 @@ function getVercelProductionDeployment(siteUrl: string) {
   }
 }
 
-function hasEnvOrVercelEnv(name: string, vercelEnvNames: Set<string>) {
-  return hasEnv(name) || vercelEnvNames.has(name)
-}
-
 function getEnvOrVercelValue(
   name: string,
   vercelEnvValues: Map<string, string>
@@ -226,22 +259,31 @@ async function runChecks() {
   const checks: CheckResult[] = []
   const vercelEnvNames = getVercelProductionEnvNames()
   const vercelEnvValues = getVercelProductionEnvValues()
-  const missingServer = REQUIRED_SERVER_ENVS.filter(
-    (key) => !hasEnvOrVercelEnv(key, vercelEnvNames)
+  const serverEnvFailures = getRequiredProductionEnvPresenceFailures(
+    REQUIRED_SERVER_ENVS,
+    vercelEnvNames
   )
-  const missingPublic = REQUIRED_PUBLIC_ENVS.filter(
-    (key) => !hasEnvOrVercelEnv(key, vercelEnvNames)
+  const publicEnvFailures = getRequiredReadableProductionEnvFailures(
+    REQUIRED_PUBLIC_ENVS,
+    vercelEnvNames,
+    vercelEnvValues
   )
 
   checks.push(
-    missingServer.length
-      ? fail('server env', `Missing: ${missingServer.join(', ')}`)
-      : pass('server env', 'Required server env vars are present.')
+    serverEnvFailures.length
+      ? fail('server env', serverEnvFailures.join('; '))
+      : pass(
+          'server env',
+          'Required server env vars exist in Vercel production.'
+        )
   )
   checks.push(
-    missingPublic.length
-      ? fail('public env', `Missing: ${missingPublic.join(', ')}`)
-      : pass('public env', 'Required public env vars are present.')
+    publicEnvFailures.length
+      ? fail('public env', publicEnvFailures.join('; '))
+      : pass(
+          'public env',
+          'Required public env vars are non-empty in Vercel production.'
+        )
   )
 
   const supabaseUrlOrInstanceId = getSupabaseUrlOrInstanceId()
