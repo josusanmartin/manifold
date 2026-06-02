@@ -1,4 +1,5 @@
 import { PROD_CONFIG } from 'common/envs/prod'
+import { isBlockedMexasApiProxyPath } from 'common/mexas-api-surface'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(req: NextRequest) {
@@ -24,6 +25,13 @@ export async function proxy(req: NextRequest) {
 
     if (shouldSkipProxy(path)) {
       return NextResponse.next()
+    }
+
+    if (isBlockedMexasApiProxyPath(path)) {
+      return NextResponse.json(
+        { message: 'Endpoint not available on MEXAS Markets.' },
+        { status: 404 }
+      )
     }
 
     return new Response('Permanent Redirect', {
