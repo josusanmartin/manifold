@@ -1162,6 +1162,16 @@ describe('MEXAS flow safety guardrails', () => {
   test('preflights the MEXAS matching RPC before live orders can debit funds', () => {
     const source = readRepoFile('web/lib/api/mexas-settlement.ts')
     const apiSource = readRepoFile('web/pages/api/v0/bet.ts')
+    const readinessSource = readRepoFile(
+      'web/pages/api/v0/market/[contractId]/mexas-order-readiness.ts'
+    )
+    const panelSource = readRepoFile(
+      'web/components/bet/limit-order-panel.tsx'
+    )
+    const proxySource = readRepoFile('web/proxy.ts')
+    const smokeSource = readRepoFile(
+      'backend/scripts/check-mexas-production-smoke.ts'
+    )
     const helper = readRepoFile('web/lib/api/mexas-rpc-matching.ts')
     const migration = readRepoFile(
       'backend/supabase/migrations/2026060203_add_mexas_matching_health.sql'
@@ -1184,6 +1194,40 @@ describe('MEXAS flow safety guardrails', () => {
       'await assertMexasCanAcceptLimitOrders(db)',
       'reservedAmount = getMexasRemainingReservedAmount(bet)',
       'await updateUserBalanceCas(db, userId, -reservedAmount',
+    ])
+    expectMarkersInOrder(readinessSource, [
+      'type MexasOrderReadinessResponse',
+      'canPlaceOrders: boolean',
+      'matchingEngineReady: boolean',
+      'if (!isMexasOrderBookOnlyContract(contract))',
+      'canMexasAcceptLimitOrders(getMexasSettlementSettings())',
+      'await assertMexasOrderbookMatchingEngineReady(db)',
+      'canPlaceOrders: true',
+      'matchingEngineReady: true',
+    ])
+    expectMarkersInOrder(panelSource, [
+      'type MexasOrderReadiness',
+      'mexas-order-readiness',
+      'const mexasOrderReadinessLoading =',
+      'const mexasOrderReadinessBlocked =',
+      'mexasOrderReadinessBlocked',
+      'El libro de ordenes MEXAS no esta listo.',
+      'mexasOrderReadinessLoading',
+      'Verificando libro...',
+      'mexasOrderReadinessBlocked',
+      'Libro no disponible',
+    ])
+    expect(proxySource).toContain(
+      '^v0\\/market\\/[^/]+\\/mexas-order-readiness$'
+    )
+    expectMarkersInOrder(smokeSource, [
+      'async function checkOrderReadiness',
+      '/mexas-order-readiness',
+      'typeof data.canPlaceOrders ===',
+      'typeof data.matchingEngineReady ===',
+      "results.push(await checkOrderReadiness('mexwcwin26a'))",
+      "results.push(await checkOrderReadiness('ukrwarend26a'))",
+      "results.push(await checkBlockedOrderReadiness('not-a-mexas-market'))",
     ])
     expect(helper).toContain("db.rpc('mexas_orderbook_matching_engine_ready')")
     expectMarkersInOrder(migration, [

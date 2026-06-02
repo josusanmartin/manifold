@@ -56,6 +56,12 @@ const expirationOptions = [
 
 const WAIT_TO_DISMISS = 3000
 
+type MexasOrderReadiness = {
+  canPlaceOrders: boolean
+  matchingEngineReady: boolean
+  message?: string
+}
+
 export default function LimitOrderPanel(props: {
   contract: MarketContract
   multiProps?: MultiBetProps
@@ -134,12 +140,53 @@ export default function LimitOrderPanel(props: {
     usePersistentLocalState<number>(0, 'limit-order-expiration')
 
   const [lastBetDetails, setLastBetDetails] = useState<Bet | null>(null)
+  const [mexasOrderReadiness, setMexasOrderReadiness] = useState<
+    MexasOrderReadiness | undefined
+  >()
 
   useEffect(() => {
     if (orderBookOnly && selectedExpiration === 1) {
       setSelectedExpiration(0)
     }
   }, [orderBookOnly, selectedExpiration, setSelectedExpiration])
+
+  useEffect(() => {
+    if (!orderBookOnly) return
+
+    let cancelled = false
+    setMexasOrderReadiness(undefined)
+
+    fetch(
+      `/api/v0/market/${encodeURIComponent(
+        contract.id
+      )}/mexas-order-readiness`
+    )
+      .then(async (response) => {
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data?.message ?? 'No se pudo verificar el libro.')
+        }
+        return data as MexasOrderReadiness
+      })
+      .then((readiness) => {
+        if (!cancelled) setMexasOrderReadiness(readiness)
+      })
+      .catch((error) => {
+        if (cancelled) return
+        setMexasOrderReadiness({
+          canPlaceOrders: false,
+          matchingEngineReady: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'No se pudo verificar el libro de ordenes MEXAS.',
+        })
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [contract.id, orderBookOnly])
 
   // State for editing payout
   const [isEditingPayout, setIsEditingPayout] = useState(false)
@@ -254,8 +301,16 @@ export default function LimitOrderPanel(props: {
     orderBookOnly &&
     !MEXAS_ONCHAIN_ESCROW_IMPLEMENTED &&
     mexasBlockedCrossingOrders.length > 0
+  const mexasOrderReadinessLoading =
+    orderBookOnly && mexasOrderReadiness === undefined
+  const mexasOrderReadinessBlocked =
+    orderBookOnly && mexasOrderReadiness?.canPlaceOrders === false
   const displayedError =
     error ??
+    (mexasOrderReadinessBlocked
+      ? mexasOrderReadiness?.message ??
+        'El libro de ordenes MEXAS no esta listo.'
+      : undefined) ??
     (mexasCrossingOrderBlocked
       ? 'El precio cruza el libro. Abre una orden que agregue liquidez.'
       : undefined)
@@ -266,6 +321,8 @@ export default function LimitOrderPanel(props: {
     !hasLimitBet ||
     error === 'Insufficient balance' ||
     error === 'Saldo insuficiente' ||
+    mexasOrderReadinessLoading ||
+    mexasOrderReadinessBlocked ||
     mexasCrossingOrderBlocked
 
   function onBetChange(newAmount: number | undefined) {
@@ -668,6 +725,10 @@ export default function LimitOrderPanel(props: {
                     'Ingresa una probabilidad'
                   ) : !betAmount ? (
                     'Ingresa una cantidad'
+                  ) : mexasOrderReadinessLoading ? (
+                    'Verificando libro...'
+                  ) : mexasOrderReadinessBlocked ? (
+                    'Libro no disponible'
                   ) : mexasCrossingOrderBlocked ? (
                     'El precio cruza el libro'
                   ) : (

@@ -79,6 +79,9 @@ function shouldSkipProxy(path: string) {
   if (/^v0\/market\/[^/]+\/mexas-resolution-readiness$/.test(path)) {
     return true
   }
+  if (/^v0\/market\/[^/]+\/mexas-order-readiness$/.test(path)) {
+    return true
+  }
 
   return pathsToSkip.some((skipPath) => {
     return path === skipPath || path.startsWith(`${skipPath}/`)

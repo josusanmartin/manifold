@@ -342,6 +342,36 @@ async function checkResolutionReadiness(contractId: string) {
   }
 }
 
+async function checkOrderReadiness(contractId: string) {
+  const { response, text } = await fetchText(
+    `/api/v0/market/${encodeURIComponent(contractId)}/mexas-order-readiness`
+  )
+  if (response.status < 200 || response.status >= 400) {
+    return fail(`order readiness ${contractId}`, `${response.status}`)
+  }
+
+  try {
+    const data = JSON.parse(text)
+    const valid =
+      data &&
+      typeof data === 'object' &&
+      typeof data.canPlaceOrders === 'boolean' &&
+      typeof data.matchingEngineReady === 'boolean'
+    return valid
+      ? pass(
+          `order readiness ${contractId}`,
+          `canPlaceOrders=${data.canPlaceOrders}, matchingEngineReady=${data.matchingEngineReady}`
+        )
+      : fail(
+          `order readiness ${contractId}`,
+          'Response does not include readiness booleans.'
+        )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return fail(`order readiness ${contractId}`, message)
+  }
+}
+
 async function checkBlockedResolutionReadiness(contractId: string) {
   const { response } = await fetchText(
     `/api/v0/market/${encodeURIComponent(
@@ -351,6 +381,15 @@ async function checkBlockedResolutionReadiness(contractId: string) {
   return response.status === 404
     ? pass(`blocked resolution readiness ${contractId}`, '404')
     : fail(`blocked resolution readiness ${contractId}`, `${response.status}`)
+}
+
+async function checkBlockedOrderReadiness(contractId: string) {
+  const { response } = await fetchText(
+    `/api/v0/market/${encodeURIComponent(contractId)}/mexas-order-readiness`
+  )
+  return response.status === 404
+    ? pass(`blocked order readiness ${contractId}`, '404')
+    : fail(`blocked order readiness ${contractId}`, `${response.status}`)
 }
 
 async function checkBlockedOrderBook(contractId: string) {
@@ -422,6 +461,8 @@ async function runSmoke() {
 
   results.push(await checkOrderBook('mexwcwin26a'))
   results.push(await checkOrderBook('ukrwarend26a'))
+  results.push(await checkOrderReadiness('mexwcwin26a'))
+  results.push(await checkOrderReadiness('ukrwarend26a'))
   results.push(await checkResolutionReadiness('mexwcwin26a'))
   results.push(await checkResolutionReadiness('ukrwarend26a'))
   results.push(
@@ -446,6 +487,7 @@ async function runSmoke() {
     )
   )
   results.push(await checkBlockedResolutionReadiness('not-a-mexas-market'))
+  results.push(await checkBlockedOrderReadiness('not-a-mexas-market'))
   results.push(
     await checkExpectedStatus(
       'unknown api fail closed',
@@ -462,6 +504,14 @@ async function runSmoke() {
     await checkExpectedStatus(
       'method orderbook POST',
       '/api/mexas-order-book?contractId=mexwcwin26a',
+      405,
+      { method: 'POST' }
+    )
+  )
+  results.push(
+    await checkExpectedStatus(
+      'method order readiness POST',
+      '/api/v0/market/mexwcwin26a/mexas-order-readiness',
       405,
       { method: 'POST' }
     )
