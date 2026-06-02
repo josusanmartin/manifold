@@ -18,6 +18,7 @@ import {
 import { shouldHideGraph } from 'common/contract-params'
 import { base64toPoints } from 'common/edge/og'
 import { HOUSE_BOT_USERNAME, SPICE_MARKET_TOOLTIP } from 'common/envs/constants'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { DAY_MS } from 'common/util/time'
 import { mergeWith, uniqBy } from 'lodash'
 import Image from 'next/image'
@@ -80,6 +81,7 @@ export function ContractPageContent(props: ContractParams) {
 
   // Just use the contract that was navigated to directly
   const liveContract = useLiveContract(props.contract)
+  const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(liveContract)
 
   const user = useUser()
 
@@ -432,7 +434,7 @@ export function ContractPageContent(props: ContractParams) {
                 description={description}
               />
             )}
-            {props.contract.isRanked !== false && (
+            {props.contract.isRanked !== false && !isMexasOrderBookOnly && (
               <MarketContext contractId={props.contract.id} />
             )}
 
