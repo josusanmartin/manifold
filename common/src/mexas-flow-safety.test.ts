@@ -1561,6 +1561,12 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain(
       'Open reservation refunds across all unresolved MEXAS markets: ${audit.openReservationRefund} MEX'
     )
+    expect(source).toContain(
+      'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-settlement'
+    )
+    expect(source).toContain(
+      'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts print:mexas-test-unwind-sql > /tmp/mexas-test-unwind.sql'
+    )
   })
 
   test('provides a read-only MEXAS settlement exposure audit script', () => {
@@ -1581,6 +1587,16 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(source).toContain('Remediation options:')
     expect(source).toContain('Implement on-chain escrow')
+    expect(source).toContain('Commands:')
+    expect(source).toContain(
+      'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-settlement'
+    )
+    expect(source).toContain(
+      'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts print:mexas-test-unwind-sql > /tmp/mexas-test-unwind.sql'
+    )
+    expect(source).toContain(
+      'It ends with rollback; change that to commit only after manual review.'
+    )
     expect(source).toContain('-- MEXAS TEST-ONLY FILLED EXPOSURE UNWIND SQL')
     expect(source).toContain('The transaction ends with ROLLBACK by default')
     expect(source).toContain('v_credit_amount numeric := ${sqlNumber(bet.cancelCredit)}')

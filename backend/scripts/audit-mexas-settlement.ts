@@ -332,6 +332,17 @@ function printTextReport(exposures: ContractExposure[]) {
   console.log(
     '  3. For test-only markets, run again with --print-test-unwind-sql, review the rollback-protected SQL, then manually decide whether to commit.'
   )
+  console.log('')
+  console.log('Commands:')
+  console.log(
+    '  COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-settlement'
+  )
+  console.log(
+    '  COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts print:mexas-test-unwind-sql > /tmp/mexas-test-unwind.sql'
+  )
+  console.log(
+    '  Review /tmp/mexas-test-unwind.sql. It ends with rollback; change that to commit only after manual review.'
+  )
 }
 
 async function main() {
