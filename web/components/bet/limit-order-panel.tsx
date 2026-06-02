@@ -408,6 +408,7 @@ export default function LimitOrderPanel(props: {
     console.error('Error in calculateCpmmMultiArbitrage:', err)
     setError(err?.message ?? `Error al calcular la orden. Inténtalo de nuevo.`)
   }
+  const displayedFilledAmount = mexasCrossingOrderBlocked ? 0 : filledAmount
   const returnPercent = formatPercent(currentReturn)
 
   const hideYesNo = isBinaryMC || !!pseudonym
@@ -561,7 +562,7 @@ export default function LimitOrderPanel(props: {
       </Col>
 
       <Col className="mt-2 w-full gap-2">
-        {outcome && hasLimitBet && filledAmount > 0 && (
+        {outcome && hasLimitBet && displayedFilledAmount > 0 && (
           <Row className="items-center justify-between gap-2 ">
             <div className="text-ink-600 whitespace-nowrap">
               {isPseudoNumeric ? (
@@ -573,7 +574,7 @@ export default function LimitOrderPanel(props: {
             </div>
             <div className="whitespace-nowrap">
               <MoneyDisplay
-                amount={filledAmount}
+                amount={displayedFilledAmount}
                 isCashContract={isCashContract}
                 token={displayToken}
               />{' '}

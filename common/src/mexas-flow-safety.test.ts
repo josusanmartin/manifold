@@ -431,14 +431,28 @@ describe('MEXAS flow safety guardrails', () => {
     expect(sqlSource).toContain('and b.user_id <> v_taker.user_id')
   })
 
-  test('allows crossing MEXAS limit orders through the UI so the RPC can match them', () => {
+  test('blocks pre-escrow MEXAS crossing orders without promising instant execution', () => {
     const source = readRepoFile('web/components/bet/limit-order-panel.tsx')
 
-    expect(source).not.toContain('mexasCrossingBlocked')
-    expect(source).not.toContain('Cruce desactivado')
-    expect(source).not.toContain('Los cruces están desactivados')
-    expect(source).toContain('const bet = await api(')
-    expect(source).toContain("'bet'")
+    expectMarkersInOrder(source, [
+      'const mexasBlockedCrossingOrders =',
+      '!MEXAS_ONCHAIN_ESCROW_IMPLEMENTED',
+      'getMexasCrossingOrders',
+      'const mexasCrossingOrderBlocked =',
+      'const displayedError =',
+      'El precio cruza el libro. Abre una orden que agregue liquidez.',
+      'mexasCrossingOrderBlocked',
+      'const displayedFilledAmount = mexasCrossingOrderBlocked ? 0 : filledAmount',
+      'displayedFilledAmount > 0',
+      'amount={displayedFilledAmount}',
+    ])
+    expectMarkersInOrder(source, [
+      'async function submitBet()',
+      'if (!user || betDisabled) return',
+      'const bet = await api(',
+      "'bet'",
+    ])
+    expect(source).not.toContain('activar escrow on-chain')
   })
 
   test('renders order book remaining sizes from canonical filled amount', () => {
