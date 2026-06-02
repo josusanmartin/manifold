@@ -83,15 +83,14 @@ const Accuracy = ({ onClick }: { onClick: (sectionTitle: string) => void }) => (
     onClick={() => onClick('Son precisas las probabilidades')}
   >
     <div className="pb-2">
-      Sí. Los mercados MEXAS se calibran mediante operaciones abiertas.
+      Sí. Los mercados MEXAS se calibran mediante órdenes límite abiertas.
       <a className="text-primary-700 ml-1 hover:underline" href="/checkout">
-        Ver mercados activos
+        Ver mercados
       </a>
       .
     </div>
     <div className="pb-2">
-      Los precios cambian cuando los usuarios compran y venden resultados, así
-      que el precio del mercado refleja la estimación colectiva actual.
+      Los precios del libro reflejan la estimación colectiva actual.
     </div>
     <div></div>
   </ExpandSection>
@@ -112,7 +111,8 @@ const PlayMoney = ({
     onClick={() => onClick('Por qué usar MEX')}
   >
     <div className="pb-2">
-      MEX es el token de Arbitrum que se usa para operar en MEXAS Markets.
+      MEX es el token de Arbitrum que se usa para abrir órdenes en MEXAS
+      Markets.
     </div>
     <div className="pb-2">
       Los depósitos permanecen en tu Wallet Privy y los retiros se envían

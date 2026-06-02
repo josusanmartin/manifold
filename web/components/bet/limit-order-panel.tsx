@@ -257,7 +257,7 @@ export default function LimitOrderPanel(props: {
   const displayedError =
     error ??
     (mexasCrossingOrderBlocked
-      ? 'El precio cruza el libro. Abre una orden que no cruce hasta activar escrow on-chain.'
+      ? 'El precio cruza el libro. Abre una orden que agregue liquidez.'
       : undefined)
   const betDisabled =
     isSubmitting ||

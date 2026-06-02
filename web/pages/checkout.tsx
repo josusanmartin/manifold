@@ -175,7 +175,7 @@ function SimpleMarketCard() {
         <Row className="text-ink-500 flex-wrap items-center gap-3 text-xs font-medium">
           <span>MEX 0 Vol.</span>
           <span>Cierra 31 dic 2026</span>
-          <span>Libro de órdenes activo</span>
+          <span>Órdenes límite</span>
         </Row>
         <Row className="flex-wrap gap-2">
           <PriceButton side="yes" href={UKRAINE_MARKET_URL} />
@@ -254,7 +254,7 @@ function CheckoutContent() {
             Mercados MEXAS
           </div>
           <div className="text-ink-1000 text-xl font-semibold">
-            Opera mercados desde tu Wallet
+            Abre órdenes límite desde tu Wallet
           </div>
         </Col>
         <Link
@@ -281,7 +281,7 @@ export default function CheckoutPage() {
     <Page trackPageView="checkout page" className="lg:col-span-10" hideFooter>
       <SEO
         title="Mercados MEXAS"
-        description="Opera mercados de predicción con MEXAS en Arbitrum."
+        description="Abre órdenes límite en mercados de predicción con MEXAS en Arbitrum."
         url="/checkout"
       />
 

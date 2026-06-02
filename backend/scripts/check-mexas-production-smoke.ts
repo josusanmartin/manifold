@@ -47,7 +47,7 @@ const PAGES = [
   },
   {
     path: '/checkout',
-    required: ['Opera mercados desde tu Wallet', 'Abrir mercado'],
+    required: ['Abre órdenes límite desde tu Wallet', 'Abrir mercado'],
   },
   {
     path: '/josusanmartin?tab=summary',

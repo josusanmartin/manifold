@@ -302,6 +302,22 @@ describe('MEXAS flow safety guardrails', () => {
       'displayedError',
       'El precio cruza el libro',
     ])
+    expect(source).not.toContain('activar escrow on-chain')
+  })
+
+  test('does not overstate live MEXAS execution before escrow is implemented', () => {
+    const checkoutSource = readRepoFile('web/pages/checkout.tsx')
+    const aboutSource = readRepoFile('web/components/about-manifold.tsx')
+    const explainerSource = readRepoFile('web/components/explainer-panel.tsx')
+
+    expect(checkoutSource).toContain('Abre órdenes límite desde tu Wallet')
+    expect(checkoutSource).toContain('Órdenes límite')
+    expect(checkoutSource).not.toContain('Opera mercados desde tu Wallet')
+    expect(checkoutSource).not.toContain('Libro de órdenes activo')
+    expect(aboutSource).toContain('Abre órdenes límite con MEX')
+    expect(explainerSource).toContain('órdenes límite abiertas')
+    expect(explainerSource).not.toContain('Ver mercados activos')
+    expect(explainerSource).not.toContain('compran y venden')
   })
 
   test('syncs wallet balances incrementally instead of restoring spent filled stake', () => {
