@@ -16,6 +16,8 @@ const MEXAS_ONLY_REDIRECTS = [
   '/activity',
   '/admin',
   '/admin/:path*',
+  '/ai',
+  '/ai/:path*',
   '/home',
   '/browse',
   '/browse/:path*',
@@ -55,6 +57,7 @@ const MEXAS_ONLY_REDIRECTS = [
   '/news/:path*',
   '/old-charity',
   '/old-charity/:path*',
+  '/og-test/:path*',
   '/pakman',
   '/post/:path*',
   '/posts',
@@ -66,8 +69,10 @@ const MEXAS_ONLY_REDIRECTS = [
   '/register-on-discord',
   '/reports',
   '/reports/:path*',
+  '/server-sitemap.xml',
   '/shop',
   '/shop/:path*',
+  '/sign-in-waiting',
   '/sitemap',
   '/sports',
   '/stats',
@@ -81,6 +86,8 @@ const MEXAS_ONLY_REDIRECTS = [
   '/welcomeoffer',
   '/wrapped',
   '/yc-s23',
+  '/embed/:path*',
+  '/notifications',
 ].map((source) => ({
   source,
   destination: '/checkout',
@@ -156,18 +163,18 @@ module.exports = {
       ...MEXAS_ONLY_REDIRECTS,
       {
         source: '/supporter',
-        destination: '/membership',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/politics',
-        destination: '/election',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/elections',
-        destination: '/election',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
 
       {
@@ -182,18 +189,18 @@ module.exports = {
       },
       {
         source: '/analytics',
-        destination: '/stats',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/labs',
-        destination: '/lab',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
 
       {
         source: '/versus',
-        destination: '/VersusBot?tab=questions',
+        destination: '/checkout',
         permanent: false,
       },
       {
@@ -224,53 +231,53 @@ module.exports = {
       },
       {
         source: '/this-month',
-        destination: '/browse?f=closing-this-month&s=most-popular',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/search',
-        destination: '/browse',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/browse/for-you',
-        destination: '/browse?fy=1&f=open',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/find',
-        destination: '/browse',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/groups',
-        destination: '/browse?t=Topics',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/group/:slug*',
-        destination: '/topic/:slug*',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/browse/:slug+',
-        destination: '/topic/:slug+',
+        destination: '/checkout',
         permanent: false,
       },
       {
         source: '/old-posts/:slug*',
-        destination: '/post/:slug*',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/questions',
-        destination: '/browse',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/dashboard/:slug',
-        destination: '/news/:slug',
-        permanent: true,
+        destination: '/checkout',
+        permanent: false,
       },
       {
         source: '/home/:newsSlug*',
@@ -282,7 +289,7 @@ module.exports = {
           },
         ],
         permanent: false,
-        destination: '/news/:tab',
+        destination: '/checkout',
       },
       {
         source: '/news/:newsSlug*',
@@ -294,7 +301,7 @@ module.exports = {
           },
         ],
         permanent: false,
-        destination: '/news/:tab',
+        destination: '/checkout',
       },
       {
         source: '/:username/portfolio',
@@ -311,8 +318,8 @@ module.exports = {
             value: '(?<topic>.*)',
           },
         ],
-        permanent: true,
-        destination: '/browse/:topic', // Using the captured value here
+        permanent: false,
+        destination: '/checkout',
       },
       // NOTE: add any external redirects at common/envs/constants.ts and update native apps.
     ]
