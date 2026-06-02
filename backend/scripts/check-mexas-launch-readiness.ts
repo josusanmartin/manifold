@@ -1,5 +1,6 @@
 import { execFileSync } from 'child_process'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
 import { resolve } from 'path'
 import { createClient } from 'common/supabase/utils'
 
@@ -36,7 +37,7 @@ const REQUIRED_MEXAS_CONTRACTS = [
   },
 ]
 
-function parseEnvLine(line: string) {
+function parseEnvAssignment(line: string) {
   const trimmed = line.trim()
   if (!trimmed || trimmed.startsWith('#')) return
 
@@ -52,7 +53,14 @@ function parseEnvLine(line: string) {
     value = value.slice(1, -1)
   }
 
-  if (!process.env[key]) process.env[key] = value
+  return { key, value }
+}
+
+function parseEnvLine(line: string) {
+  const assignment = parseEnvAssignment(line)
+  if (assignment && !process.env[assignment.key]) {
+    process.env[assignment.key] = assignment.value
+  }
 }
 
 function loadEnvFiles() {
@@ -105,8 +113,45 @@ function getVercelProductionEnvNames() {
   }
 }
 
+function getVercelProductionEnvValues() {
+  const env = new Map<string, string>()
+  const tempDir = mkdtempSync(resolve(tmpdir(), 'mexas-vercel-env-'))
+  const envFile = resolve(tempDir, '.env.production')
+
+  try {
+    execFileSync(
+      'vercel',
+      ['env', 'pull', envFile, '--environment', 'production', '--yes'],
+      {
+        cwd: resolve(__dirname, '../..'),
+        encoding: 'utf8',
+        stdio: ['ignore', 'ignore', 'ignore'],
+      }
+    )
+
+    for (const line of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+      const assignment = parseEnvAssignment(line)
+      if (assignment) env.set(assignment.key, assignment.value)
+    }
+  } catch {
+    // Vercel env names are still checked separately; values are best-effort for
+    // validating launch-mode flags without exposing secrets.
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true })
+  }
+
+  return env
+}
+
 function hasEnvOrVercelEnv(name: string, vercelEnvNames: Set<string>) {
   return hasEnv(name) || vercelEnvNames.has(name)
+}
+
+function getEnvOrVercelValue(
+  name: string,
+  vercelEnvValues: Map<string, string>
+) {
+  return process.env[name]?.trim() || vercelEnvValues.get(name)?.trim()
 }
 
 function getSupabaseUrlOrInstanceId() {
@@ -136,6 +181,7 @@ async function runChecks() {
 
   const checks: CheckResult[] = []
   const vercelEnvNames = getVercelProductionEnvNames()
+  const vercelEnvValues = getVercelProductionEnvValues()
   const missingServer = REQUIRED_SERVER_ENVS.filter(
     (key) => !hasEnvOrVercelEnv(key, vercelEnvNames)
   )
@@ -250,8 +296,14 @@ async function runChecks() {
     )
   }
 
-  const matchingMode = process.env.MEXAS_MATCHING_ENGINE_MODE
-  const settlementMode = process.env.MEXAS_SETTLEMENT_MODE
+  const matchingMode = getEnvOrVercelValue(
+    'MEXAS_MATCHING_ENGINE_MODE',
+    vercelEnvValues
+  )
+  const settlementMode = getEnvOrVercelValue(
+    'MEXAS_SETTLEMENT_MODE',
+    vercelEnvValues
+  )
   checks.push(
     matchingMode === 'rpc'
       ? pass('matching mode', 'MEXAS_MATCHING_ENGINE_MODE=rpc.')
@@ -269,8 +321,12 @@ async function runChecks() {
         )
   )
   checks.push(
-    process.env.MEXAS_ALLOW_UNESCROWED_MATCHING === 'true' ||
-      process.env.MEXAS_ALLOW_UNESCROWED_RESOLUTION === 'true'
+    getEnvOrVercelValue('MEXAS_ALLOW_UNESCROWED_MATCHING', vercelEnvValues) ===
+      'true' ||
+      getEnvOrVercelValue(
+        'MEXAS_ALLOW_UNESCROWED_RESOLUTION',
+        vercelEnvValues
+      ) === 'true'
       ? fail(
           'unescrowed overrides',
           'Unescrowed matching/resolution overrides must be disabled for launch.'

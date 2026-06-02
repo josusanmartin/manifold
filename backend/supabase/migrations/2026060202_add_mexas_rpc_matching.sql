@@ -94,6 +94,10 @@ begin
     raise exception 'Taker order is cancelled' using errcode = '25006';
   end if;
 
+  if v_taker.expires_at is not null and v_taker.expires_at <= v_now_ts then
+    raise exception 'Taker order is expired' using errcode = '25006';
+  end if;
+
   if coalesce(v_taker.is_filled, false) or coalesce((v_taker_data ->> 'isFilled')::boolean, false) then
     return jsonb_build_object(
       'taker',

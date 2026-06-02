@@ -9,6 +9,10 @@ function countOccurrences(source: string, marker: string) {
   return source.split(marker).length - 1
 }
 
+function compactWhitespace(source: string) {
+  return source.replace(/\s+/g, ' ').trim()
+}
+
 function expectMarkersInOrder(source: string, markers: string[]) {
   let previousIndex = -1
 
@@ -124,20 +128,99 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('async function updateLimitBetCas(')
   })
 
+  test('refunds the inserted MEXAS order when post-insert matching fails', () => {
+    const source = readRepoFile('web/pages/api/v0/bet.ts')
+
+    expectMarkersInOrder(source, [
+      'async function cancelInsertedMexasOrderAndRefund',
+      'const currentBet = convertBet(currentRow as Row',
+      'const refundAmount = getMexasRemainingReservedAmount(currentBet)',
+      ".eq('bet_id', bet.id)",
+      ".eq('user_id', userId)",
+      ".eq('is_cancelled', false)",
+      ".eq('is_filled', false)",
+      ".eq('updated_time', currentRow.updated_time)",
+      'await refundMexasReservation(',
+      'refundAmount',
+    ])
+    expectMarkersInOrder(source, [
+      'const matchedBet = hasCrossingOrders',
+      '? await matchMexasOrderbookLimitOrderRpc(db, bet.id)',
+      '} catch (error) {',
+      'if (debited && !inserted && bet)',
+      'if (debited && inserted && bet)',
+      'await cancelInsertedMexasOrderAndRefund(',
+    ])
+  })
+
   test('locks down the MEXAS matching RPC to the backend service role', () => {
+    const source = readRepoFile(
+      'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
+    )
+    const sql = compactWhitespace(source)
+
+    expect(sql).toMatch(
+      /create or replace function public\.mexas_match_orderbook_limit_order ?\(/
+    )
+    expect(sql).toContain('returns jsonb language plpgsql security invoker')
+    expect(source).toContain('for update')
+    expect(sql).toMatch(
+      /revoke execute on function public\.mexas_match_orderbook_limit_order ?\(text, bigint, integer\) from public, anon, authenticated/
+    )
+    expect(sql).toMatch(
+      /grant execute on function public\.mexas_match_orderbook_limit_order ?\(text, bigint, integer\) to service_role/
+    )
+    expect(source).not.toContain('skip locked')
+  })
+
+  test('keeps the SQL matcher atomic and deterministic under concurrent takers', () => {
     const source = readRepoFile(
       'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
     )
 
     expectMarkersInOrder(source, [
-      'create or replace function public.mexas_match_orderbook_limit_order',
-      'language plpgsql',
-      'security invoker',
-      'for update',
-      'revoke execute on function public.mexas_match_orderbook_limit_order(text, bigint, integer) from public, anon, authenticated',
-      'grant execute on function public.mexas_match_orderbook_limit_order(text, bigint, integer) to service_role',
+      'from public.contract_bets',
+      'where bet_id = p_taker_bet_id',
+      'for update;',
+      'from public.contracts',
+      'where id = v_taker.contract_id',
+      'for update;',
+      'while v_remaining_amount > v_epsilon',
+      'select *',
+      'into v_maker',
+      'order by',
+      "case when v_taker_outcome = 'YES' then (b.data ->> 'limitProb')::numeric end asc",
+      "case when v_taker_outcome = 'NO' then (b.data ->> 'limitProb')::numeric end desc",
+      'b.created_time asc',
+      'b.bet_id asc',
+      'limit 1',
+      'for update;',
+      'update public.contract_bets',
+      'where bet_id = v_maker.bet_id',
+      'update public.contract_bets',
+      'where bet_id = v_taker.bet_id',
     ])
     expect(source).not.toContain('skip locked')
+  })
+
+  test('the SQL matcher rejects closed/resolved markets and expired orders', () => {
+    const source = readRepoFile(
+      'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
+    )
+
+    expectMarkersInOrder(source, [
+      'if v_contract.resolution_time is not null',
+      "raise exception 'Market is resolved'",
+      'if v_contract.close_time is not null and v_contract.close_time <= v_now_ts',
+      "raise exception 'Trading is closed'",
+      'if v_taker.expires_at is not null and v_taker.expires_at <= v_now_ts',
+      "raise exception 'Taker order is expired'",
+    ])
+    expectMarkersInOrder(source, [
+      'and coalesce(b.is_cancelled, false) = false',
+      'and coalesce(b.is_filled, false) = false',
+      'and (b.expires_at is null or b.expires_at > v_now_ts)',
+    ])
   })
 
   test('preflights the MEXAS matching RPC before a crossing order can debit funds', () => {

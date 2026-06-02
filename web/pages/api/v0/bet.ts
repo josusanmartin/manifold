@@ -316,6 +316,67 @@ async function refundMexasReservation(
   await updateMexasUserBalanceCas(db, userId, amount, { creditKey })
 }
 
+async function cancelInsertedMexasOrderAndRefund(
+  db: SupabaseClient,
+  bet: LimitBet,
+  userId: string,
+  reservedAmount: number
+) {
+  if (reservedAmount <= 0) return
+
+  const { data: currentRow, error: readError } = await db
+    .from('contract_bets')
+    .select('*')
+    .eq('bet_id', bet.id)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (readError) throw readError
+  if (!currentRow) return
+
+  const currentBet = convertBet(currentRow as Row<'contract_bets'>) as LimitBet
+  const refundAmount = getMexasRemainingReservedAmount(currentBet)
+  if (refundAmount <= 0) return
+
+  const currentData =
+    currentRow.data &&
+    typeof currentRow.data === 'object' &&
+    !Array.isArray(currentRow.data)
+      ? currentRow.data
+      : currentBet
+  const now = Date.now()
+  const { data: cancelledRow, error } = await db
+    .from('contract_bets')
+    .update({
+      is_cancelled: true,
+      data: {
+        ...currentData,
+        isCancelled: true,
+        mexasFundsReleased: true,
+        mexasReleaseCreditKey: `mexas-placement-refund:${bet.id}`,
+        mexasReleaseReason: 'placement-error',
+        mexasReleasedAt: now,
+      } as any,
+    })
+    .eq('bet_id', bet.id)
+    .eq('user_id', userId)
+    .eq('is_cancelled', false)
+    .eq('is_filled', false)
+    .eq('updated_time', currentRow.updated_time)
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  if (!cancelledRow) return
+
+  await refundMexasReservation(
+    db,
+    userId,
+    refundAmount,
+    `mexas-placement-refund:${bet.id}`
+  )
+}
+
 async function updateUserBalanceCas(
   db: SupabaseClient,
   userId: string,
@@ -788,6 +849,14 @@ async function placeBinaryBet(
             userId,
             reservedAmount,
             `mexas-insert-refund:${bet.id}`
+          )
+        }
+        if (debited && inserted && bet) {
+          await cancelInsertedMexasOrderAndRefund(
+            db,
+            bet,
+            userId,
+            reservedAmount
           )
         }
         throw error
