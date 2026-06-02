@@ -221,6 +221,22 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain("'bet'")
   })
 
+  test('renders order book remaining sizes from canonical filled amount', () => {
+    const panelSource = readRepoFile(
+      'web/components/contract/order-book-panel.tsx'
+    )
+    const checkoutSource = readRepoFile('web/pages/checkout.tsx')
+
+    expect(panelSource).toContain('getMexasOpenOrderAmount')
+    expect(panelSource).not.toContain('sumBy(bet.fills')
+    expectMarkersInOrder(checkoutSource, [
+      'function remainingOrderAmount',
+      '(order.orderAmount ?? 0) - (order.amount ?? 0)',
+    ])
+    expect(checkoutSource).not.toContain('fills?:')
+    expect(checkoutSource).not.toContain('order.fills')
+  })
+
   test('refunds the inserted MEXAS order when post-insert matching fails', () => {
     const source = readRepoFile('web/pages/api/v0/bet.ts')
 

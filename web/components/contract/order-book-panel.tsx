@@ -7,6 +7,7 @@ import { shortFormatNumber } from 'common/util/format'
 import { orderBy, sumBy } from 'lodash'
 import { useEffect, useState } from 'react'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+import { getMexasOpenOrderAmount } from 'common/mexas-order-book'
 import { Col } from '../layout/col'
 import { Row } from '../layout/row'
 
@@ -33,8 +34,7 @@ function isOpenLimitBet(bet: Bet): bet is LimitBet {
 }
 
 function remainingOrderAmount(bet: LimitBet) {
-  const filled = sumBy(bet.fills ?? [], (fill) => Math.max(0, fill.amount))
-  return Math.max(0, bet.orderAmount - filled)
+  return getMexasOpenOrderAmount(bet)
 }
 
 function getMarkets(contract: OrderBookContract): MarketRow[] {

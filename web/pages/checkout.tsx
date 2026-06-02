@@ -19,7 +19,6 @@ const UKRAINE_MARKET_ID = 'ukrwarend26a'
 
 type OrderBookBet = {
   amount?: number
-  fills?: { amount?: number }[]
   isCancelled?: boolean
   isFilled?: boolean
   limitProb?: number
@@ -28,10 +27,7 @@ type OrderBookBet = {
 }
 
 function remainingOrderAmount(order: OrderBookBet) {
-  const filled = order.fills?.length
-    ? order.fills.reduce((sum, fill) => sum + Math.max(0, fill.amount ?? 0), 0)
-    : Math.max(0, order.amount ?? 0)
-  return Math.max(0, (order.orderAmount ?? 0) - filled)
+  return Math.max(0, (order.orderAmount ?? 0) - (order.amount ?? 0))
 }
 
 function getOrderBookMidPrice(orders: OrderBookBet[]) {
