@@ -260,7 +260,7 @@ export function LimitOrdersTable(props: {
   if (betWithDetails.length === 0) {
     return (
       <Col className={clsx(className, 'items-center justify-center p-4')}>
-        <p className="text-ink-800">No limit orders found</p>
+        <p className="text-ink-800">No hay ordenes limite</p>
       </Col>
     )
   }
@@ -268,7 +268,7 @@ export function LimitOrdersTable(props: {
   if (filteredByQueryAndExpiredBets.length === 0) {
     return (
       <Col className={clsx(className, 'items-center justify-center p-4')}>
-        <p className="text-ink-800">No limit orders match your criteria</p>
+        <p className="text-ink-800">No hay ordenes con esos filtros</p>
       </Col>
     )
   }
@@ -276,12 +276,12 @@ export function LimitOrdersTable(props: {
   return (
     <Col className={clsx(className, 'w-full')}>
       <div className="bg-canvas-0 grid-cols-16 sticky top-10 z-10 mb-1 grid gap-2 text-sm font-semibold sm:top-0">
-        <div className="col-span-3">Price</div>
+        <div className="col-span-3">Precio</div>
         <div
           className="col-span-2 mr-1 flex cursor-pointer items-center justify-end sm:mr-0 "
           onClick={() => onSetSort('createTime')}
         >
-          Created
+          Creada
           {sort.field === 'createTime' &&
             (sort.direction === 'asc' ? <BiCaretUp /> : <BiCaretDown />)}
         </div>
@@ -289,7 +289,7 @@ export function LimitOrdersTable(props: {
           className="col-span-2 flex cursor-pointer items-center justify-end"
           onClick={() => onSetSort('expiryTime')}
         >
-          Expires
+          Expira
           {sort.field === 'expiryTime' &&
             (sort.direction === 'asc' ? <BiCaretUp /> : <BiCaretDown />)}
         </div>
@@ -297,7 +297,7 @@ export function LimitOrdersTable(props: {
           className="col-span-2 flex cursor-pointer items-center justify-end"
           onClick={() => onSetSort('updateTime')}
         >
-          Fill
+          Ejecucion
           {sort.field === 'updateTime' &&
             (sort.direction === 'asc' ? <BiCaretUp /> : <BiCaretDown />)}
         </div>
@@ -305,7 +305,7 @@ export function LimitOrdersTable(props: {
           className="col-span-4 flex cursor-pointer items-center justify-end sm:col-span-2"
           onClick={() => onSetSort('remainingAmount')}
         >
-          Remaining
+          Restante
           {sort.field === 'remainingAmount' &&
             (sort.direction === 'asc' ? <BiCaretUp /> : <BiCaretDown />)}
         </div>
@@ -313,7 +313,7 @@ export function LimitOrdersTable(props: {
           className="col-span-2 hidden cursor-pointer items-center justify-end sm:flex"
           onClick={() => onSetSort('priceDiff')}
         >
-          Price ∆
+          Precio
           {sort.field === 'priceDiff' &&
             (sort.direction === 'asc' ? <BiCaretUp /> : <BiCaretDown />)}
         </div>
@@ -456,10 +456,10 @@ export function LimitOrdersTable(props: {
                 {isYourBets && (isFilledOrCancelled || isExpired) && isOpen && (
                   <IconButton
                     size="2xs"
-                    aria-label="Reload order with same parameters"
+                    aria-label="Reabrir orden con los mismos parametros"
                     onClick={() => setShowLimitModal(bet)}
                   >
-                    <Tooltip text="Reload order with same parameters">
+                    <Tooltip text="Reabrir orden con los mismos parametros">
                       <span className="text-ink-500">
                         <DocumentDuplicateIcon className="h-4 w-4" />
                       </span>
@@ -469,10 +469,10 @@ export function LimitOrdersTable(props: {
                 {isYourBets && !isFilledOrCancelled && !isExpired && isOpen && (
                   <IconButton
                     size="2xs"
-                    aria-label="Place a new order with same parameters"
+                    aria-label="Abrir nueva orden con los mismos parametros"
                     onClick={() => setShowLimitModal(bet)}
                   >
-                    <Tooltip text="Place a new order with same parameters">
+                    <Tooltip text="Abrir nueva orden con los mismos parametros">
                       <span className="text-ink-500">
                         <DocumentDuplicateIcon className="h-4 w-4" />
                       </span>
@@ -482,10 +482,10 @@ export function LimitOrdersTable(props: {
 
                 <IconButton
                   size="2xs"
-                  aria-label="Edit orders for this market"
+                  aria-label="Editar ordenes de este mercado"
                   onClick={() => openContractModal(contract.id)}
                 >
-                  <Tooltip text="Edit orders for this market">
+                  <Tooltip text="Editar ordenes de este mercado">
                     <span className="text-ink-500">
                       <PencilIcon className="h-4 w-4" />
                     </span>
@@ -508,7 +508,7 @@ export function LimitOrdersTable(props: {
       {contractModalId && (
         <Modal open={!!contractModalId} setOpen={closeContractModal}>
           <div className={MODAL_CLASS}>
-            <h3 className="mb-4 text-lg font-bold">All orders</h3>
+            <h3 className="mb-4 text-lg font-bold">Todas las ordenes</h3>
             {contractModalId && contractsById[contractModalId] && (
               <OrderTable
                 contract={contractsById[contractModalId]}
@@ -518,7 +518,7 @@ export function LimitOrdersTable(props: {
               />
             )}
             <Button className="mt-4" onClick={closeContractModal}>
-              Close
+              Cerrar
             </Button>
           </div>
         </Modal>
@@ -599,8 +599,8 @@ export function LimitOrdersToggle(props: {
       <ChoicesToggleGroup
         currentChoice={showLimitOrders ? 'Orders' : 'Bets'}
         choicesMap={{
-          Bets: 'Bets',
-          Orders: 'Orders',
+          Bets: 'Operaciones',
+          Orders: 'Ordenes',
         }}
         setChoice={(choice) => setShowLimitOrders(choice === 'Orders')}
       />

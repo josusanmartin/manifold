@@ -228,7 +228,7 @@ function BookSide(props: { levels: Level[]; side: 'bid' | 'ask' }) {
       }
     >
       <Row className="text-ink-500 bg-canvas-50 border-ink-200 border-b px-4 py-2 text-xs font-medium uppercase">
-        <span className="flex-1">{isBid ? 'Bids' : 'Asks'}</span>
+        <span className="flex-1">{isBid ? 'Compras' : 'Ventas'}</span>
         <span className="w-20 text-right">Precio</span>
         <span className="w-20 text-right">Tamaño</span>
       </Row>
@@ -243,7 +243,7 @@ function BookSide(props: { levels: Level[]; side: 'bid' | 'ask' }) {
           ))
         ) : (
           <Row className="text-ink-500 items-center justify-center px-4 py-6 text-sm">
-            {isBid ? 'Sin bids' : 'Sin asks'}
+            {isBid ? 'Sin compras' : 'Sin ventas'}
           </Row>
         )}
       </Col>

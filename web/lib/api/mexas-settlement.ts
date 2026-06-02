@@ -1,25 +1,27 @@
 import { APIError } from 'common/api/utils'
-import { type MexasSettlementAudit } from 'common/mexas-settlement'
+import {
+  canMexasMatchCrossingOrders,
+  canMexasResolveFilledPositions,
+  type MexasSettlementAudit,
+  type MexasSettlementSettings,
+} from 'common/mexas-settlement'
 
-function isEscrowSettlementMode() {
-  return process.env.MEXAS_SETTLEMENT_MODE === 'escrow'
-}
-
-function allowsUnescrowedMatching() {
-  return process.env.MEXAS_ALLOW_UNESCROWED_MATCHING === 'true'
-}
-
-function allowsUnescrowedResolution() {
-  return process.env.MEXAS_ALLOW_UNESCROWED_RESOLUTION === 'true'
+function getMexasSettlementSettings(): MexasSettlementSettings {
+  return {
+    allowUnescrowedMatching: process.env.MEXAS_ALLOW_UNESCROWED_MATCHING,
+    allowUnescrowedResolution: process.env.MEXAS_ALLOW_UNESCROWED_RESOLUTION,
+    matchingEngineMode: process.env.MEXAS_MATCHING_ENGINE_MODE,
+    settlementMode: process.env.MEXAS_SETTLEMENT_MODE,
+  }
 }
 
 export function assertMexasCanMatchCrossingOrders(hasCrossingOrders: boolean) {
   if (!hasCrossingOrders) return
-  if (isEscrowSettlementMode() || allowsUnescrowedMatching()) return
+  if (canMexasMatchCrossingOrders(getMexasSettlementSettings())) return
 
   throw new APIError(
     503,
-    'El matching MEXAS requiere escrow on-chain. Puedes abrir ordenes limite, pero los cruces estan desactivados hasta configurar MEXAS_SETTLEMENT_MODE=escrow.'
+    'El matching MEXAS requiere escrow on-chain y un motor transaccional. Puedes abrir ordenes limite, pero los cruces estan desactivados hasta configurar MEXAS_SETTLEMENT_MODE=escrow y MEXAS_MATCHING_ENGINE_MODE=transactional.'
   )
 }
 
@@ -27,7 +29,7 @@ export function assertMexasCanResolveFilledPositions(
   audit: MexasSettlementAudit
 ) {
   if (audit.filledBetCount === 0) return
-  if (isEscrowSettlementMode() || allowsUnescrowedResolution()) return
+  if (canMexasResolveFilledPositions(getMexasSettlementSettings())) return
 
   throw new APIError(
     503,

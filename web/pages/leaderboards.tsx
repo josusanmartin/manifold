@@ -30,11 +30,11 @@ import { getCurrentPortfolio } from 'common/supabase/portfolio-metrics'
 import Link from 'next/link'
 
 const LEADERBOARD_TYPES = [
-  { name: 'Profit', value: 'profit' },
-  { name: 'Loss', value: 'loss' },
-  { name: 'Volume', value: 'volume' },
-  { name: 'Creators', value: 'creator' },
-  { name: 'Referrals', value: 'referral' },
+  { name: 'Ganancia', value: 'profit' },
+  { name: 'Perdida', value: 'loss' },
+  { name: 'Volumen', value: 'volume' },
+  { name: 'Creadores', value: 'creator' },
+  { name: 'Referidos', value: 'referral' },
 ] as const
 
 type LeaderboardType = (typeof LEADERBOARD_TYPES)[number]['value']
@@ -118,7 +118,7 @@ export default function Leaderboards() {
     }
   }, [topic])
 
-  const token = 'MANA'
+  const token = 'MEX'
 
   const {
     data: entries,
@@ -139,12 +139,12 @@ export default function Leaderboards() {
 
   const allColumns: { [key in LeaderboardType]: LeaderboardColumn<Entry>[] } = {
     profit: [
-      { header: 'Profit', renderCell: (c) => formatMoney(c.score, token) },
+      { header: 'Ganancia', renderCell: (c) => formatMoney(c.score, token) },
     ],
 
     loss: [
       {
-        header: 'Loss',
+        header: 'Perdida',
         renderCell: (c) => (
           <span className={c.score < 0 ? 'text-scarlet-500' : 'text-ink-400'}>
             {formatMoney(c.score, token)}
@@ -154,7 +154,7 @@ export default function Leaderboards() {
     ],
 
     volume: [
-      { header: 'Volume', renderCell: (c) => formatMoney(c.score, token) },
+      { header: 'Volumen', renderCell: (c) => formatMoney(c.score, token) },
     ],
 
     creator: [
@@ -162,12 +162,12 @@ export default function Leaderboards() {
     ],
 
     referral: [
-      { header: 'Referrals', renderCell: (c) => c.score },
+      { header: 'Referidos', renderCell: (c) => c.score },
       {
         header: (
           <span className="flex items-center gap-1">
-            Referred profits
-            <InfoTooltip text="Total profit earned by referred users" />
+            Ganancias referidas
+            <InfoTooltip text="Ganancia total obtenida por usuarios referidos" />
           </span>
         ),
         renderCell: (c) => formatMoney(c.totalReferredProfit ?? 0, token),
@@ -180,8 +180,8 @@ export default function Leaderboards() {
   return (
     <Page trackPageView={'leaderboards'}>
       <SEO
-        title="Leaderboards"
-        description={`Manifold's leaderboards show the top ${BETTORS}, question creators, and referrers.`}
+        title="Clasificaciones"
+        description={`Clasificaciones de MEXAS para los mejores ${BETTORS}, creadores de mercados y referidores.`}
         url="/leaderboards"
       />
 
@@ -190,17 +190,17 @@ export default function Leaderboards() {
         <Col className="gap-1">
           <Row className="items-center justify-between">
             <h1 className="text-primary-700 text-2xl font-semibold">
-              Leaderboard
+              Clasificacion
             </h1>
             <Link
               href="/leagues"
               className="text-ink-500 hover:text-ink-700 text-sm"
             >
-              Monthly leagues →
+              Ligas mensuales
             </Link>
           </Row>
           <p className="text-ink-500 text-sm">
-            All-time top traders on Manifold
+            Mejores traders historicos en MEXAS
           </p>
         </Col>
 
@@ -208,7 +208,7 @@ export default function Leaderboards() {
         {user && myScores?.[type] && (
           <div className="bg-canvas-50 border-ink-200 rounded-lg border px-4 py-3">
             <Row className="items-center justify-between">
-              <span className="text-ink-600 text-sm">Your rank</span>
+              <span className="text-ink-600 text-sm">Tu posicion</span>
               <span className="text-ink-900 text-lg font-semibold tabular-nums">
                 #{data?.rank?.toLocaleString() ?? '—'}
               </span>
@@ -224,7 +224,7 @@ export default function Leaderboards() {
           <button
             onClick={refresh}
             className="text-ink-400 hover:text-ink-600 hover:bg-canvas-100 rounded p-1.5 transition-colors"
-            title="Refresh"
+            title="Actualizar"
           >
             <RefreshIcon className="h-4 w-4" />
           </button>
@@ -266,11 +266,11 @@ export default function Leaderboards() {
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
               <span className="text-ink-600 text-sm">
-                Error loading leaderboard
+                Error cargando la clasificacion
               </span>
               <span className="text-ink-400 text-xs">{error.message}</span>
               <Button onClick={refresh} size="sm" color="gray-outline">
-                Try again
+                Reintentar
               </Button>
             </div>
           ) : null}

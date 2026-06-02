@@ -9,14 +9,16 @@ import {
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
-import { bulkIncrementBalancesQuery } from './supabase/users'
+import { getMexasOrderReleaseCreditKey } from 'common/mexas-resolution'
 
 export async function expireLimitOrders() {
   const pg = createSupabaseDirectClient()
   const unfilteredBets = await pg.map(
     `
     update contract_bets
-    set data = data || '{"isCancelled": true}'
+    set
+      is_cancelled = true,
+      data = coalesce(data, '{}'::jsonb) || '{"isCancelled": true}'::jsonb
     where is_filled = false
     and is_cancelled = false
     and expires_at < now()
@@ -42,29 +44,55 @@ export async function expireLimitOrders() {
           : 0
 
       return refundAmount > 0
-        ? { betId: bet.id, userId: bet.userId, refundAmount }
+        ? {
+            betId: bet.id,
+            userId: bet.userId,
+            refundAmount,
+            creditKey: getMexasOrderReleaseCreditKey(bet.id),
+          }
         : undefined
     })
     .filter((refund) => refund !== undefined)
 
   if (mexasRefunds.length > 0) {
     await pg.tx(async (tx) => {
-      await tx.none(
-        bulkIncrementBalancesQuery(
-          mexasRefunds.map((refund) => ({
-            id: refund.userId,
-            balance: refund.refundAmount,
-          }))
+      for (const refund of mexasRefunds) {
+        await tx.none(
+          `
+          update users
+          set
+            balance = balance + $2,
+            data = jsonb_set(
+              coalesce(data, '{}'::jsonb),
+              '{mexasBalanceCreditKeys}',
+              coalesce(
+                coalesce(data, '{}'::jsonb)->'mexasBalanceCreditKeys',
+                '[]'::jsonb
+              ) || to_jsonb($3::text),
+              true
+            )
+          where id = $1
+            and not (
+              coalesce(
+                coalesce(data, '{}'::jsonb)->'mexasBalanceCreditKeys',
+                '[]'::jsonb
+              ) ? $3
+            )
+        `,
+          [refund.userId, refund.refundAmount, refund.creditKey]
         )
-      )
-      await tx.none(
-        `
-        update contract_bets
-        set data = data || '{"mexasFundsReleased": true}'::jsonb
-        where bet_id in ($1:list)
-      `,
-        [mexasRefunds.map((refund) => refund.betId)]
-      )
+        await tx.none(
+          `
+          update contract_bets
+          set data = coalesce(data, '{}'::jsonb) || jsonb_build_object(
+            'mexasFundsReleased', true,
+            'mexasReleaseCreditKey', $2
+          )
+          where bet_id = $1
+        `,
+          [refund.betId, refund.creditKey]
+        )
+      }
     })
   }
 

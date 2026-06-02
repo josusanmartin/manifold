@@ -34,7 +34,7 @@ export function Leaderboard<T extends LeaderboardEntry>(props: {
       {title != undefined && <Title>{title}</Title>}
       {entries.length === 0 ? (
         <div className="text-ink-500 py-8 text-center text-sm">
-          No entries yet
+          Sin entradas
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -45,7 +45,7 @@ export function Leaderboard<T extends LeaderboardEntry>(props: {
                   #
                 </th>
                 <th className="text-ink-500 py-3 text-left text-xs font-medium uppercase tracking-wide">
-                  Trader
+                  Operador
                 </th>
                 {columns.map((column, index) => (
                   <th
@@ -111,7 +111,7 @@ export function LoadingLeaderboard(props: {
                 #
               </th>
               <th className="text-ink-500 py-3 text-left text-xs font-medium uppercase tracking-wide">
-                Trader
+                Operador
               </th>
               {columns.map((column, index) => (
                 <th

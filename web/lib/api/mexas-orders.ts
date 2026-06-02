@@ -54,6 +54,7 @@ async function releaseExpiredMexasOrder(
   const { error } = await db
     .from('contract_bets')
     .update({
+      is_cancelled: true,
       data: {
         ...data,
         isCancelled: true,

@@ -11,7 +11,17 @@ import {
   join,
   groupBy,
 } from 'shared/supabase/sql-builder'
-import { assertUnreachable } from 'common/util/types'
+
+type LeaderboardToken = 'MANA' | 'MEX' | 'CASH'
+
+function whereContractToken(token: LeaderboardToken) {
+  if (token === 'CASH') return where('c.token = ${token}', { token })
+  if (token === 'MEX') {
+    return where(`coalesce(c.data->>'token', c.token) = 'MEX'`)
+  }
+
+  return where(`c.token = 'MANA' and coalesce(c.data->>'token', '') != 'MEX'`)
+}
 
 export const getLeaderboard: APIHandler<'leaderboard'> = async ({
   groupId,
@@ -43,28 +53,26 @@ export const getLeaderboard: APIHandler<'leaderboard'> = async ({
 
   const whereInGroup =
     groupId &&
-    (token === 'MANA'
-      ? where(
-          `c.id in (select contract_id from group_contracts where group_id = $<groupId>)`,
-          { groupId }
-        )
-      : token === 'CASH'
+    (token === 'CASH'
       ? where(
           `c.data->>'siblingContractId' in (select contract_id from group_contracts where group_id = $<groupId>)`,
           { groupId }
         )
-      : assertUnreachable(token))
+      : where(
+          `c.id in (select contract_id from group_contracts where group_id = $<groupId>)`,
+          { groupId }
+        ))
 
   if ((kind == 'profit' || kind == 'loss') && !groupId) {
     const query = renderSql(
       from('user_portfolio_history_latest uph'),
       join('users u on u.id = uph.user_id'),
       select('uph.user_id as user_id'),
-      token === 'MANA'
-        ? select('uph.profit as score') // excludes unranked
-        : select(
+      token === 'CASH'
+        ? select(
             'uph.cash_balance + uph.cash_investment_value - uph.total_cash_deposits as score'
-          ),
+          )
+        : select('uph.profit as score'), // excludes unranked
       where('user_id not in ($1:list)', [HIDE_FROM_LEADERBOARD_USER_IDS]),
       where(
         `coalesce((u.data->>'isBannedFromPosting')::boolean, false) is not true`
@@ -89,7 +97,7 @@ export const getLeaderboard: APIHandler<'leaderboard'> = async ({
       where(
         `coalesce((u.data->>'isBannedFromPosting')::boolean, false) is not true`
       ),
-      where('c.token = ${token}', { token }),
+      whereContractToken(token),
       where('c.outcome_type != ${outcomeType}', { outcomeType: 'POLL' }),
       where('c.outcome_type != ${outcomeType}', { outcomeType: 'BOUNTY' }),
       whereInGroup,
@@ -126,7 +134,7 @@ export const getLeaderboard: APIHandler<'leaderboard'> = async ({
       groupBy('user_id'),
     ],
 
-    where('c.token = ${token}', { token }),
+    whereContractToken(token),
 
     whereInGroup,
 

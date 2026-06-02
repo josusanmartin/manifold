@@ -1,8 +1,11 @@
 import { Bet, LimitBet } from './bet'
 import {
+  canMexasMatchCrossingOrders,
+  canMexasResolveFilledPositions,
   getMexasSettlementAudit,
   hasMexasFilledExposure,
   hasMexasSettlementExposure,
+  hasTransactionalMexasMatchingEngine,
 } from './mexas-settlement'
 
 function bet(props: Partial<Bet> & Pick<Bet, 'id' | 'userId'>): Bet {
@@ -120,5 +123,48 @@ describe('MEXAS settlement audit', () => {
       cancelPayout: 0,
     })
     expect(hasMexasSettlementExposure(audit)).toBe(false)
+  })
+
+  test('requires both escrow and a transactional engine before matching', () => {
+    expect(canMexasMatchCrossingOrders({})).toBe(false)
+    expect(
+      canMexasMatchCrossingOrders({
+        settlementMode: 'escrow',
+      })
+    ).toBe(false)
+    expect(
+      canMexasMatchCrossingOrders({
+        matchingEngineMode: 'transactional',
+      })
+    ).toBe(false)
+    expect(
+      canMexasMatchCrossingOrders({
+        settlementMode: 'escrow',
+        matchingEngineMode: 'transactional',
+      })
+    ).toBe(true)
+    expect(
+      canMexasMatchCrossingOrders({
+        allowUnescrowedMatching: 'true',
+        matchingEngineMode: 'transactional',
+      })
+    ).toBe(true)
+    expect(
+      hasTransactionalMexasMatchingEngine({
+        matchingEngineMode: 'transactional',
+      })
+    ).toBe(true)
+  })
+
+  test('allows resolution with escrow or explicit unescrowed override', () => {
+    expect(canMexasResolveFilledPositions({})).toBe(false)
+    expect(
+      canMexasResolveFilledPositions({ settlementMode: 'escrow' })
+    ).toBe(true)
+    expect(
+      canMexasResolveFilledPositions({
+        allowUnescrowedResolution: 'true',
+      })
+    ).toBe(true)
   })
 })

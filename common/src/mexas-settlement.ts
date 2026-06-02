@@ -15,6 +15,13 @@ export type MexasSettlementAudit = {
   cancelPayout: number
 }
 
+export type MexasSettlementSettings = {
+  allowUnescrowedMatching?: string
+  allowUnescrowedResolution?: string
+  matchingEngineMode?: string
+  settlementMode?: string
+}
+
 function roundAmount(value: number) {
   return Math.round(value * 1e8) / 1e8
 }
@@ -57,4 +64,29 @@ export function getMexasSettlementAudit(bets: Bet[]): MexasSettlementAudit {
 
 export function hasMexasSettlementExposure(audit: MexasSettlementAudit) {
   return audit.filledBetCount > 0 || audit.openReservationRefund > EPSILON
+}
+
+export function hasTransactionalMexasMatchingEngine(
+  settings: MexasSettlementSettings
+) {
+  return settings.matchingEngineMode === 'transactional'
+}
+
+export function canMexasMatchCrossingOrders(
+  settings: MexasSettlementSettings
+) {
+  return (
+    hasTransactionalMexasMatchingEngine(settings) &&
+    (settings.settlementMode === 'escrow' ||
+      settings.allowUnescrowedMatching === 'true')
+  )
+}
+
+export function canMexasResolveFilledPositions(
+  settings: MexasSettlementSettings
+) {
+  return (
+    settings.settlementMode === 'escrow' ||
+    settings.allowUnescrowedResolution === 'true'
+  )
 }
