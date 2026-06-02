@@ -121,6 +121,24 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('keeps logged-in balance UI on Privy/MEX instead of Firebase/MANA', () => {
+    const authSource = readRepoFile('web/components/auth-context.tsx')
+    const meSource = readRepoFile('web/pages/me.tsx')
+
+    expectMarkersInOrder(authSource, [
+      'const showToast',
+      '<span>Recibido</span>',
+      'coinType="MEX"',
+    ])
+    expect(authSource).not.toContain('Cha-ching! Received')
+    expectMarkersInOrder(meSource, [
+      "import { useIsAuthorized, useUser } from 'web/hooks/use-user'",
+      'const isAuthorized = useIsAuthorized()',
+      "router.replace('/wallet')",
+    ])
+    expect(meSource).not.toContain('redirectIfLoggedOut')
+  })
+
   test('syncs wallet balances incrementally instead of restoring spent filled stake', () => {
     const marketSource = readRepoFile('common/src/mexas-market.ts')
     const signupSource = readRepoFile('web/pages/api/privy-user.ts')

@@ -369,14 +369,14 @@ export function AuthProvider(props: {
 const showToast = (manaChange: number, cashChange: number) => {
   toast.success(
     <Row className="gap-1">
-      <span>Cha-ching! Received</span>
+      <span>Recibido</span>
       {manaChange > 0 && (
         <Row className="items-center justify-center">
           +
           <TokenNumber
             amount={manaChange}
             className="font-bold"
-            coinType="MANA"
+            coinType="MEX"
           />
           {cashChange > 0 && <span className="mx-1">&</span>}
         </Row>

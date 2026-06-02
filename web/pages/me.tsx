@@ -1,14 +1,12 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
 
-import { useUser } from 'web/hooks/use-user'
-import { redirectIfLoggedOut } from 'web/lib/firebase/server-auth'
-
-export const getServerSideProps = redirectIfLoggedOut('/')
+import { useIsAuthorized, useUser } from 'web/hooks/use-user'
 
 export default function MePage() {
   const router = useRouter()
   const user = useUser()
+  const isAuthorized = useIsAuthorized()
 
   useEffect(() => {
     if (user) {
@@ -18,8 +16,10 @@ export default function MePage() {
         pathname: `/${user.username}`,
         query,
       })
+    } else if (isAuthorized === false) {
+      router.replace('/wallet')
     }
-  }, [user, router.query])
+  }, [isAuthorized, user, router])
 
   return <></>
 }
