@@ -24,6 +24,7 @@ type JsonObject = Record<string, unknown>
 
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
+const USER_UPDATE_ATTEMPTS = 5
 
 const bodySchema = z
   .object({
@@ -237,13 +238,6 @@ async function updateExistingUser(params: {
   deviceToken?: string
 }) {
   const { db, email, walletAddress, userRow } = params
-  const walletSync = await getMexasWalletSync(userRow, walletAddress)
-  const userData = {
-    ...getUserData(userRow),
-    ...(walletSync?.data ?? {}),
-    privyUserId: userRow.id,
-    ...(walletAddress ? { privyWalletAddress: walletAddress } : {}),
-  }
   const existingPrivateUser =
     (params.privateUserRow?.data as Record<string, unknown> | undefined) ?? {}
   const existingEmail =
@@ -270,11 +264,36 @@ async function updateExistingUser(params: {
     privyWalletAddress: walletAddress ?? existingWalletAddress,
   } as Row<'private_users'>['data']
 
-  const [
-    { data: updatedUser, error: userError },
-    { data: updatedPrivateUser, error: privateUserError },
-  ] = await Promise.all([
-    db
+  const { data: updatedPrivateUser, error: privateUserError } =
+    params.privateUserRow
+      ? await db
+          .from('private_users')
+          .update({ data: privateUser })
+          .eq('id', userRow.id)
+          .select()
+          .single()
+      : await db
+          .from('private_users')
+          .insert({ id: userRow.id, data: privateUser })
+          .select()
+          .single()
+
+  if (privateUserError) throw privateUserError
+  if (!updatedPrivateUser) {
+    throw new Error('Could not update Privy user.')
+  }
+
+  let latestUserRow = userRow
+  for (let attempt = 0; attempt < USER_UPDATE_ATTEMPTS; attempt++) {
+    const walletSync = await getMexasWalletSync(latestUserRow, walletAddress)
+    const userData = {
+      ...getUserData(latestUserRow),
+      ...(walletSync?.data ?? {}),
+      privyUserId: latestUserRow.id,
+      ...(walletAddress ? { privyWalletAddress: walletAddress } : {}),
+    }
+
+    const { data: updatedUser, error: userError } = await db
       .from('users')
       .update({
         data: userData,
@@ -285,33 +304,30 @@ async function updateExistingUser(params: {
             }
           : {}),
       })
-      .eq('id', userRow.id)
+      .eq('id', latestUserRow.id)
+      .eq('balance', latestUserRow.balance)
       .select()
-      .single(),
-    params.privateUserRow
-      ? db
-          .from('private_users')
-          .update({ data: privateUser })
-          .eq('id', userRow.id)
-          .select()
-          .single()
-      : db
-          .from('private_users')
-          .insert({ id: userRow.id, data: privateUser })
-          .select()
-          .single(),
-  ])
+      .maybeSingle()
 
-  if (userError) throw userError
-  if (privateUserError) throw privateUserError
-  if (!updatedUser || !updatedPrivateUser) {
-    throw new Error('Could not update Privy user.')
+    if (userError) throw userError
+    if (updatedUser) {
+      return {
+        user: convertUser(updatedUser),
+        privateUser: convertPrivateUser(updatedPrivateUser),
+      }
+    }
+
+    const { data: refetchedUserRow, error: refetchError } = await db
+      .from('users')
+      .select()
+      .eq('id', latestUserRow.id)
+      .single()
+
+    if (refetchError) throw refetchError
+    latestUserRow = refetchedUserRow
   }
 
-  return {
-    user: convertUser(updatedUser),
-    privateUser: convertPrivateUser(updatedPrivateUser),
-  }
+  throw new Error('Could not update Privy user balance.')
 }
 
 async function createPrivyManifoldUser(params: {

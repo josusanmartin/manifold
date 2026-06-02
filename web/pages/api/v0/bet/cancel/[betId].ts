@@ -13,6 +13,8 @@ import { createClient, type Row } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
 
 type ErrorResponse = { message: string }
+const BALANCE_UPDATE_ATTEMPTS = 5
+const EPSILON = 1e-9
 
 let privyClient: PrivyClient | undefined
 
@@ -58,7 +60,10 @@ async function getPrivyUserId(req: NextApiRequest) {
   const token = getBearerToken(req)
   if (!token) throw new APIError(401, 'Missing Privy token.')
 
-  const verified = await getPrivyClient().utils().auth().verifyAccessToken(token)
+  const verified = await getPrivyClient()
+    .utils()
+    .auth()
+    .verifyAccessToken(token)
   return verified.user_id
 }
 
@@ -69,6 +74,43 @@ function getSingleQueryValue(value: string | string[] | undefined) {
 function getBetData(row: Row<'contract_bets'>) {
   const data = row.data
   return data && typeof data === 'object' && !Array.isArray(data) ? data : {}
+}
+
+async function addUserBalanceCas(
+  db: ReturnType<typeof getSupabaseAdminClient>,
+  userId: string,
+  amount: number
+) {
+  if (amount <= 0) return
+
+  for (let attempt = 0; attempt < BALANCE_UPDATE_ATTEMPTS; attempt++) {
+    const { data: userRow, error: userReadError } = await db
+      .from('users')
+      .select('id,balance')
+      .eq('id', userId)
+      .single()
+
+    if (userReadError) throw userReadError
+    if (!userRow) throw new APIError(404, 'User not found.')
+
+    const nextBalance = userRow.balance + amount
+    if (nextBalance < -EPSILON) {
+      throw new APIError(403, 'Invalid balance update.')
+    }
+
+    const { data: updatedUserRow, error: userUpdateError } = await db
+      .from('users')
+      .update({ balance: nextBalance })
+      .eq('id', userId)
+      .eq('balance', userRow.balance)
+      .select('id')
+      .maybeSingle()
+
+    if (userUpdateError) throw userUpdateError
+    if (updatedUserRow) return
+  }
+
+  throw new APIError(503, 'Balance changed. Please try again.')
 }
 
 export default async function handler(
@@ -118,6 +160,9 @@ export default async function handler(
     if (!contractRow) throw new APIError(404, 'Contract not found.')
 
     const contract = convertContract(contractRow) as MarketContract
+    if (contract.isResolved) {
+      throw new APIError(403, 'Market is resolved.')
+    }
     const betData = getBetData(
       betRow as Row<'contract_bets'>
     ) as MexasReservedOrderData & Record<string, unknown>
@@ -146,27 +191,18 @@ export default async function handler(
         },
       })
       .eq('bet_id', betId)
+      .eq('updated_time', (betRow as Row<'contract_bets'>).updated_time)
       .eq('is_cancelled', false)
       .select()
-      .single()
+      .maybeSingle()
 
     if (updateError) throw updateError
+    if (!updatedBetRow) {
+      throw new APIError(503, 'Order changed. Please refresh and try again.')
+    }
 
     if (refundAmount > 0) {
-      const { data: userRow, error: userReadError } = await db
-        .from('users')
-        .select('id,balance')
-        .eq('id', userId)
-        .single()
-
-      if (userReadError) throw userReadError
-
-      const { error: userUpdateError } = await db
-        .from('users')
-        .update({ balance: userRow.balance + refundAmount })
-        .eq('id', userId)
-
-      if (userUpdateError) throw userUpdateError
+      await addUserBalanceCas(db, userId, refundAmount)
     }
 
     return res

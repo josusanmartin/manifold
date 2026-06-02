@@ -8,6 +8,13 @@ import {
   getMexasRemainingReservedAmount,
   isMexasOrderBookOnlyContract,
 } from 'common/mexas-market'
+import {
+  getMexasOpenOrderAmount,
+  isMexasCrossingOrder,
+  matchMexasLimitOrder,
+  sortMexasMakersForTaker,
+  type MexasOutcome,
+} from 'common/mexas-order-book'
 import { getBinaryCpmmBetInfo } from 'common/new-bet'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
@@ -28,6 +35,9 @@ type ErrorResponse = { message: string; details?: unknown }
 
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
+const BALANCE_UPDATE_ATTEMPTS = 5
+const MATCH_ATTEMPTS = 50
+const EPSILON = 1e-9
 
 let privyClient: PrivyClient | undefined
 
@@ -73,11 +83,19 @@ async function getPrivyUserId(req: NextApiRequest) {
   const token = getBearerToken(req)
   if (!token) throw new APIError(401, 'Missing Privy token.')
 
-  const verified = await getPrivyClient().utils().auth().verifyAccessToken(token)
+  const verified = await getPrivyClient()
+    .utils()
+    .auth()
+    .verifyAccessToken(token)
   return verified.user_id
 }
 
 function getUserData(row: Row<'users'> | null) {
+  const data = row?.data
+  return data && typeof data === 'object' && !Array.isArray(data) ? data : {}
+}
+
+function getContractData(row: Row<'contracts'> | null) {
   const data = row?.data
   return data && typeof data === 'object' && !Array.isArray(data) ? data : {}
 }
@@ -115,32 +133,50 @@ async function syncMexasWalletBalance(
   if (!walletAddress || !isAddress(walletAddress)) return userRow
 
   const currentUnits = await getMexasBalanceUnits(walletAddress as Address)
-  const previousUnits = parseSyncedMexasUnits(data)
-  const deltaAmount = mexasUnitsDeltaToAmount(currentUnits - previousUnits)
-  const balance = Math.max(0, userRow.balance + deltaAmount)
-  const totalDeposits =
-    deltaAmount > 0
-      ? userRow.total_deposits + deltaAmount
-      : userRow.total_deposits
-  const syncedData = {
-    ...data,
-    [MEXAS_WALLET_SYNC_UNITS_KEY]: currentUnits.toString(),
-    [MEXAS_WALLET_SYNC_TIME_KEY]: Date.now(),
+  let latestUserRow = userRow
+
+  for (let attempt = 0; attempt < BALANCE_UPDATE_ATTEMPTS; attempt++) {
+    const latestData = getUserData(latestUserRow) as Record<string, unknown>
+    const previousUnits = parseSyncedMexasUnits(latestData)
+    const deltaAmount = mexasUnitsDeltaToAmount(currentUnits - previousUnits)
+    const balance = Math.max(0, latestUserRow.balance + deltaAmount)
+    const totalDeposits =
+      deltaAmount > 0
+        ? latestUserRow.total_deposits + deltaAmount
+        : latestUserRow.total_deposits
+    const syncedData = {
+      ...latestData,
+      [MEXAS_WALLET_SYNC_UNITS_KEY]: currentUnits.toString(),
+      [MEXAS_WALLET_SYNC_TIME_KEY]: Date.now(),
+    }
+
+    const { data: updatedUserRow, error } = await db
+      .from('users')
+      .update({
+        balance,
+        total_deposits: totalDeposits,
+        data: syncedData as any,
+      })
+      .eq('id', latestUserRow.id)
+      .eq('balance', latestUserRow.balance)
+      .select()
+      .maybeSingle()
+
+    if (error) throw error
+    if (updatedUserRow) return updatedUserRow
+
+    const { data: refetchedUserRow, error: refetchError } = await db
+      .from('users')
+      .select('*')
+      .eq('id', latestUserRow.id)
+      .single()
+
+    if (refetchError) throw refetchError
+    if (!refetchedUserRow) throw new APIError(404, 'User not found.')
+    latestUserRow = refetchedUserRow
   }
 
-  const { data: updatedUserRow, error } = await db
-    .from('users')
-    .update({
-      balance,
-      total_deposits: totalDeposits,
-      data: syncedData,
-    })
-    .eq('id', userRow.id)
-    .select()
-    .single()
-
-  if (error) throw error
-  return updatedUserRow ?? userRow
+  throw new APIError(503, 'Balance changed. Please try again.')
 }
 
 function betToRow(bet: Bet): Tables['contract_bets']['Insert'] {
@@ -188,10 +224,7 @@ function createMexasOpenLimitBet(
   userId: string
 ) {
   if (params.limitProb === undefined) {
-    throw new APIError(
-      400,
-      'Los mercados MEXAS solo aceptan órdenes límite.'
-    )
+    throw new APIError(400, 'Los mercados MEXAS solo aceptan órdenes límite.')
   }
 
   const now = Date.now()
@@ -233,20 +266,51 @@ async function refundMexasReservation(
 ) {
   if (amount <= 0) return
 
-  const { data: userRow, error: readError } = await db
-    .from('users')
-    .select('id,balance')
-    .eq('id', userId)
-    .single()
+  await updateUserBalanceCas(db, userId, amount)
+}
 
-  if (readError) throw readError
+async function updateUserBalanceCas(
+  db: SupabaseClient,
+  userId: string,
+  delta: number,
+  dataPatch?: Record<string, unknown>
+) {
+  for (let attempt = 0; attempt < BALANCE_UPDATE_ATTEMPTS; attempt++) {
+    const { data: userRow, error: readError } = await db
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single()
 
-  const { error: updateError } = await db
-    .from('users')
-    .update({ balance: userRow.balance + amount })
-    .eq('id', userId)
+    if (readError) throw readError
+    if (!userRow) throw new APIError(404, 'User not found.')
 
-  if (updateError) throw updateError
+    const nextBalance = userRow.balance + delta
+    if (nextBalance < -EPSILON) {
+      throw new APIError(403, 'Insufficient balance.')
+    }
+
+    const { data: updatedUserRow, error: updateError } = await db
+      .from('users')
+      .update({
+        balance: Math.max(0, nextBalance),
+        data: (dataPatch
+          ? {
+              ...getUserData(userRow),
+              ...dataPatch,
+            }
+          : getUserData(userRow)) as any,
+      })
+      .eq('id', userId)
+      .eq('balance', userRow.balance)
+      .select()
+      .maybeSingle()
+
+    if (updateError) throw updateError
+    if (updatedUserRow) return updatedUserRow
+  }
+
+  throw new APIError(503, 'Balance changed. Please try again.')
 }
 
 function getContractUpdate(
@@ -276,13 +340,11 @@ function getContractUpdate(
       volume: contract.volume + Math.abs(bet.amount),
       lastBetTime: now,
       lastUpdatedTime: now,
-      uniqueBettorCount:
-        contract.uniqueBettorCount + (isUniqueBettor ? 1 : 0),
+      uniqueBettorCount: contract.uniqueBettorCount + (isUniqueBettor ? 1 : 0),
     },
     last_bet_time: millisToTs(now),
     last_updated_time: millisToTs(now),
-    unique_bettor_count:
-      contract.uniqueBettorCount + (isUniqueBettor ? 1 : 0),
+    unique_bettor_count: contract.uniqueBettorCount + (isUniqueBettor ? 1 : 0),
   }
 }
 
@@ -306,6 +368,183 @@ async function loadUnfilledLimitBets(
     .filter((bet): bet is LimitBet => {
       return !bet.answerId && bet.outcome !== outcome && bet.limitProb != null
     })
+}
+
+type LimitBetRow = {
+  bet: LimitBet
+  row: Row<'contract_bets'>
+}
+
+async function loadMexasCrossingOrderRows(
+  db: SupabaseClient,
+  contractId: string,
+  outcome: MexasOutcome,
+  limitProb: number
+) {
+  const { data, error } = await db
+    .from('contract_bets')
+    .select('*')
+    .eq('contract_id', contractId)
+    .eq('is_filled', false)
+    .eq('is_cancelled', false)
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+    .limit(500)
+
+  if (error) throw error
+
+  const rows = (data ?? [])
+    .map((row) => ({
+      row: row as Row<'contract_bets'>,
+      bet: convertBet(row as Row<'contract_bets'>),
+    }))
+    .filter((entry): entry is LimitBetRow => {
+      const bet = entry.bet
+      return (
+        !bet.answerId &&
+        bet.limitProb !== undefined &&
+        bet.orderAmount !== undefined &&
+        !bet.isFilled &&
+        !bet.isCancelled &&
+        getMexasOpenOrderAmount(bet as LimitBet) > EPSILON &&
+        isMexasCrossingOrder(outcome, limitProb, bet as LimitBet)
+      )
+    })
+
+  const sorted = sortMexasMakersForTaker(
+    outcome,
+    rows.map((entry) => entry.bet)
+  )
+
+  return sorted
+    .map((bet) => rows.find((entry) => entry.bet.id === bet.id))
+    .filter((entry): entry is LimitBetRow => entry !== undefined)
+}
+
+async function updateLimitBetCas(
+  db: SupabaseClient,
+  currentRow: Row<'contract_bets'>,
+  updatedBet: LimitBet
+) {
+  const { data, error } = await db
+    .from('contract_bets')
+    .update(betToRow(updatedBet))
+    .eq('bet_id', currentRow.bet_id)
+    .eq('updated_time', currentRow.updated_time)
+    .eq('is_cancelled', false)
+    .eq('is_filled', false)
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  return data ? (convertBet(data as Row<'contract_bets'>) as LimitBet) : null
+}
+
+async function updateTakerBet(db: SupabaseClient, bet: LimitBet) {
+  const { data, error } = await db
+    .from('contract_bets')
+    .update(betToRow(bet))
+    .eq('bet_id', bet.id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return convertBet(data as Row<'contract_bets'>) as LimitBet
+}
+
+async function matchMexasOrder(
+  db: SupabaseClient,
+  taker: LimitBet & { outcome: MexasOutcome }
+) {
+  let updatedTaker = taker
+
+  for (let attempt = 0; attempt < MATCH_ATTEMPTS; attempt++) {
+    const remainingAmount = getMexasOpenOrderAmount(updatedTaker)
+    if (remainingAmount <= EPSILON) break
+
+    const makerRows = await loadMexasCrossingOrderRows(
+      db,
+      updatedTaker.contractId,
+      updatedTaker.outcome,
+      updatedTaker.limitProb
+    )
+    if (!makerRows.length) break
+
+    const [candidate] = matchMexasLimitOrder({
+      amount: remainingAmount,
+      limitProb: updatedTaker.limitProb,
+      makers: makerRows.map((entry) => entry.bet),
+      outcome: updatedTaker.outcome,
+      takerBetId: updatedTaker.id,
+      timestamp: Date.now(),
+    }).matches
+    if (!candidate) break
+
+    const makerRow = makerRows.find(
+      (entry) => entry.bet.id === candidate.maker.id
+    )
+    if (!makerRow) continue
+
+    const committedMaker = await updateLimitBetCas(
+      db,
+      makerRow.row,
+      candidate.updatedMaker
+    )
+    if (!committedMaker) continue
+
+    const nextAmount = updatedTaker.amount + candidate.takerAmount
+    const nextShares = updatedTaker.shares + candidate.shares
+    updatedTaker = {
+      ...updatedTaker,
+      amount: Math.round(nextAmount * 1e8) / 1e8,
+      shares: Math.round(nextShares * 1e8) / 1e8,
+      fills: [...(updatedTaker.fills ?? []), candidate.takerFill],
+    }
+    const takerOpenAmount = getMexasOpenOrderAmount(updatedTaker)
+    updatedTaker = {
+      ...updatedTaker,
+      isFilled: takerOpenAmount <= EPSILON,
+      mexasFundsReleased:
+        takerOpenAmount <= EPSILON
+          ? true
+          : (updatedTaker as LimitBet & { mexasFundsReleased?: boolean })
+              .mexasFundsReleased,
+    } as LimitBet & { outcome: MexasOutcome }
+  }
+
+  if (updatedTaker.amount !== taker.amount || updatedTaker.isFilled) {
+    return await updateTakerBet(db, updatedTaker)
+  }
+
+  return updatedTaker
+}
+
+async function updateMexasContractAfterOrder(
+  db: SupabaseClient,
+  contractRow: Row<'contracts'>,
+  contract: MarketContract,
+  bet: LimitBet
+) {
+  const now = Date.now()
+  const data = getContractData(contractRow)
+  const volume = contract.volume + Math.abs(bet.amount)
+  const update = {
+    data: {
+      ...data,
+      volume,
+      lastBetTime: bet.amount > 0 ? now : contract.lastBetTime,
+      lastUpdatedTime: now,
+    },
+    last_bet_time: bet.amount > 0 ? millisToTs(now) : contractRow.last_bet_time,
+    last_updated_time: millisToTs(now),
+  }
+
+  const { error } = await db
+    .from('contracts')
+    .update(update)
+    .eq('id', contract.id)
+  if (error) {
+    console.warn('Failed to update MEXAS contract after order', error)
+  }
 }
 
 async function getBalanceByUserId(db: SupabaseClient, bets: LimitBet[]) {
@@ -359,7 +598,10 @@ async function placeBinaryBet(
 
   const contract = convertContract(contractRow) as MarketContract
   if (contract.mechanism !== 'cpmm-1' || contract.outcomeType !== 'BINARY') {
-    throw new APIError(400, 'This MEXAS bet route supports binary CPMM markets.')
+    throw new APIError(
+      400,
+      'This MEXAS bet route supports binary CPMM markets.'
+    )
   }
   if (contract.closeTime && Date.now() > contract.closeTime) {
     throw new APIError(403, 'Trading is closed.')
@@ -369,10 +611,7 @@ async function placeBinaryBet(
     isMexasOrderBookOnlyContract(contract) &&
     params.limitProb === undefined
   ) {
-    throw new APIError(
-      400,
-      'Los mercados MEXAS solo aceptan órdenes límite.'
-    )
+    throw new APIError(400, 'Los mercados MEXAS solo aceptan órdenes límite.')
   }
   const syncedUserRow = await syncMexasWalletBalance(db, userRow)
   if (syncedUserRow.balance < params.amount) {
@@ -384,47 +623,39 @@ async function placeBinaryBet(
       contract as MarketContract & { prob: number },
       params,
       userId
-    )
+    ) as LimitBet & { outcome: MexasOutcome }
 
     if (params.dryRun) {
-      return res.status(200).json({ ...bet, betId: 'dry-run' })
+      const makerRows = await loadMexasCrossingOrderRows(
+        db,
+        params.contractId,
+        bet.outcome,
+        bet.limitProb
+      )
+      const simulated = matchMexasLimitOrder({
+        amount: bet.orderAmount,
+        limitProb: bet.limitProb,
+        makers: makerRows.map((entry) => entry.bet),
+        outcome: bet.outcome,
+        takerBetId: 'dry-run',
+        timestamp: Date.now(),
+      })
+      return res.status(200).json({
+        ...bet,
+        amount: simulated.takerAmount,
+        shares: simulated.takerShares,
+        fills: simulated.takerFills,
+        isFilled: simulated.remainingAmount <= EPSILON,
+        betId: 'dry-run',
+      })
     }
 
-    const contractData =
-      contractRow.data &&
-      typeof contractRow.data === 'object' &&
-      !Array.isArray(contractRow.data)
-        ? contractRow.data
-        : {}
-
     const reservedAmount = getMexasRemainingReservedAmount(bet)
-    const { error: userUpdateError } = await db
-      .from('users')
-      .update({
-        balance: syncedUserRow.balance - reservedAmount,
-        data: {
-          ...getUserData(syncedUserRow),
-          lastBetTime: bet.createdTime,
-        },
-      })
-      .eq('id', userId)
-
-    if (userUpdateError) throw userUpdateError
+    await updateUserBalanceCas(db, userId, -reservedAmount, {
+      lastBetTime: bet.createdTime,
+    })
 
     try {
-      const { error: contractUpdateError } = await db
-        .from('contracts')
-        .update({
-          data: {
-            ...contractData,
-            lastUpdatedTime: bet.createdTime,
-          },
-          last_updated_time: millisToTs(bet.createdTime),
-        })
-        .eq('id', contract.id)
-
-      if (contractUpdateError) throw contractUpdateError
-
       const { error: betError } = await db
         .from('contract_bets')
         .insert(betToRow(bet))
@@ -434,7 +665,13 @@ async function placeBinaryBet(
       throw error
     }
 
-    return res.status(200).json({ ...bet, betId: bet.id } as LimitBet)
+    const matchedBet = await matchMexasOrder(db, bet)
+    await updateMexasContractAfterOrder(db, contractRow, contract, matchedBet)
+
+    return res.status(200).json({
+      ...matchedBet,
+      betId: matchedBet.id,
+    } as LimitBet)
   }
 
   const unfilledBets = await loadUnfilledLimitBets(
