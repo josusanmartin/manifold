@@ -4,6 +4,7 @@ import { tmpdir } from 'os'
 import { resolve } from 'path'
 import {
   getMissingMexasEscrowCapabilities,
+  getMexasSettlementAudit,
   hasOperationalMexasEscrow,
 } from 'common/mexas-settlement'
 import { MEXAS_PUBLIC_RPC_URL, MEXAS_TOKEN } from 'common/crypto/mexas'
@@ -66,6 +67,10 @@ type OpenMexasOrder = {
   betId: string
   remainingReservedUnits: bigint
   userId: string
+}
+
+type SettlementExposureCheckOptions = {
+  hasOperationalEscrow: boolean
 }
 
 type UserBacking = {
@@ -373,6 +378,20 @@ async function loadMexasOrderbookContractIds(db: SupabaseClient) {
   return [...ids]
 }
 
+async function loadOpenMexasOrderbookContractIds(db: SupabaseClient) {
+  const contractIds = await loadMexasOrderbookContractIds(db)
+  if (!contractIds.length) return []
+
+  const { data, error } = await db
+    .from('contracts')
+    .select('id')
+    .in('id', contractIds)
+    .is('resolution_time', null)
+
+  if (error) throw error
+  return ((data ?? []) as Pick<Row<'contracts'>, 'id'>[]).map((row) => row.id)
+}
+
 async function loadOpenReservedMexasOrders(
   db: SupabaseClient,
   contractIds: string[]
@@ -495,6 +514,83 @@ async function checkOpenMexasOrderBacking(
   }
 }
 
+async function checkMexasSettlementExposure(
+  db: SupabaseClient,
+  options: SettlementExposureCheckOptions
+): Promise<CheckResult> {
+  try {
+    const contractIds = await loadOpenMexasOrderbookContractIds(db)
+    if (!contractIds.length) {
+      return pass(
+        'settlement exposure',
+        'No unresolved MEXAS orderbook markets found.'
+      )
+    }
+
+    const rows: Row<'contract_bets'>[] = []
+    for (let from = 0; ; from += OPEN_ORDER_PAGE_SIZE) {
+      const { data, error } = await db
+        .from('contract_bets')
+        .select('*')
+        .in('contract_id', contractIds)
+        .eq('is_cancelled', false)
+        .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
+
+      if (error) throw error
+
+      rows.push(...((data ?? []) as Row<'contract_bets'>[]))
+      if ((data ?? []).length < OPEN_ORDER_PAGE_SIZE) break
+    }
+
+    const audit = getMexasSettlementAudit(rows.map((row) => convertBet(row)))
+    const rowsByContractId = rows.reduce((map, row) => {
+      const contractRows = map.get(row.contract_id) ?? []
+      contractRows.push(row)
+      map.set(row.contract_id, contractRows)
+      return map
+    }, new Map<string, Row<'contract_bets'>[]>())
+    const contractExposureDetails = [...rowsByContractId.entries()]
+      .map(([contractId, contractRows]) => ({
+        audit: getMexasSettlementAudit(
+          contractRows.map((row) => convertBet(row))
+        ),
+        contractId,
+      }))
+      .filter(({ audit }) => audit.filledBetCount > 0)
+      .map(
+        ({ audit, contractId }) =>
+          `${contractId}: ${audit.filledBetCount} filled, YES ${audit.yesPayout}, NO ${audit.noPayout}, CANCEL ${audit.cancelPayout}`
+      )
+    if (audit.filledBetCount === 0) {
+      return pass(
+        'settlement exposure',
+        'No filled MEXAS positions require resolution payouts yet.'
+      )
+    }
+
+    if (!options.hasOperationalEscrow) {
+      return fail(
+        'settlement exposure',
+        `${audit.filledBetCount} filled MEXAS positions require escrow before resolution payouts. Max payout exposure: YES ${audit.yesPayout} MEX, NO ${audit.noPayout} MEX, CANCEL ${audit.cancelPayout} MEX. Markets: ${contractExposureDetails
+          .slice(0, 5)
+          .join('; ')}${
+          contractExposureDetails.length > 5
+            ? `; ${contractExposureDetails.length - 5} more`
+            : ''
+        }.`
+      )
+    }
+
+    return pass(
+      'settlement exposure',
+      `${audit.filledBetCount} filled MEXAS positions have operational escrow for resolution payouts.`
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return fail('settlement exposure', message)
+  }
+}
+
 async function checkUrl(url: string) {
   const response = await fetch(url, { redirect: 'follow' })
   return response.status
@@ -516,6 +612,7 @@ async function runChecks() {
     vercelEnvValues
   )
   let needsLaunchSql = false
+  let supabaseDb: SupabaseClient | undefined
 
   checks.push(
     serverEnvFailures.length
@@ -545,6 +642,7 @@ async function runChecks() {
     )
   } else {
     const db = createClient(supabaseUrlOrInstanceId, supabaseAdminKey)
+    supabaseDb = db
     const { error: mexContractsError, count } = await db
       .from('contracts')
       .select('id', { count: 'exact', head: true })
@@ -670,6 +768,11 @@ async function runChecks() {
     settlementMode,
   })
   const missingEscrowCapabilities = getMissingMexasEscrowCapabilities()
+  if (supabaseDb) {
+    checks.push(
+      await checkMexasSettlementExposure(supabaseDb, { hasOperationalEscrow })
+    )
+  }
   checks.push(
     matchingMode === 'rpc'
       ? pass('matching mode', 'MEXAS_MATCHING_ENGINE_MODE=rpc.')

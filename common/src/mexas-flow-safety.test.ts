@@ -779,6 +779,31 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('PRIVATE_KEY')
   })
 
+  test('launch readiness blocks filled MEXAS settlement exposure without operational escrow', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('async function checkMexasSettlementExposure')
+    expectMarkersInOrder(source, [
+      'async function loadOpenMexasOrderbookContractIds',
+      'const contractIds = await loadMexasOrderbookContractIds(db)',
+      ".is('resolution_time', null)",
+      'async function checkMexasSettlementExposure',
+      'getMexasSettlementAudit(rows.map((row) => convertBet(row)))',
+      'const rowsByContractId = rows.reduce',
+      'contractExposureDetails',
+      'if (audit.filledBetCount === 0)',
+      'if (!options.hasOperationalEscrow)',
+      'filled MEXAS positions require escrow before resolution payouts',
+      'Markets:',
+      'await checkMexasSettlementExposure(supabaseDb, { hasOperationalEscrow })',
+    ])
+    expect(source).toContain('YES ${audit.yesPayout} MEX')
+    expect(source).toContain('NO ${audit.noPayout} MEX')
+    expect(source).toContain('CANCEL ${audit.cancelPayout} MEX')
+  })
+
   test('launch readiness cannot be passed by setting the escrow env before escrow code exists', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'
