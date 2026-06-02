@@ -156,6 +156,6 @@ export const convertContract = <T extends Contract>(c: {
     freshnessScore: c.freshness_score,
     viewCount: Number(c.view_count),
     dailyScore: c.daily_score,
-    token: c.token,
+    token: (c.data as { token?: string }).token === 'MEX' ? 'MEX' : c.token,
     boosted: c.boosted ?? false,
   } as T)

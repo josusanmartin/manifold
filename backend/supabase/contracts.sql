@@ -43,6 +43,7 @@ create table if not exists
         token = any (
           array[
             ('MANA'::character varying)::text,
+            ('MEX'::character varying)::text,
             ('CASH'::character varying)::text
           ]
         )

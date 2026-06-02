@@ -1,46 +1,51 @@
 import { createClient } from 'common/supabase/utils'
-import { ENV_CONFIG } from 'common/envs/constants'
 
 let currentToken: string | undefined
 
 export function getSupabaseInstanceId() {
-  return (
+  const instanceIdOrUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_INSTANCE_ID ||
-    process.env.SUPABASE_INSTANCE_ID ||
-    ENV_CONFIG.supabaseInstanceId
-  )
+    process.env.SUPABASE_INSTANCE_ID
+
+  if (!instanceIdOrUrl) {
+    throw new Error(
+      'MEXAS Supabase requires NEXT_PUBLIC_SUPABASE_URL or SUPABASE_INSTANCE_ID.'
+    )
+  }
+
+  return instanceIdOrUrl
 }
 
 export function initSupabaseClient() {
-  // LOCAL_ONLY mode: use local Supabase URL and key from env
-  const localUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-  const localKey =
-    process.env.NEXT_PUBLIC_SUPABASE_KEY ||
+  const publicUrlOrInstanceId =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_INSTANCE_ID
+  const publicKey =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.SUPABASE_KEY
+    process.env.NEXT_PUBLIC_SUPABASE_KEY
+
   if (
     process.env.LOCAL_ONLY === 'true' ||
     process.env.NEXT_PUBLIC_LOCAL_ONLY === 'true'
   ) {
-    if (localUrl && localKey) {
-      return createClient(localUrl, localKey)
+    if (publicUrlOrInstanceId && publicKey) {
+      return createClient(publicUrlOrInstanceId, publicKey)
     } else {
       throw new Error(
-        'LOCAL_ONLY mode requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_KEY to be set'
+        'LOCAL_ONLY mode requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to be set'
       )
     }
   }
 
-  const instanceId = getSupabaseInstanceId()
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.SUPABASE_KEY ||
-    ENV_CONFIG.supabaseAnonKey
-  return createClient(instanceId, key)
+  if (!publicUrlOrInstanceId || !publicKey) {
+    throw new Error(
+      'MEXAS Supabase client requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.'
+    )
+  }
+
+  return createClient(publicUrlOrInstanceId, publicKey)
 }
 
 export function updateSupabaseAuth(token?: string) {

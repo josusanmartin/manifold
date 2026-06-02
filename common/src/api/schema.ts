@@ -122,7 +122,7 @@ export const API = (_apiTypeCheck = {
     authed: true,
     props: z
       .object({
-        token: z.enum(['MANA', 'CASH', 'LOAN']),
+        token: z.enum(['MANA', 'MEX', 'CASH', 'LOAN']),
       })
       .strict(),
     returns: {} as { status: boolean },
@@ -461,7 +461,7 @@ export const API = (_apiTypeCheck = {
       .object({
         groupId: z.string().optional(),
         limit: z.coerce.number().min(1).max(100).default(50),
-        token: z.enum(['MANA', 'CASH']).default('MANA'),
+        token: z.enum(['MANA', 'MEX', 'CASH']).default('MANA'),
         kind: z.enum(['creator', 'profit', 'loss', 'volume', 'referral']),
       })
       .strict(),

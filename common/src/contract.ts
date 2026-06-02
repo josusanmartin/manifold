@@ -132,7 +132,7 @@ export type Contract<T extends AnyContractType = AnyContractType> = {
   likedByUserCount?: number
 } & T
 
-export type ContractToken = 'MANA' | 'CASH'
+export type ContractToken = 'MANA' | 'MEX' | 'CASH'
 export type CPMMContract = Contract & CPMM
 export type CPMMMultiContract = Contract & CPMMMulti
 export type CPMMNumericContract = Contract & CPMMNumber

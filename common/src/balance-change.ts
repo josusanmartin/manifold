@@ -1,6 +1,6 @@
 import { Bet } from 'common/bet'
 import { User } from 'common/user'
-import { Visibility } from 'common/contract'
+import { ContractToken, Visibility } from 'common/contract'
 import { QuestType } from 'common/quest'
 import { Answer } from 'common/answer'
 import { AnyTxnCategory, Txn } from './txn'
@@ -19,7 +19,7 @@ type MinimalContract = {
   slug?: string
   visibility: Visibility
   creatorUsername: string
-  token: 'MANA' | 'CASH'
+  token: ContractToken
 }
 
 export const BET_BALANCE_CHANGE_TYPES = [

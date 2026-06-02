@@ -41,6 +41,7 @@ import { QuestType } from 'common/quest'
 import { PROFIT_FEE_FRACTION } from 'common/economy'
 import { CalendarIcon } from '@heroicons/react/solid'
 import DropdownMenu from '../widgets/dropdown-menu'
+import { ContractToken } from 'common/contract'
 
 export const BalanceChangeTable = (props: { user: User }) => {
   const { user } = props
@@ -365,7 +366,7 @@ const BetBalanceChangeRow = (props: {
   balance: { mana: number; cash: number }
   avatarSize: 'sm' | 'md'
   hideBalance?: boolean
-  token: 'MANA' | 'CASH'
+  token: ContractToken
 }) => {
   const { change, balance, avatarSize, hideBalance, token } = props
   const { amount, contract, answer, bet, type } = change
@@ -373,7 +374,7 @@ const BetBalanceChangeRow = (props: {
   const { slug, question, creatorUsername } = contract
   const niceAmount = formatWithToken({
     amount: Math.abs(amount),
-    token: token === 'MANA' ? 'M$' : 'CASH',
+    token: token === 'CASH' ? 'CASH' : 'MEX',
     short: true,
   })
   const direction =
