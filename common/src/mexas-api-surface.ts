@@ -97,6 +97,14 @@ const BLOCKED_MEXAS_PROXY_PATH_PATTERNS = [
   /^v0\/toggle-merch-/,
 ]
 
+const ALLOWED_MEXAS_API_PROXY_PATH_PATTERNS: RegExp[] = []
+
 export function isBlockedMexasApiProxyPath(path: string) {
   return BLOCKED_MEXAS_PROXY_PATH_PATTERNS.some((pattern) => pattern.test(path))
+}
+
+export function isAllowedMexasApiProxyPath(path: string) {
+  return ALLOWED_MEXAS_API_PROXY_PATH_PATTERNS.some((pattern) =>
+    pattern.test(path)
+  )
 }

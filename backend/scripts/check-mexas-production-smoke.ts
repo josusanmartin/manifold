@@ -73,6 +73,15 @@ const REDIRECTS = [
   { destination: '/checkout', path: '/sitemap' },
 ]
 
+const BLOCKED_API_PATHS = [
+  '/api/v0/comment',
+  '/api/v0/deployment-id',
+  '/api/v0/get-mana-summary-stats',
+  '/api/v0/get-market-loan-max',
+  '/api/v0/search-markets-full',
+  '/api/v0/user/by-id/balance',
+]
+
 function pass(name: string, details: string): SmokeResult {
   return { details, name, status: 'pass' }
 }
@@ -174,6 +183,13 @@ async function checkOrderBook(contractId: string) {
   }
 }
 
+async function checkBlockedApi(path: string) {
+  const response = await fetch(`${SITE_URL}${path}`, { redirect: 'manual' })
+  return response.status === 404
+    ? pass(`blocked api ${path}`, '404')
+    : fail(`blocked api ${path}`, `${response.status}`)
+}
+
 async function runSmoke() {
   const results: SmokeResult[] = []
 
@@ -183,6 +199,10 @@ async function runSmoke() {
 
   for (const redirect of REDIRECTS) {
     results.push(await checkRedirect(redirect.path, redirect.destination))
+  }
+
+  for (const path of BLOCKED_API_PATHS) {
+    results.push(await checkBlockedApi(path))
   }
 
   results.push(await checkOrderBook('mexwcwin26a'))

@@ -243,4 +243,16 @@ describe('MEXAS flow safety guardrails', () => {
       'grant execute on function public.mexas_orderbook_matching_engine_ready() to service_role',
     ])
   })
+
+  test('fails closed before proxying unknown Manifold API endpoints', () => {
+    const source = readRepoFile('web/proxy.ts')
+
+    expectMarkersInOrder(source, [
+      'if (shouldSkipProxy(path))',
+      'if (isBlockedMexasApiProxyPath(path))',
+      'if (!isAllowedMexasApiProxyPath(path))',
+      'return NextResponse.json(MEXAS_API_UNAVAILABLE_RESPONSE, { status: 404 })',
+      "return new Response('Permanent Redirect'",
+    ])
+  })
 })
