@@ -1100,6 +1100,25 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('hasEnvOrVercelEnv')
   })
 
+  test('launch readiness runs the backend API compile gate', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expectMarkersInOrder(source, [
+      'function checkBackendApiCompile',
+      "'corepack'",
+      "'yarn'",
+      "'--cwd'",
+      "'backend/api'",
+      "'compile'",
+      "COREPACK_ENABLE_STRICT: '0'",
+      "return pass('backend API compile'",
+      "return fail(\n      'backend API compile'",
+      'checks.push(checkBackendApiCompile())',
+    ])
+  })
+
   test('launch readiness reports how to apply missing Supabase launch SQL', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'

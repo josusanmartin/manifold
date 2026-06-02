@@ -304,6 +304,45 @@ function formatAddressForDiagnostics(address: string | undefined) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
+function getLastNonEmptyLines(output: unknown, maxLines = 8) {
+  return String(output ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-maxLines)
+    .join('; ')
+}
+
+function checkBackendApiCompile(): CheckResult {
+  try {
+    execFileSync('corepack', ['yarn', '--cwd', 'backend/api', 'compile'], {
+      cwd: resolve(__dirname, '../..'),
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        COREPACK_ENABLE_STRICT: '0',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    return pass('backend API compile', 'backend/api TypeScript compile passes.')
+  } catch (error) {
+    const details =
+      typeof error === 'object' && error
+        ? [
+            getLastNonEmptyLines((error as { stdout?: unknown }).stdout),
+            getLastNonEmptyLines((error as { stderr?: unknown }).stderr),
+            (error as { message?: string }).message,
+          ]
+            .filter(Boolean)
+            .join('; ')
+        : String(error)
+    return fail(
+      'backend API compile',
+      details || 'backend/api TypeScript compile failed.'
+    )
+  }
+}
+
 function checkTreasuryWalletEnv(
   vercelEnvValues: Map<string, string>
 ): CheckResult {
@@ -1023,6 +1062,7 @@ async function runChecks() {
   let needsLaunchSql = false
   let supabaseDb: SupabaseClient | undefined
 
+  checks.push(checkBackendApiCompile())
   checks.push(
     serverEnvFailures.length
       ? fail('server env', serverEnvFailures.join('; '))
