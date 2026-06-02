@@ -525,7 +525,7 @@ function ProfilePublicStats(props: {
           <span className={clsx('font-semibold')}>
             {DIVISION_NAMES[leagueInfo.division ?? '']}
           </span>{' '}
-          Rank {leagueInfo.rank}
+          Puesto {leagueInfo.rank}
         </Link>
       )}
 
@@ -567,11 +567,11 @@ function FollowsDialog(props: {
           className="mx-6"
           tabs={[
             {
-              title: 'Following',
+              title: 'Siguiendo',
               content: <FollowList userIds={followingIds} />,
             },
             {
-              title: 'Followers',
+              title: 'Seguidores',
               content: <FollowList userIds={followerIds} />,
             },
           ]}

@@ -369,6 +369,39 @@ describe('MEXAS flow safety guardrails', () => {
     expect(meSource).not.toContain('redirectIfLoggedOut')
   })
 
+  test('keeps profile tabs and wallet payments on the Spanish MEXAS surface', () => {
+    const profileSource = readRepoFile('web/pages/[username]/index.tsx')
+    const paymentsSource = readRepoFile('web/pages/payments.tsx')
+
+    expectMarkersInOrder(profileSource, [
+      "title: 'Resumen'",
+      "title: 'Operaciones'",
+      "title: 'Mercados'",
+      "title: 'Movimientos'",
+      "title: 'Wallet'",
+    ])
+    expect(profileSource).toContain('Puesto {leagueInfo.rank}')
+    expect(profileSource).toContain("title: 'Siguiendo'")
+    expect(profileSource).toContain("title: 'Seguidores'")
+    expect(profileSource).not.toContain("title: 'Following'")
+    expect(profileSource).not.toContain("title: 'Followers'")
+    expect(profileSource).not.toContain('Rank {leagueInfo.rank}')
+    expect(profileSource).not.toContain("title: 'Comments'")
+    expect(profileSource).not.toContain("title: 'Achievements'")
+
+    expectMarkersInOrder(paymentsSource, [
+      'Los controles de la Wallet son privados',
+      '<MexasWalletSummary className="w-full" />',
+      '<h2',
+      'Wallet MEX',
+      'Deposita {MEXAS_TOKEN.symbol} en tu Wallet Privy',
+    ])
+    expect(paymentsSource).not.toContain('Receive Mana')
+    expect(paymentsSource).not.toContain('Send Mana')
+    expect(paymentsSource).not.toContain('Default Amount')
+    expect(paymentsSource).not.toContain('Default Message')
+  })
+
   test('renders and validates MEX order amounts as MEX, not MANA or M$', () => {
     const amountSource = readRepoFile('web/components/widgets/amount-input.tsx')
     const limitSource = readRepoFile('web/components/bet/limit-order-panel.tsx')
