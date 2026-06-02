@@ -276,6 +276,8 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('web/components/bet/limit-order-panel.tsx')
 
     expect(source).toContain("{ label: 'Expira inmediatamente', value: 1 }")
+    expect(source).toContain('MEXAS_ONCHAIN_ESCROW_IMPLEMENTED')
+    expect(source).toContain('getMexasCrossingOrders')
     expectMarkersInOrder(source, [
       'if (orderBookOnly && selectedExpiration === 1)',
       'setSelectedExpiration(0)',
@@ -288,6 +290,17 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       "error === 'Insufficient balance'",
       "error === 'Saldo insuficiente'",
+      'mexasCrossingOrderBlocked',
+    ])
+    expectMarkersInOrder(source, [
+      'const mexasBlockedCrossingOrders =',
+      'orderBookOnly',
+      '!MEXAS_ONCHAIN_ESCROW_IMPLEMENTED',
+      'getMexasCrossingOrders',
+      'takerUserId: user?.id',
+      'const mexasCrossingOrderBlocked =',
+      'displayedError',
+      'El precio cruza el libro',
     ])
   })
 

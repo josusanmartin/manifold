@@ -14,6 +14,11 @@ import {
 } from 'common/contract'
 import { TRADE_TERM } from 'common/envs/constants'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+import {
+  getMexasCrossingOrders,
+  type MexasOutcome,
+} from 'common/mexas-order-book'
+import { MEXAS_ONCHAIN_ESCROW_IMPLEMENTED } from 'common/mexas-settlement'
 import { CandidateBet } from 'common/new-bet'
 import { getPseudoProbability } from 'common/pseudo-numeric'
 import { formatPercent } from 'common/util/format'
@@ -233,13 +238,35 @@ export default function LimitOrderPanel(props: {
       : getBinaryMCProb(preLimitProb, outcome as 'YES' | 'NO')
 
   const amount = betAmount ?? 0
+  const mexasBlockedCrossingOrders =
+    orderBookOnly &&
+    !MEXAS_ONCHAIN_ESCROW_IMPLEMENTED &&
+    outcome &&
+    limitProb !== undefined
+      ? getMexasCrossingOrders({
+          limitProb,
+          makers: unfilledBets,
+          outcome: outcome as MexasOutcome,
+          takerUserId: user?.id,
+        })
+      : []
+  const mexasCrossingOrderBlocked =
+    orderBookOnly &&
+    !MEXAS_ONCHAIN_ESCROW_IMPLEMENTED &&
+    mexasBlockedCrossingOrders.length > 0
+  const displayedError =
+    error ??
+    (mexasCrossingOrderBlocked
+      ? 'El precio cruza el libro. Abre una orden que no cruce hasta activar escrow on-chain.'
+      : undefined)
   const betDisabled =
     isSubmitting ||
     !outcome ||
     !betAmount ||
     !hasLimitBet ||
     error === 'Insufficient balance' ||
-    error === 'Saldo insuficiente'
+    error === 'Saldo insuficiente' ||
+    mexasCrossingOrderBlocked
 
   function onBetChange(newAmount: number | undefined) {
     setBetAmount(newAmount)
@@ -404,7 +431,7 @@ export default function LimitOrderPanel(props: {
           parentClassName="max-w-full mt-1"
           amount={betAmount}
           onChange={onBetChange}
-          error={error}
+          error={displayedError}
           setError={setError}
           disabled={isSubmitting}
           showSlider
@@ -640,6 +667,8 @@ export default function LimitOrderPanel(props: {
                     'Ingresa una probabilidad'
                   ) : !betAmount ? (
                     'Ingresa una cantidad'
+                  ) : mexasCrossingOrderBlocked ? (
+                    'El precio cruza el libro'
                   ) : (
                     <span>
                       Abrir orden por{' '}
