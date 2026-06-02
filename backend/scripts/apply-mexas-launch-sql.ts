@@ -201,6 +201,17 @@ ${verificationSql}
 `
 }
 
+function wrapSqlForManualRun(sql: string) {
+  return `-- MEXAS launch SQL for Supabase SQL Editor.
+-- The script is transaction-wrapped so verification errors roll back all DDL
+-- and DML from this launch SQL.
+begin;
+
+${sql}
+commit;
+`
+}
+
 async function verify(client: any) {
   const contractRows = await client.query(
     `
@@ -244,7 +255,7 @@ async function main() {
 
   const sql = readSql()
   if (process.argv.includes('--print-sql')) {
-    console.log(sql)
+    console.log(wrapSqlForManualRun(sql))
     return
   }
 

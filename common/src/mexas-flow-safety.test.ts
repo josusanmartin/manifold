@@ -1307,6 +1307,18 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('backend/scripts/apply-mexas-launch-sql.ts')
     const compact = compactWhitespace(source)
 
+    expect(source).toContain('function wrapSqlForManualRun')
+    expect(source).toContain('verification errors roll back all DDL')
+    expect(source).toContain('begin;')
+    expect(source).toContain('commit;')
+    expectMarkersInOrder(source, [
+      "if (process.argv.includes('--print-sql'))",
+      'console.log(wrapSqlForManualRun(sql))',
+      'return',
+      "await client.query('begin')",
+      'await client.query(sql)',
+      "await client.query('commit')",
+    ])
     expect(source).toContain('-- Verification block for manual Supabase SQL Editor runs')
     expect(source).toContain("raise exception 'MEXAS launch SQL verification failed: %'")
     expect(source).toContain("raise notice 'PASS MEXAS launch SQL applied and verified.'")

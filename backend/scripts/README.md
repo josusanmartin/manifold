@@ -67,6 +67,11 @@ SQL manually in Supabase, run:
 $ yarn --silent --cwd backend/scripts apply:mexas-launch-sql --print-sql > mexas-launch.sql
 ```
 
+The printed SQL is wrapped in `begin; ... commit;` and contains a verification
+block that raises on incomplete RPC grants, indexes, or token normalization. If
+verification raises in Supabase SQL Editor, the launch SQL rolls back instead of
+leaving partial DDL/DML applied.
+
 For a narrower production UI/API smoke test that should pass before every deploy,
 run:
 
