@@ -5,6 +5,7 @@
     "firestore": "dev-mantic-markets.appspot.com"
   },
   "scripts": {
+    "check:mexas-launch": "ts-node check-mexas-launch-readiness.ts",
     "code": "ts-node manicode.ts"
   },
   "dependencies": {

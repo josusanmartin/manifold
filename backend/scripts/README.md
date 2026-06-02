@@ -41,3 +41,13 @@ $ ts-node script.ts
 ### Environment variables
 
 Secret keys are automatically loaded into `process.env` when you use the `runScript` function.
+
+## MEXAS launch readiness
+
+Before enabling live MEXAS matching or treating the fork as launch-ready, run:
+
+```shell
+$ yarn --cwd backend/scripts check:mexas-launch
+```
+
+This script loads local `.env` files, checks production Vercel env names, verifies the Supabase matching health RPC, checks required settlement flags, and smoke-tests the main public MEXAS pages. A failing result means production is not ready to launch with live matching.

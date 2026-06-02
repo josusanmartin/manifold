@@ -1,0 +1,266 @@
+import { execFileSync } from 'child_process'
+import { existsSync, readFileSync } from 'fs'
+import { resolve } from 'path'
+import { createClient } from 'common/supabase/utils'
+
+type CheckStatus = 'pass' | 'warn' | 'fail'
+
+type CheckResult = {
+  details: string
+  name: string
+  status: CheckStatus
+}
+
+const REQUIRED_SERVER_ENVS = [
+  'PROD_ADMIN_SUPABASE_KEY',
+  'PRIVY_APP_ID',
+  'PRIVY_APP_SECRET',
+  'MEXAS_TREASURY_WALLET_ADDRESS',
+]
+
+const REQUIRED_PUBLIC_ENVS = [
+  'NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS',
+  'NEXT_PUBLIC_PRIVY_APP_ID',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+  'NEXT_PUBLIC_SUPABASE_URL',
+]
+
+function parseEnvLine(line: string) {
+  const trimmed = line.trim()
+  if (!trimmed || trimmed.startsWith('#')) return
+
+  const index = trimmed.indexOf('=')
+  if (index <= 0) return
+
+  const key = trimmed.slice(0, index).trim()
+  let value = trimmed.slice(index + 1).trim()
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1)
+  }
+
+  if (!process.env[key]) process.env[key] = value
+}
+
+function loadEnvFiles() {
+  const roots = [process.cwd(), resolve(__dirname, '../..')]
+  const seen = new Set<string>()
+
+  for (const root of roots) {
+    for (const path of ['.env', '.env.local', 'web/.env', 'web/.env.local']) {
+      const fullPath = resolve(root, path)
+      if (seen.has(fullPath) || !existsSync(fullPath)) continue
+      seen.add(fullPath)
+      for (const line of readFileSync(fullPath, 'utf8').split(/\r?\n/)) {
+        parseEnvLine(line)
+      }
+    }
+  }
+}
+
+function pass(name: string, details: string): CheckResult {
+  return { details, name, status: 'pass' }
+}
+
+function warn(name: string, details: string): CheckResult {
+  return { details, name, status: 'warn' }
+}
+
+function fail(name: string, details: string): CheckResult {
+  return { details, name, status: 'fail' }
+}
+
+function hasEnv(name: string) {
+  return !!process.env[name]?.trim()
+}
+
+function getVercelProductionEnvNames() {
+  try {
+    const output = execFileSync('vercel', ['env', 'ls', 'production'], {
+      cwd: resolve(__dirname, '../..'),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    return new Set(
+      output
+        .split(/\r?\n/)
+        .map((line) => line.trim().split(/\s+/)[0])
+        .filter((name) => /^[A-Z0-9_]+$/.test(name))
+    )
+  } catch {
+    return new Set<string>()
+  }
+}
+
+function hasEnvOrVercelEnv(name: string, vercelEnvNames: Set<string>) {
+  return hasEnv(name) || vercelEnvNames.has(name)
+}
+
+function getSupabaseUrlOrInstanceId() {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    process.env.SUPABASE_INSTANCE_ID ||
+    process.env.NEXT_PUBLIC_SUPABASE_INSTANCE_ID
+  )
+}
+
+function getSupabaseAdminKey() {
+  return (
+    process.env.PROD_ADMIN_SUPABASE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.DEV_ADMIN_SUPABASE_KEY
+  )
+}
+
+async function checkUrl(url: string) {
+  const response = await fetch(url, { redirect: 'follow' })
+  return response.status
+}
+
+async function runChecks() {
+  loadEnvFiles()
+
+  const checks: CheckResult[] = []
+  const vercelEnvNames = getVercelProductionEnvNames()
+  const missingServer = REQUIRED_SERVER_ENVS.filter(
+    (key) => !hasEnvOrVercelEnv(key, vercelEnvNames)
+  )
+  const missingPublic = REQUIRED_PUBLIC_ENVS.filter(
+    (key) => !hasEnvOrVercelEnv(key, vercelEnvNames)
+  )
+
+  checks.push(
+    missingServer.length
+      ? fail('server env', `Missing: ${missingServer.join(', ')}`)
+      : pass('server env', 'Required server env vars are present.')
+  )
+  checks.push(
+    missingPublic.length
+      ? fail('public env', `Missing: ${missingPublic.join(', ')}`)
+      : pass('public env', 'Required public env vars are present.')
+  )
+
+  const supabaseUrlOrInstanceId = getSupabaseUrlOrInstanceId()
+  const supabaseAdminKey = getSupabaseAdminKey()
+  if (!supabaseUrlOrInstanceId || !supabaseAdminKey) {
+    checks.push(
+      fail(
+        'supabase admin client',
+        'Missing Supabase URL/instance id or admin/service key.'
+      )
+    )
+  } else {
+    const db = createClient(supabaseUrlOrInstanceId, supabaseAdminKey)
+    const { error: mexContractsError, count } = await db
+      .from('contracts')
+      .select('id', { count: 'exact', head: true })
+      .eq('token', 'MEX')
+
+    checks.push(
+      mexContractsError
+        ? fail(
+            'supabase MEX contracts',
+            `Could not read MEX contracts: ${mexContractsError.message}`
+          )
+        : pass(
+            'supabase MEX contracts',
+            `Supabase is reachable; ${count ?? 0} MEX contracts found.`
+          )
+    )
+
+    const { data: matchingReady, error: matchingReadyError } = await db.rpc(
+      'mexas_orderbook_matching_engine_ready'
+    )
+    checks.push(
+      matchingReadyError
+        ? fail(
+            'matching RPC health',
+            `Health RPC is not callable: ${matchingReadyError.message}`
+          )
+        : matchingReady === true
+        ? pass('matching RPC health', 'Matching health RPC reports ready.')
+        : fail('matching RPC health', 'Matching health RPC returned false.')
+    )
+  }
+
+  const matchingMode = process.env.MEXAS_MATCHING_ENGINE_MODE
+  const settlementMode = process.env.MEXAS_SETTLEMENT_MODE
+  checks.push(
+    matchingMode === 'rpc'
+      ? pass('matching mode', 'MEXAS_MATCHING_ENGINE_MODE=rpc.')
+      : fail(
+          'matching mode',
+          'MEXAS_MATCHING_ENGINE_MODE must be rpc before launch.'
+        )
+  )
+  checks.push(
+    settlementMode === 'escrow'
+      ? pass('settlement mode', 'MEXAS_SETTLEMENT_MODE=escrow.')
+      : fail(
+          'settlement mode',
+          'MEXAS_SETTLEMENT_MODE must be escrow before launch.'
+        )
+  )
+  checks.push(
+    process.env.MEXAS_ALLOW_UNESCROWED_MATCHING === 'true' ||
+      process.env.MEXAS_ALLOW_UNESCROWED_RESOLUTION === 'true'
+      ? fail(
+          'unescrowed overrides',
+          'Unescrowed matching/resolution overrides must be disabled for launch.'
+        )
+      : pass('unescrowed overrides', 'No unescrowed overrides are enabled.')
+  )
+
+  const siteUrl =
+    process.env.MEXAS_SITE_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'https://mexas-manifold.vercel.app'
+  for (const path of [
+    '/wallet',
+    '/checkout',
+    '/mexas-test/ganara-mexico-la-copa-mundial-2026',
+  ]) {
+    try {
+      const status = await checkUrl(`${siteUrl}${path}`)
+      checks.push(
+        status >= 200 && status < 400
+          ? pass(`site ${path}`, `${status}`)
+          : fail(`site ${path}`, `${status}`)
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      checks.push(fail(`site ${path}`, message))
+    }
+  }
+
+  return checks
+}
+
+async function main() {
+  const checks = await runChecks()
+  const hasFailure = checks.some((check) => check.status === 'fail')
+
+  for (const check of checks) {
+    const marker =
+      check.status === 'pass'
+        ? 'PASS'
+        : check.status === 'warn'
+        ? 'WARN'
+        : 'FAIL'
+    console.log(`${marker} ${check.name}: ${check.details}`)
+  }
+
+  if (hasFailure) {
+    process.exitCode = 1
+  }
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error)
+    process.exitCode = 1
+  })
+}
