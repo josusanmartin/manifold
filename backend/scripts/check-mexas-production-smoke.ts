@@ -85,6 +85,7 @@ const REDIRECTS = [
   { destination: '/checkout', path: '/explore' },
   { destination: '/checkout', path: '/feed' },
   { destination: '/checkout', path: '/lab' },
+  { destination: '/checkout', path: '/labs' },
   { destination: '/checkout', path: '/leagues' },
   { destination: '/checkout', path: '/live' },
   { destination: '/checkout', path: '/membership' },
@@ -115,6 +116,12 @@ const REDIRECTS = [
   { destination: '/checkout', path: '/prize' },
   { destination: '/checkout', path: '/shop' },
   { destination: '/checkout', path: '/sitemap' },
+  { destination: '/about', path: '/api' },
+  { destination: '/about', path: '/api/v0' },
+  { destination: '/about', path: '/mana-only-terms' },
+  { destination: '/about', path: '/privacy' },
+  { destination: '/about', path: '/sweepstakes-rules' },
+  { destination: '/about', path: '/terms' },
 ]
 
 const BLOCKED_API_PATHS = [

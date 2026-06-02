@@ -55,6 +55,7 @@ describe('MEXAS route surface', () => {
       '/home',
       '/home/:newsSlug*',
       '/lab',
+      '/labs',
       '/leaderboards',
       '/leaderboards/:path*',
       '/leagues',
@@ -115,6 +116,24 @@ describe('MEXAS route surface', () => {
     for (const source of protectedRoutes) {
       expect(redirectsBySource.get(source)).toMatchObject({
         destination: '/checkout',
+        permanent: false,
+      })
+    }
+  })
+
+  test('redirects informational legacy aliases to the MEXAS about page', async () => {
+    const redirectsBySource = await getRedirectsBySource()
+
+    for (const source of [
+      '/api',
+      '/api/v0',
+      '/mana-only-terms',
+      '/privacy',
+      '/sweepstakes-rules',
+      '/terms',
+    ]) {
+      expect(redirectsBySource.get(source)).toMatchObject({
+        destination: '/about',
         permanent: false,
       })
     }
