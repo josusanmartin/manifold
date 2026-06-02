@@ -676,6 +676,8 @@ describe('MEXAS flow safety guardrails', () => {
       'bets mexico slug open-limit',
       'blocked bets unknown username',
       '/api/v0/bets?username=__mexas_missing_user__',
+      'unknown api fail closed',
+      '/api/v0/not-a-real-mexas-api',
     ])
     expectMarkersInOrder(source, [
       'async function checkExpectedStatus',
@@ -685,6 +687,13 @@ describe('MEXAS flow safety guardrails', () => {
       '/api/mexas-order-book?contractId=mexwcwin26a',
       'method resolution readiness POST',
       '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
+      'method bet GET',
+      '/api/v0/bet',
+      'auth bet POST',
+      'auth cancel POST',
+      '/api/v0/bet/cancel/__missing_bet__',
+      'auth resolve POST',
+      '/api/v0/market/mexwcwin26a/resolve',
     ])
   })
 

@@ -439,6 +439,13 @@ async function runSmoke() {
   )
   results.push(await checkBlockedResolutionReadiness('not-a-mexas-market'))
   results.push(
+    await checkExpectedStatus(
+      'unknown api fail closed',
+      '/api/v0/not-a-real-mexas-api',
+      404
+    )
+  )
+  results.push(
     await checkExpectedStatus('method bets POST', '/api/v0/bets', 405, {
       method: 'POST',
     })
@@ -456,6 +463,30 @@ async function runSmoke() {
       'method resolution readiness POST',
       '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
       405,
+      { method: 'POST' }
+    )
+  )
+  results.push(
+    await checkExpectedStatus('method bet GET', '/api/v0/bet', 405)
+  )
+  results.push(
+    await checkExpectedStatus('auth bet POST', '/api/v0/bet', 401, {
+      method: 'POST',
+    })
+  )
+  results.push(
+    await checkExpectedStatus(
+      'auth cancel POST',
+      '/api/v0/bet/cancel/__missing_bet__',
+      401,
+      { method: 'POST' }
+    )
+  )
+  results.push(
+    await checkExpectedStatus(
+      'auth resolve POST',
+      '/api/v0/market/mexwcwin26a/resolve',
+      401,
       { method: 'POST' }
     )
   )
