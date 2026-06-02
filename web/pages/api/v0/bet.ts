@@ -147,8 +147,77 @@ function betToRow(bet: Bet): Tables['contract_bets']['Insert'] {
     user_id: bet.userId,
     created_time: millisToTs(bet.createdTime),
     expires_at: bet.expiresAt ? millisToTs(bet.expiresAt) : null,
+    amount: bet.amount,
+    answer_id: bet.answerId ?? null,
+    is_api: bet.isApi ?? false,
+    is_cancelled: bet.isCancelled ?? null,
+    is_filled: bet.isFilled ?? null,
+    is_redemption: bet.isRedemption,
+    loan_amount: bet.loanAmount ?? 0,
+    outcome: bet.outcome,
+    prob_after: bet.probAfter,
+    prob_before: bet.probBefore,
+    shares: bet.shares,
     data: bet as any,
   })
+}
+
+function getLimitOrderExpiresAt(params: {
+  expiresAt?: number
+  expiresMillisAfter?: number
+}) {
+  if (params.expiresAt) return params.expiresAt
+  if (params.expiresMillisAfter) return Date.now() + params.expiresMillisAfter
+  return undefined
+}
+
+function createMexasOpenLimitBet(
+  contract: MarketContract & { prob: number },
+  params: {
+    amount: number
+    contractId: string
+    expiresAt?: number
+    expiresMillisAfter?: number
+    limitProb?: number
+    outcome: 'YES' | 'NO'
+    silent?: boolean
+  },
+  userId: string
+) {
+  if (params.limitProb === undefined) {
+    throw new APIError(
+      400,
+      'Los mercados MEXAS solo aceptan órdenes límite.'
+    )
+  }
+
+  const now = Date.now()
+  return removeUndefinedProps({
+    id: getNewBetId(),
+    userId,
+    contractId: params.contractId,
+    createdTime: now,
+    amount: 0,
+    loanAmount: 0,
+    outcome: params.outcome,
+    shares: 0,
+    probBefore: contract.prob,
+    probAfter: contract.prob,
+    fees: {
+      creatorFee: 0,
+      platformFee: 0,
+      liquidityFee: 0,
+    },
+    isApi: false,
+    isRedemption: false,
+    orderAmount: params.amount,
+    limitProb: params.limitProb,
+    isFilled: false,
+    isCancelled: false,
+    fills: [],
+    expiresAt: getLimitOrderExpiresAt(params),
+    silent: params.silent,
+  }) as LimitBet
 }
 
 function getContractUpdate(
@@ -279,6 +348,58 @@ async function placeBinaryBet(
   const syncedUserRow = await syncMexasWalletBalance(db, userRow)
   if (syncedUserRow.balance < params.amount) {
     throw new APIError(403, 'Insufficient balance.')
+  }
+
+  if (isMexasOrderBookOnlyContract(contract)) {
+    const bet = createMexasOpenLimitBet(
+      contract as MarketContract & { prob: number },
+      params,
+      userId
+    )
+
+    if (params.dryRun) {
+      return res.status(200).json({ ...bet, betId: 'dry-run' })
+    }
+
+    const contractData =
+      contractRow.data &&
+      typeof contractRow.data === 'object' &&
+      !Array.isArray(contractRow.data)
+        ? contractRow.data
+        : {}
+
+    const [
+      { error: userUpdateError },
+      { error: betError },
+      { error: contractUpdateError },
+    ] = await Promise.all([
+      db
+        .from('users')
+        .update({
+          data: {
+            ...getUserData(syncedUserRow),
+            lastBetTime: bet.createdTime,
+          },
+        })
+        .eq('id', userId),
+      db.from('contract_bets').insert(betToRow(bet)),
+      db
+        .from('contracts')
+        .update({
+          data: {
+            ...contractData,
+            lastUpdatedTime: bet.createdTime,
+          },
+          last_updated_time: millisToTs(bet.createdTime),
+        })
+        .eq('id', contract.id),
+    ])
+
+    if (userUpdateError) throw userUpdateError
+    if (betError) throw betError
+    if (contractUpdateError) throw contractUpdateError
+
+    return res.status(200).json({ ...bet, betId: bet.id } as LimitBet)
   }
 
   const unfilledBets = await loadUnfilledLimitBets(
