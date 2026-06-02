@@ -1,5 +1,6 @@
 import { APIError } from 'common/api/utils'
 import {
+  canMexasAcceptLimitOrders,
   canMexasMatchCrossingOrders,
   canMexasResolveFilledPositions,
   type MexasSettlementAudit,
@@ -31,6 +32,18 @@ export async function assertMexasCanMatchCrossingOrders(
   throw new APIError(
     503,
     'El matching MEXAS requiere escrow on-chain y un motor transaccional atomico. Puedes abrir ordenes limite, pero los cruces estan desactivados hasta implementar el motor de settlement.'
+  )
+}
+
+export async function assertMexasCanAcceptLimitOrders(db: SupabaseClient) {
+  if (canMexasAcceptLimitOrders(getMexasSettlementSettings())) {
+    await assertMexasOrderbookMatchingEngineReady(db)
+    return
+  }
+
+  throw new APIError(
+    503,
+    'Las ordenes MEXAS requieren el motor transaccional de libro de ordenes antes de reservar MEX.'
   )
 }
 

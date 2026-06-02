@@ -40,7 +40,10 @@ import {
   releaseUnbackedMexasOrders,
   getOpenReservedMexasAmount,
 } from 'web/lib/api/mexas-orders'
-import { assertMexasCanMatchCrossingOrders } from 'web/lib/api/mexas-settlement'
+import {
+  assertMexasCanAcceptLimitOrders,
+  assertMexasCanMatchCrossingOrders,
+} from 'web/lib/api/mexas-settlement'
 import { matchMexasOrderbookLimitOrderRpc } from 'web/lib/api/mexas-rpc-matching'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
@@ -821,6 +824,7 @@ async function placeBinaryBet(
           })
         }
 
+        await assertMexasCanAcceptLimitOrders(db)
         reservedAmount = getMexasRemainingReservedAmount(bet)
         await updateUserBalanceCas(db, userId, -reservedAmount, {
           lastBetTime: bet.createdTime,

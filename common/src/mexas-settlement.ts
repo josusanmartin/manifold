@@ -115,6 +115,10 @@ export function hasOperationalMexasEscrow(settings: MexasSettlementSettings) {
   )
 }
 
+export function canMexasAcceptLimitOrders(settings: MexasSettlementSettings) {
+  return hasTransactionalMexasMatchingEngine(settings)
+}
+
 export function getMissingMexasEscrowCapabilities() {
   return Object.entries(MEXAS_ONCHAIN_ESCROW_CAPABILITIES)
     .filter(([, implemented]) => !implemented)

@@ -1159,17 +1159,31 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
-  test('preflights the MEXAS matching RPC before a crossing order can debit funds', () => {
+  test('preflights the MEXAS matching RPC before live orders can debit funds', () => {
     const source = readRepoFile('web/lib/api/mexas-settlement.ts')
+    const apiSource = readRepoFile('web/pages/api/v0/bet.ts')
     const helper = readRepoFile('web/lib/api/mexas-rpc-matching.ts')
     const migration = readRepoFile(
       'backend/supabase/migrations/2026060203_add_mexas_matching_health.sql'
     )
 
     expectMarkersInOrder(source, [
+      'export async function assertMexasCanAcceptLimitOrders',
+      'canMexasAcceptLimitOrders(getMexasSettlementSettings())',
+      'await assertMexasOrderbookMatchingEngineReady(db)',
+      'Las ordenes MEXAS requieren el motor transaccional',
+    ])
+    expectMarkersInOrder(source, [
       'export async function assertMexasCanMatchCrossingOrders',
       'canMexasMatchCrossingOrders(getMexasSettlementSettings())',
       'await assertMexasOrderbookMatchingEngineReady(db)',
+    ])
+    expectMarkersInOrder(apiSource, [
+      'if (params.dryRun)',
+      'return res.status(200).json',
+      'await assertMexasCanAcceptLimitOrders(db)',
+      'reservedAmount = getMexasRemainingReservedAmount(bet)',
+      'await updateUserBalanceCas(db, userId, -reservedAmount',
     ])
     expect(helper).toContain("db.rpc('mexas_orderbook_matching_engine_ready')")
     expectMarkersInOrder(migration, [

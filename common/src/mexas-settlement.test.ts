@@ -1,6 +1,7 @@
 import { Bet, LimitBet } from './bet'
 import {
   canMexasMatchCrossingOrders,
+  canMexasAcceptLimitOrders,
   canMexasResolveFilledPositions,
   getMissingMexasEscrowCapabilities,
   getMexasSettlementAudit,
@@ -170,6 +171,12 @@ describe('MEXAS settlement audit', () => {
     ).toBe(false)
     expect(
       hasTransactionalMexasMatchingEngine({
+        matchingEngineMode: 'rpc',
+      })
+    ).toBe(true)
+    expect(canMexasAcceptLimitOrders({})).toBe(false)
+    expect(
+      canMexasAcceptLimitOrders({
         matchingEngineMode: 'rpc',
       })
     ).toBe(true)
