@@ -42,7 +42,7 @@ export default function LoginPage() {
                 <LoginRow
                   icon={<ShieldCheckIcon className="h-5 w-5" />}
                   label="Cuenta Privy"
-                  value="Email o cartera"
+                  value="Email o Wallet"
                 />
                 <LoginRow
                   icon={<SwitchHorizontalIcon className="h-5 w-5" />}
@@ -58,7 +58,7 @@ export default function LoginPage() {
                   Iniciar sesión
                 </h2>
                 <p className="text-ink-500 text-sm">
-                  Privy crea la cuenta y la cartera integrada.
+                  Privy crea la cuenta y la Wallet integrada.
                 </p>
               </Col>
               <Button

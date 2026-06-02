@@ -144,9 +144,9 @@ function MexasRail() {
     <aside className="border-ink-200 bg-canvas-0 h-fit rounded-md border">
       <Col className="gap-4 p-4">
         <Col className="gap-1">
-          <h2 className="text-ink-1000 text-lg font-semibold">Cartera MEX</h2>
+          <h2 className="text-ink-1000 text-lg font-semibold">Wallet MEX</h2>
           <p className="text-ink-500 text-sm">
-            El MEX depositado en tu cartera permanece disponible en{' '}
+            El MEX depositado en tu Wallet permanece disponible en{' '}
             {MEXAS_TOKEN.chainName}.
           </p>
         </Col>
@@ -166,7 +166,7 @@ function CheckoutContent() {
             Mercados MEXAS
           </div>
           <div className="text-ink-1000 text-xl font-semibold">
-            Opera mercados desde tu cartera
+            Opera mercados desde tu Wallet
           </div>
         </Col>
         <Link

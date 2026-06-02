@@ -28,7 +28,7 @@ export const UserPayments = (props: { userId: string }) => {
   if (!user || user.id !== userId) {
     return (
       <Col className="border-ink-200 bg-canvas-50 text-ink-600 rounded-md border p-4 text-sm">
-        Los controles de la cartera son privados para la cuenta conectada.
+        Los controles de la Wallet son privados para la cuenta conectada.
       </Col>
     )
   }
@@ -53,9 +53,9 @@ export const PaymentsModal = (props: {
     <Modal open={show} setOpen={setShow} size="md">
       <Col className="bg-canvas-0 gap-5 overflow-hidden rounded-xl p-5 shadow-xl">
         <Col className="gap-1">
-          <h2 className="text-ink-1000 text-xl font-semibold">Cartera MEX</h2>
+          <h2 className="text-ink-1000 text-xl font-semibold">Wallet MEX</h2>
           <p className="text-ink-600 text-sm">
-            Deposita {MEXAS_TOKEN.symbol} en tu cartera Privy en{' '}
+            Deposita {MEXAS_TOKEN.symbol} en tu Wallet Privy en{' '}
             {MEXAS_TOKEN.chainName}.
           </p>
         </Col>

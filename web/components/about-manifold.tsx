@@ -13,7 +13,7 @@ export const AboutManifold = ({ className = '' }: AboutManifoldProps) => {
         deportes y más.
       </div>
       <div className="mb-2">
-        Opera cada mercado directamente con MEX desde tu cartera Privy.
+        Opera cada mercado directamente con MEX desde tu Wallet Privy.
       </div>
     </div>
   )

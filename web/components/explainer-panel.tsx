@@ -115,7 +115,7 @@ const PlayMoney = ({
       MEX es el token de Arbitrum que se usa para operar en MEXAS Markets.
     </div>
     <div className="pb-2">
-      Los depósitos permanecen en tu cartera Privy y los retiros se envían
+      Los depósitos permanecen en tu Wallet Privy y los retiros se envían
       directamente on-chain.
     </div>
   </ExpandSection>
@@ -136,14 +136,14 @@ const CashPrizes = ({
     onClick={() => onClick('Cómo retiro fondos')}
   >
     <div className="pb-2">
-      MEXAS liquida retiros a través de tu cartera conectada.
+      MEXAS liquida retiros a través de tu Wallet conectada.
     </div>
     <div className="pb-2">
       Mantén suficiente ETH en Arbitrum para pagar el gas de las transferencias.
     </div>
     <div className="pb-2">
       <Link href="/wallet" className="text-primary-700 hover:underline">
-        Abrir cartera MEX
+        Abrir Wallet MEX
       </Link>
     </div>
   </ExpandSection>

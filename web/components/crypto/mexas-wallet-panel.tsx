@@ -43,7 +43,7 @@ import {
 function MissingPrivyConfig(props: { missingEnv: string[] }) {
   return (
     <Col className="border-ink-200 bg-canvas-50 text-ink-600 gap-2 rounded-md border p-3 text-sm">
-      <div className="font-semibold">La cartera Privy no está configurada.</div>
+      <div className="font-semibold">La Wallet Privy no está configurada.</div>
       <div>Configura {props.missingEnv.join(', ')} antes de desplegar.</div>
     </Col>
   )
@@ -95,7 +95,7 @@ export function MexasWalletSummary(props: { className?: string }) {
       await privy.ensureEmbeddedWallet()
     } catch (error) {
       console.error('Failed to create Privy wallet', error)
-      setWalletError('No se pudo crear la cartera. Inténtalo de nuevo.')
+      setWalletError('No se pudo crear la Wallet. Inténtalo de nuevo.')
     } finally {
       setCreatingWallet(false)
     }
@@ -109,11 +109,11 @@ export function MexasWalletSummary(props: { className?: string }) {
     >
       <Col className="gap-1">
         <div className="text-ink-500 text-xs font-medium uppercase">
-          Dirección de la cartera
+          Dirección de la Wallet
         </div>
         <div className="text-ink-900 break-all font-mono text-xs">
           {!privy.ready
-            ? 'Cargando cartera...'
+            ? 'Cargando Wallet...'
             : privy.walletAddress ?? 'No conectada'}
         </div>
       </Col>
@@ -126,7 +126,7 @@ export function MexasWalletSummary(props: { className?: string }) {
           disabled
         >
           <LoadingIndicator size="sm" className="mr-2 !text-white" />
-          Cargando cartera...
+          Cargando Wallet...
         </Button>
       ) : !privy.authenticated ? (
         <Button
@@ -135,7 +135,7 @@ export function MexasWalletSummary(props: { className?: string }) {
           size="md"
           onClick={privy.login}
         >
-          Conectar cartera
+          Conectar Wallet
         </Button>
       ) : !privy.walletAddress ? (
         <Button
@@ -145,7 +145,7 @@ export function MexasWalletSummary(props: { className?: string }) {
           loading={creatingWallet}
           onClick={createWallet}
         >
-          Crear cartera
+          Crear Wallet
         </Button>
       ) : (
         <Link
@@ -204,7 +204,7 @@ function MexasWalletPanelInner() {
       await createWallet()
     } catch (error) {
       console.error('Failed to create Privy wallet', error)
-      setBalanceError('No se pudo crear la cartera. Inténtalo de nuevo.')
+      setBalanceError('No se pudo crear la Wallet. Inténtalo de nuevo.')
     } finally {
       setLoadingWallet(false)
     }
@@ -288,7 +288,7 @@ function MexasWalletPanelInner() {
         disabled
       >
         <LoadingIndicator size="sm" className="mr-2 !text-white" />
-        Cargando cartera...
+        Cargando Wallet...
       </Button>
     )
   }
@@ -301,7 +301,7 @@ function MexasWalletPanelInner() {
         size="lg"
         onClick={() => login()}
       >
-        Conectar cartera Privy
+        Conectar Wallet Privy
       </Button>
     )
   }
@@ -316,7 +316,7 @@ function MexasWalletPanelInner() {
           loading={loadingWallet}
           onClick={createPrivyWallet}
         >
-          Crear cartera Privy
+          Crear Wallet Privy
         </Button>
         {balanceError && (
           <div className="text-scarlet-600 text-xs">{balanceError}</div>
@@ -401,7 +401,7 @@ function MexasWalletPanelInner() {
             Retirar MEX
           </div>
           <div className="text-ink-500 text-xs">
-            Envía {MEXAS_TOKEN.symbol} desde tu cartera Privy en{' '}
+            Envía {MEXAS_TOKEN.symbol} desde tu Wallet Privy en{' '}
             {MEXAS_TOKEN.chainName}. Necesitas una pequeña cantidad de ETH en
             Arbitrum para el gas.
           </div>
@@ -473,7 +473,7 @@ function MexasWalletPanelInner() {
       </Col>
 
       <div className="text-ink-600 border-ink-200 rounded-md border bg-teal-50/70 p-3 text-sm dark:bg-teal-950/20">
-        Deposita {MEXAS_TOKEN.symbol} directamente en esta cartera en{' '}
+        Deposita {MEXAS_TOKEN.symbol} directamente en esta Wallet en{' '}
         {MEXAS_TOKEN.chainName}. No hay conversión ni saldo interno separado.
       </div>
 

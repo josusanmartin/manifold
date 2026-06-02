@@ -23,8 +23,8 @@ const MARKET_POINTS = [
   },
   {
     icon: <ShieldCheckIcon className="h-5 w-5" />,
-    label: 'Cartera',
-    value: 'Cartera integrada de Privy',
+    label: 'Wallet',
+    value: 'Wallet integrada de Privy',
   },
 ]
 
