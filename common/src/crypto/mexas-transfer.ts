@@ -34,6 +34,9 @@ export function parseErc20TransferUnits(data: string) {
 }
 
 export function mexasUnitsToTokenAmount(units: bigint) {
+  if (units > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error('MEXAS transfer amount is too large.')
+  }
   return Number(units) / 10 ** MEXAS_TOKEN.decimals
 }
 

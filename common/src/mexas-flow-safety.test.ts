@@ -611,4 +611,22 @@ describe('MEXAS flow safety guardrails', () => {
       'order escrow/release code is not implemented yet',
     ])
   })
+
+  test('MEXAS deposit receipt verification uses the shared ERC20 transfer parser', () => {
+    const source = readRepoFile('backend/api/src/record-mexas-purchase.ts')
+
+    expect(source).toContain(
+      "from 'common/crypto/mexas-transfer'"
+    )
+    expectMarkersInOrder(source, [
+      'getConfirmedMexasTransferUnits',
+      'mexasUnitsToTokenAmount',
+      'normalizeEvmAddress',
+      'function getConfirmedMexasTreasuryTransferUnits',
+      'return getConfirmedMexasTransferUnits',
+    ])
+    expect(source).not.toContain('const TRANSFER_TOPIC')
+    expect(source).not.toContain('function addressTopic')
+    expect(source).not.toContain('function parseTokenUnits')
+  })
 })

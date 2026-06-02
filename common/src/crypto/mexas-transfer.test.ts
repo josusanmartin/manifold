@@ -82,5 +82,8 @@ describe('MEXAS ERC20 transfer parsing', () => {
     expect(() => parseErc20TransferUnits('nope')).toThrow(
       'Invalid ERC20 transfer amount data'
     )
+    expect(() => mexasUnitsToTokenAmount(10_000_000_000_000_000n)).toThrow(
+      'MEXAS transfer amount is too large'
+    )
   })
 })

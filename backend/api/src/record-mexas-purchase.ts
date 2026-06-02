@@ -7,6 +7,12 @@ import {
   MEXAS_PUBLIC_RPC_URL,
   MEXAS_TOKEN,
 } from 'common/crypto/mexas'
+import {
+  getConfirmedMexasTransferUnits,
+  mexasUnitsToTokenAmount,
+  normalizeEvmAddress,
+  type MexasTransferReceipt,
+} from 'common/crypto/mexas-transfer'
 import { trackPublicEvent } from 'shared/analytics'
 import { createSupabaseDirectClient } from 'shared/supabase/init'
 import { updateUser } from 'shared/supabase/users'
@@ -14,45 +20,21 @@ import { runTxnInBetQueue } from 'shared/txn/run-txn'
 import { getUser, log } from 'shared/utils'
 import { verifyMessage, type Address, type Hex } from 'viem'
 
-const TRANSFER_TOPIC =
-  '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
-
 type RpcResponse<T> = {
   result?: T
   error?: { code: number; message: string }
 }
 
-type TransactionReceipt = {
+type TransactionReceipt = MexasTransferReceipt & {
   transactionHash: string
-  status?: string
-  logs: Array<{
-    address: string
-    topics: string[]
-    data: string
-  }>
 }
 
 function normalizeAddress(address: string) {
-  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+  try {
+    return normalizeEvmAddress(address)
+  } catch {
     throw new APIError(400, 'Invalid address')
   }
-  return address.toLowerCase()
-}
-
-function addressTopic(address: string) {
-  return `0x${'0'.repeat(24)}${normalizeAddress(address).slice(2)}`
-}
-
-function unitsToTokenAmount(units: number) {
-  return units / 10 ** MEXAS_TOKEN.decimals
-}
-
-function parseTokenUnits(data: string) {
-  const units = parseInt(data, 16)
-  if (!Number.isSafeInteger(units)) {
-    throw new APIError(400, 'MEXAS transfer amount is too large')
-  }
-  return units
 }
 
 async function arbitrumRpc<T>(method: string, params: unknown[]): Promise<T> {
@@ -91,24 +73,22 @@ async function getTransactionReceipt(txHash: string) {
   ])
 }
 
-function getMexasTransferUnits(
+function getConfirmedMexasTreasuryTransferUnits(
   receipt: TransactionReceipt,
   payerAddress: string,
   treasuryAddress: string
 ) {
-  const tokenAddress = normalizeAddress(MEXAS_TOKEN.address)
-  const fromTopic = addressTopic(payerAddress)
-  const toTopic = addressTopic(treasuryAddress)
-
-  return receipt.logs.reduce((sum, event) => {
-    if (normalizeAddress(event.address) !== tokenAddress) return sum
-    if ((event.topics[0] ?? '').toLowerCase() !== TRANSFER_TOPIC) return sum
-    if ((event.topics[1] ?? '').toLowerCase() !== fromTopic) return sum
-    if ((event.topics[2] ?? '').toLowerCase() !== toTopic) return sum
-    if (!/^0x[a-fA-F0-9]+$/.test(event.data)) return sum
-
-    return sum + parseTokenUnits(event.data)
-  }, 0)
+  try {
+    return getConfirmedMexasTransferUnits(
+      receipt,
+      payerAddress,
+      treasuryAddress
+    )
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Invalid MEXAS transfer log'
+    throw new APIError(400, message)
+  }
 }
 
 export const recordMexasPurchase: APIHandler<'record-mexas-purchase'> = async (
@@ -167,20 +147,20 @@ export const recordMexasPurchase: APIHandler<'record-mexas-purchase'> = async (
     throw new APIError(400, 'MEXAS transaction failed on-chain')
   }
 
-  const mexasUnits = getMexasTransferUnits(
+  const mexasUnits = getConfirmedMexasTreasuryTransferUnits(
     receipt,
     normalizedPayer,
     normalizedTreasury
   )
 
-  if (mexasUnits <= 0) {
+  if (mexasUnits <= BigInt(0)) {
     throw new APIError(
       400,
       'Transaction does not contain a MEXAS transfer from this wallet to the configured treasury.'
     )
   }
 
-  let mexasAmount = unitsToTokenAmount(mexasUnits)
+  let mexasAmount = mexasUnitsToTokenAmount(mexasUnits)
   let creditAmount = 0
   let alreadyProcessed = false
 
