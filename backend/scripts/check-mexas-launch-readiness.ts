@@ -12,6 +12,7 @@ import {
   getMexasRemainingReservedAmount,
   isMexasOrderBookOnlyContract,
 } from 'common/mexas-market'
+import { getMexasOpenOrderAmount } from 'common/mexas-order-book'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import { createClient } from 'common/supabase/utils'
@@ -63,11 +64,20 @@ const OPEN_ORDER_PAGE_SIZE = 1000
 const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
 const ZERO_EVM_ADDRESS = '0x0000000000000000000000000000000000000000'
 const ERC20_BALANCE_OF_SELECTOR = '0x70a08231'
+const EPSILON = 1e-9
 
 type OpenMexasOrder = {
   betId: string
   remainingReservedUnits: bigint
   userId: string
+}
+
+type OpenMexasLimitOrder = {
+  betId: string
+  contractId: string
+  limitProb: number
+  openAmount: number
+  outcome: 'YES' | 'NO'
 }
 
 type SettlementExposureCheckOptions = {
@@ -503,6 +513,111 @@ async function loadOpenReservedMexasOrders(
   return orders
 }
 
+async function loadOpenMexasLimitOrders(
+  db: SupabaseClient,
+  contractIds: string[]
+) {
+  if (!contractIds.length) return []
+
+  const now = new Date().toISOString()
+  const orders: OpenMexasLimitOrder[] = []
+
+  for (let from = 0; ; from += OPEN_ORDER_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('contract_bets')
+      .select('*')
+      .in('contract_id', contractIds)
+      .eq('is_filled', false)
+      .eq('is_cancelled', false)
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
+
+    if (error) throw error
+
+    for (const row of (data ?? []) as Row<'contract_bets'>[]) {
+      const bet = convertBet(row)
+      if (bet.answerId) continue
+      if (bet.outcome !== 'YES' && bet.outcome !== 'NO') continue
+      if (typeof bet.limitProb !== 'number') continue
+
+      const openAmount = getMexasOpenOrderAmount(bet as any)
+      if (openAmount <= EPSILON) continue
+
+      orders.push({
+        betId: bet.id,
+        contractId: bet.contractId,
+        limitProb: bet.limitProb,
+        openAmount,
+        outcome: bet.outcome,
+      })
+    }
+    if ((data ?? []).length < OPEN_ORDER_PAGE_SIZE) break
+  }
+
+  return orders
+}
+
+function formatProbability(prob: number) {
+  return `${(prob * 100).toFixed(2)}%`
+}
+
+async function checkNoCrossedMexasOrderBooks(
+  db: SupabaseClient
+): Promise<CheckResult> {
+  try {
+    const contractIds = await loadOpenMexasOrderbookContractIds(db)
+    const orders = await loadOpenMexasLimitOrders(db, contractIds)
+    const ordersByContractId = orders.reduce((map, order) => {
+      const contractOrders = map.get(order.contractId) ?? []
+      contractOrders.push(order)
+      map.set(order.contractId, contractOrders)
+      return map
+    }, new Map<string, OpenMexasLimitOrder[]>())
+    const failures: string[] = []
+
+    for (const [contractId, contractOrders] of ordersByContractId) {
+      const yesBid = contractOrders
+        .filter((order) => order.outcome === 'YES')
+        .sort(
+          (a, b) => b.limitProb - a.limitProb || a.betId.localeCompare(b.betId)
+        )[0]
+      const noAsk = contractOrders
+        .filter((order) => order.outcome === 'NO')
+        .sort(
+          (a, b) => a.limitProb - b.limitProb || a.betId.localeCompare(b.betId)
+        )[0]
+
+      if (!yesBid || !noAsk) continue
+      if (yesBid.limitProb + EPSILON < noAsk.limitProb) continue
+
+      failures.push(
+        `${contractId} crossed: YES ${formatProbability(
+          yesBid.limitProb
+        )} (${yesBid.betId}) >= NO ${formatProbability(noAsk.limitProb)} (${
+          noAsk.betId
+        })`
+      )
+    }
+
+    if (failures.length) {
+      return fail(
+        'crossed order books',
+        `${failures.slice(0, 5).join('; ')}${
+          failures.length > 5 ? `; ${failures.length - 5} more` : ''
+        }`
+      )
+    }
+
+    return pass(
+      'crossed order books',
+      `No crossed open MEXAS order books found across ${contractIds.length} unresolved markets.`
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return fail('crossed order books', message)
+  }
+}
+
 async function checkOpenMexasOrderBacking(
   db: SupabaseClient
 ): Promise<CheckResult> {
@@ -800,6 +915,7 @@ async function runChecks() {
     )
 
     checks.push(await checkOpenMexasOrderBacking(db))
+    checks.push(await checkNoCrossedMexasOrderBooks(db))
   }
 
   if (needsLaunchSql) {

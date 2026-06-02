@@ -804,6 +804,36 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('PRIVATE_KEY')
   })
 
+  test('launch readiness fails persistent crossed MEXAS order books', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('async function checkNoCrossedMexasOrderBooks')
+    expect(source).toContain('getMexasOpenOrderAmount')
+    expectMarkersInOrder(source, [
+      'async function loadOpenMexasLimitOrders',
+      ".eq('is_filled', false)",
+      ".eq('is_cancelled', false)",
+      '.or(`expires_at.is.null,expires_at.gt.${now}`)',
+      'if (bet.answerId) continue',
+      "bet.outcome !== 'YES' && bet.outcome !== 'NO'",
+      "typeof bet.limitProb !== 'number'",
+      'const openAmount = getMexasOpenOrderAmount',
+      'async function checkNoCrossedMexasOrderBooks',
+      'const yesBid = contractOrders',
+      "order.outcome === 'YES'",
+      'b.limitProb - a.limitProb',
+      'const noAsk = contractOrders',
+      "order.outcome === 'NO'",
+      'a.limitProb - b.limitProb',
+      'yesBid.limitProb + EPSILON < noAsk.limitProb',
+      "fail('crossed order books'",
+      'checks.push(await checkNoCrossedMexasOrderBooks(db))',
+    ])
+    expect(source).toContain("'crossed order books'")
+  })
+
   test('launch readiness blocks filled MEXAS settlement exposure without operational escrow', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'
