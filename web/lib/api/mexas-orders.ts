@@ -385,6 +385,7 @@ export async function releaseExpiredMexasOrders(
       .eq('is_cancelled', false)
       .lte('expires_at', now)
       .eq('data->>mexasFundsReserved', 'true')
+      .eq('data->>mexasFundsReleased', 'false')
       .range(0, EXPIRED_ORDER_PAGE_SIZE - 1)
 
     if (options.contractId) query = query.eq('contract_id', options.contractId)
@@ -467,6 +468,7 @@ async function loadOpenReservedMexasOrderRows(
       .eq('is_filled', false)
       .eq('is_cancelled', false)
       .eq('data->>mexasFundsReserved', 'true')
+      .eq('data->>mexasFundsReleased', 'false')
       .or(`expires_at.is.null,expires_at.gt.${now}`)
       .range(from, from + OPEN_RESERVED_ORDER_PAGE_SIZE - 1)
 

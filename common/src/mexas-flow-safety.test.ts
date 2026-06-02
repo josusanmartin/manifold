@@ -166,6 +166,12 @@ describe('MEXAS flow safety guardrails', () => {
 
     expect(source).toContain(".lte('expires_at', now)")
     expectMarkersInOrder(source, [
+      'export async function releaseExpiredMexasOrders',
+      ".lte('expires_at', now)",
+      ".eq('data->>mexasFundsReserved', 'true')",
+      ".eq('data->>mexasFundsReleased', 'false')",
+    ])
+    expectMarkersInOrder(source, [
       'async function prepareOpenMexasOrderRelease',
       'const { data: preparedRow, error } = await db',
       'mexasFundsReleased:',
@@ -205,6 +211,12 @@ describe('MEXAS flow safety guardrails', () => {
       'export async function releaseUnbackedMexasOrders',
       'let released = await releasePendingMexasOrderReleases(db, options)',
       'const rows = await loadOpenReservedMexasOrderRows(db, options)',
+    ])
+    expectMarkersInOrder(source, [
+      'async function loadOpenReservedMexasOrderRows',
+      ".eq('data->>mexasFundsReserved', 'true')",
+      ".eq('data->>mexasFundsReleased', 'false')",
+      '.or(`expires_at.is.null,expires_at.gt.${now}`)',
     ])
     expectMarkersInOrder(source, [
       'async function cancelUnbackedMexasOrder',
