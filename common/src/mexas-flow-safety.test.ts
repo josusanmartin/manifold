@@ -514,6 +514,30 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('skip locked')
   })
 
+  test('indexes MEXAS maker lookup by side, price, and time priority', () => {
+    const source = readRepoFile(
+      'backend/supabase/migrations/20260602153551_add_mexas_orderbook_indexes.sql'
+    )
+
+    expectMarkersInOrder(source, [
+      'create index if not exists contract_bets_mexas_orderbook_no_asks_idx',
+      'contract_id',
+      "((data ->> 'limitProb')::numeric) asc",
+      'created_time asc',
+      'bet_id asc',
+      "data ->> 'outcome' = 'NO'",
+      'create index if not exists contract_bets_mexas_orderbook_yes_bids_idx',
+      'contract_id',
+      "((data ->> 'limitProb')::numeric) desc",
+      'created_time asc',
+      'bet_id asc',
+      "data ->> 'outcome' = 'YES'",
+    ])
+    expect(source).toContain('coalesce(is_cancelled, false) = false')
+    expect(source).toContain('coalesce(is_filled, false) = false')
+    expect(source).toContain("data ->> 'answerId' is null")
+  })
+
   test('keeps the SQL matcher atomic and deterministic under concurrent takers', () => {
     const source = readRepoFile(
       'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
@@ -630,7 +654,13 @@ describe('MEXAS flow safety guardrails', () => {
     expect(helper).toContain("db.rpc('mexas_orderbook_matching_engine_ready')")
     expectMarkersInOrder(migration, [
       'create or replace function public.mexas_orderbook_matching_engine_ready',
-      "to_regprocedure('public.mexas_match_orderbook_limit_order(text,bigint,integer)') is not null",
+      "to_regprocedure('public.mexas_match_orderbook_limit_order(text,bigint,integer)') as matcher",
+      "to_regprocedure('public.mexas_orderbook_matching_engine_ready()') as health",
+      'when matcher is null or health is null then false',
+      "has_function_privilege('service_role', matcher, 'execute')",
+      "not has_function_privilege('anon', matcher, 'execute')",
+      "to_regclass('public.contract_bets_mexas_orderbook_no_asks_idx') is not null",
+      "to_regclass('public.contract_bets_mexas_orderbook_yes_bids_idx') is not null",
       'revoke execute on function public.mexas_orderbook_matching_engine_ready() from public, anon, authenticated',
       'grant execute on function public.mexas_orderbook_matching_engine_ready() to service_role',
     ])
@@ -661,6 +691,14 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain(
       "public.mexas_orderbook_matching_engine_ready() is distinct from true"
     )
+    expect(source).toContain(
+      "to_regclass('public.contract_bets_mexas_orderbook_no_asks_idx') is null"
+    )
+    expect(source).toContain(
+      "to_regclass('public.contract_bets_mexas_orderbook_yes_bids_idx') is null"
+    )
+    expect(source).toContain("'NO ask orderbook index missing'")
+    expect(source).toContain("'YES bid orderbook index missing'")
     expect(compact).toContain(
       "has_function_privilege( 'service_role', 'public.mexas_match_orderbook_limit_order(text,bigint,integer)', 'execute' )"
     )

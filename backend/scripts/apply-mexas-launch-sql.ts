@@ -7,6 +7,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060201_allow_mex_contract_token.sql',
   'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql',
   'backend/supabase/migrations/2026060203_add_mexas_matching_health.sql',
+  'backend/supabase/migrations/20260602153551_add_mexas_orderbook_indexes.sql',
 ]
 
 const REQUIRED_CONTRACT_IDS = ['mexwcwin26a', 'ukrwarend26a']
@@ -120,6 +121,14 @@ begin
     v_failures := array_append(v_failures, 'matching health RPC missing');
   elsif public.mexas_orderbook_matching_engine_ready() is distinct from true then
     v_failures := array_append(v_failures, 'matching health RPC returned false');
+  end if;
+
+  if to_regclass('public.contract_bets_mexas_orderbook_no_asks_idx') is null then
+    v_failures := array_append(v_failures, 'NO ask orderbook index missing');
+  end if;
+
+  if to_regclass('public.contract_bets_mexas_orderbook_yes_bids_idx') is null then
+    v_failures := array_append(v_failures, 'YES bid orderbook index missing');
   end if;
 
   if not has_function_privilege(
