@@ -1,4 +1,5 @@
 import {
+  getMexasAvailableBalance,
   getTotalMexasRemainingReservedAmount,
   getUnbackedMexasOrderIds,
   type MexasReservedOrderData,
@@ -58,5 +59,26 @@ describe('MEXAS reserved order backing', () => {
     ]
 
     expect(getUnbackedMexasOrderIds(orders, 4)).toEqual(['b'])
+  })
+
+  test('derives available balance from on-chain MEX minus open reservations', () => {
+    expect(
+      getMexasAvailableBalance({
+        onChainAmount: 9,
+        openReservedAmount: 5,
+      })
+    ).toBe(4)
+    expect(
+      getMexasAvailableBalance({
+        onChainAmount: 4,
+        openReservedAmount: 5,
+      })
+    ).toBe(0)
+    expect(
+      getMexasAvailableBalance({
+        onChainAmount: 10.123456789,
+        openReservedAmount: 0.000000004,
+      })
+    ).toBe(10.12345679)
   })
 })

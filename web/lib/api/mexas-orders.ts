@@ -1,6 +1,8 @@
 import { LimitBet } from 'common/bet'
 import {
+  getMexasAvailableBalance,
   getMexasRemainingReservedAmount,
+  getTotalMexasRemainingReservedAmount,
   getUnbackedMexasOrderIds,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
@@ -9,10 +11,15 @@ import { convertBet } from 'common/supabase/bets'
 import type { Row, SupabaseClient } from 'common/supabase/utils'
 import { isAddress, type Address } from 'viem'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
-import { updateMexasUserBalanceCas } from './mexas-balance'
+import {
+  setMexasUserBalanceCas,
+  updateMexasUserBalanceCas,
+} from './mexas-balance'
 
 const EXPIRED_ORDER_PAGE_SIZE = 1000
 const OPEN_RESERVED_ORDER_PAGE_SIZE = 1000
+const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
+const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
 
 function getBetData(row: Row<'contract_bets'>) {
   const data = row.data
@@ -30,6 +37,31 @@ function getUserData(row: { data: unknown } | null) {
 
 function mexasUnitsToAmount(units: bigint) {
   return Number(formatMexasUnits(units))
+}
+
+async function syncAvailableBalanceFromBacking(params: {
+  db: SupabaseClient
+  onChainAmount: number
+  onChainUnits: bigint
+  userId: string
+}) {
+  const openReservedAmount = await getOpenReservedMexasAmount(params.db, {
+    userId: params.userId,
+  })
+  return await setMexasUserBalanceCas(
+    params.db,
+    params.userId,
+    getMexasAvailableBalance({
+      onChainAmount: params.onChainAmount,
+      openReservedAmount,
+    }),
+    {
+      dataPatch: {
+        [MEXAS_WALLET_SYNC_UNITS_KEY]: params.onChainUnits.toString(),
+        [MEXAS_WALLET_SYNC_TIME_KEY]: Date.now(),
+      },
+    }
+  )
 }
 
 async function releaseExpiredMexasOrder(
@@ -146,9 +178,11 @@ async function getUserOnChainMexasAmount(
   if (typeof walletAddress !== 'string' || !isAddress(walletAddress)) return 0
 
   try {
-    return mexasUnitsToAmount(
-      await getMexasBalanceUnits(walletAddress as Address)
-    )
+    const units = await getMexasBalanceUnits(walletAddress as Address)
+    return {
+      amount: mexasUnitsToAmount(units),
+      units,
+    }
   } catch (error) {
     if (requireBalanceRead) throw error
     console.warn('Failed to read MEXAS backing balance', {
@@ -157,6 +191,19 @@ async function getUserOnChainMexasAmount(
     })
     return undefined
   }
+}
+
+export async function getOpenReservedMexasAmount(
+  db: SupabaseClient,
+  options: {
+    contractId?: string
+    userId?: string
+  } = {}
+) {
+  const rows = await loadOpenReservedMexasOrderRows(db, options)
+  return getTotalMexasRemainingReservedAmount(
+    rows.map((row) => convertBet(row) as LimitBet & MexasReservedOrderData)
+  )
 }
 
 async function cancelUnbackedMexasOrder(
@@ -230,13 +277,26 @@ export async function releaseUnbackedMexasOrders(
     const bets = userOrderRows.map(
       (row) => convertBet(row) as LimitBet & MexasReservedOrderData
     )
-    const unbackedIds = new Set(getUnbackedMexasOrderIds(bets, onChainAmount))
+    const backedAmount =
+      typeof onChainAmount === 'number' ? onChainAmount : onChainAmount.amount
+    const unbackedIds = new Set(getUnbackedMexasOrderIds(bets, backedAmount))
     if (!unbackedIds.size) continue
 
+    let userReleased = 0
     for (const row of userOrderRows) {
       if (unbackedIds.has(row.bet_id)) {
-        released += await cancelUnbackedMexasOrder(db, row)
+        const rowReleased = await cancelUnbackedMexasOrder(db, row)
+        userReleased += rowReleased
+        released += rowReleased
       }
+    }
+    if (userReleased && typeof onChainAmount !== 'number') {
+      await syncAvailableBalanceFromBacking({
+        db,
+        userId,
+        onChainAmount: onChainAmount.amount,
+        onChainUnits: onChainAmount.units,
+      })
     }
   }
 

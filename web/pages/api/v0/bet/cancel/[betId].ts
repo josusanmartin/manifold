@@ -17,6 +17,7 @@ import { releaseUnbackedMexasOrders } from 'web/lib/api/mexas-orders'
 
 type ErrorResponse = { message: string }
 const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
+const ORDER_LOCK_TIMEOUT_MS = 30 * 1000
 
 let privyClient: PrivyClient | undefined
 
@@ -91,6 +92,14 @@ function hasFreshMexasResolutionLock(data: Record<string, unknown>) {
     typeof data.mexasResolvingSince === 'number' ? data.mexasResolvingSince : 0
 
   return locked && Date.now() - since < RESOLUTION_LOCK_TIMEOUT_MS
+}
+
+function hasFreshMexasOrderLock(data: Record<string, unknown>) {
+  const locked = data.mexasOrderLock === true
+  const since =
+    typeof data.mexasOrderLockSince === 'number' ? data.mexasOrderLockSince : 0
+
+  return locked && Date.now() - since < ORDER_LOCK_TIMEOUT_MS
 }
 
 async function releaseMexasCancelledOrderFunds(
@@ -177,6 +186,9 @@ export default async function handler(
     }
     if (hasFreshMexasResolutionLock(getContractData(typedContractRow))) {
       throw new APIError(503, 'Market resolution is in progress.')
+    }
+    if (hasFreshMexasOrderLock(getContractData(typedContractRow))) {
+      throw new APIError(503, 'Order placement is in progress. Please retry.')
     }
     const betData = getBetData(typedBetRow) as MexasReservedOrderData &
       Record<string, unknown>

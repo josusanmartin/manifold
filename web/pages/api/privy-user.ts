@@ -6,6 +6,7 @@ import { type UserAndPrivateUser, type PrivateUser } from 'common/user'
 import { getDefaultNotificationPreferences } from 'common/user-notification-preferences'
 import { cleanDisplayName, cleanUsername } from 'common/util/clean-username'
 import { randomString } from 'common/util/random'
+import { getMexasAvailableBalance } from 'common/mexas-market'
 import { convertPrivateUser, convertUser } from 'common/supabase/users'
 import {
   createClient,
@@ -14,6 +15,7 @@ import {
 } from 'common/supabase/utils'
 import { isAddress, type Address } from 'viem'
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { getOpenReservedMexasAmount } from 'web/lib/api/mexas-orders'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
 
@@ -145,7 +147,11 @@ function mexasUnitsDeltaToAmount(deltaUnits: bigint) {
   return sign * mexasUnitsToAmount(absUnits)
 }
 
-async function getMexasWalletSync(row: Row<'users'>, walletAddress?: string) {
+async function getMexasWalletSync(
+  db: SupabaseClient,
+  row: Row<'users'>,
+  walletAddress?: string
+) {
   if (!walletAddress || !isAddress(walletAddress)) return undefined
 
   try {
@@ -153,7 +159,14 @@ async function getMexasWalletSync(row: Row<'users'>, walletAddress?: string) {
     const currentUnits = await getMexasBalanceUnits(walletAddress as Address)
     const previousUnits = parseSyncedMexasUnits(data)
     const deltaAmount = mexasUnitsDeltaToAmount(currentUnits - previousUnits)
-    const balance = Math.max(0, row.balance + deltaAmount)
+    const onChainAmount = mexasUnitsToAmount(currentUnits)
+    const openReservedAmount = await getOpenReservedMexasAmount(db, {
+      userId: row.id,
+    })
+    const balance = getMexasAvailableBalance({
+      onChainAmount,
+      openReservedAmount,
+    })
     const totalDeposits =
       deltaAmount > 0 ? row.total_deposits + deltaAmount : row.total_deposits
 
@@ -287,7 +300,11 @@ async function updateExistingUser(params: {
 
   let latestUserRow = userRow
   for (let attempt = 0; attempt < USER_UPDATE_ATTEMPTS; attempt++) {
-    const walletSync = await getMexasWalletSync(latestUserRow, walletAddress)
+    const walletSync = await getMexasWalletSync(
+      db,
+      latestUserRow,
+      walletAddress
+    )
     const userData = {
       ...getUserData(latestUserRow),
       ...(walletSync?.data ?? {}),

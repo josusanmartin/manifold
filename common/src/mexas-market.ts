@@ -46,6 +46,16 @@ export function getTotalMexasRemainingReservedAmount(
   )
 }
 
+export function getMexasAvailableBalance(params: {
+  onChainAmount: number
+  openReservedAmount: number
+}) {
+  return Math.max(
+    0,
+    Math.round((params.onChainAmount - params.openReservedAmount) * 1e8) / 1e8
+  )
+}
+
 export function getUnbackedMexasOrderIds(
   orders: (MexasReservedOrderData & { id: string })[],
   backedAmount: number

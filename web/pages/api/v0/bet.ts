@@ -5,6 +5,7 @@ import { getNewBetId, LimitBet, type Bet } from 'common/bet'
 import { getCpmmProbability } from 'common/calculate-cpmm'
 import { MarketContract } from 'common/contract'
 import {
+  getMexasAvailableBalance,
   getMexasRemainingReservedAmount,
   isMexasOrderBookOnlyContract,
 } from 'common/mexas-market'
@@ -34,6 +35,7 @@ import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
 import {
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
+  getOpenReservedMexasAmount,
 } from 'web/lib/api/mexas-orders'
 import { assertMexasCanMatchCrossingOrders } from 'web/lib/api/mexas-settlement'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
@@ -172,7 +174,14 @@ async function syncMexasWalletBalance(
     const latestData = getUserData(latestUserRow) as Record<string, unknown>
     const previousUnits = parseSyncedMexasUnits(latestData)
     const deltaAmount = mexasUnitsDeltaToAmount(currentUnits - previousUnits)
-    const balance = Math.max(0, latestUserRow.balance + deltaAmount)
+    const onChainAmount = mexasUnitsToAmount(currentUnits)
+    const openReservedAmount = await getOpenReservedMexasAmount(db, {
+      userId: latestUserRow.id,
+    })
+    const balance = getMexasAvailableBalance({
+      onChainAmount,
+      openReservedAmount,
+    })
     const totalDeposits =
       deltaAmount > 0
         ? latestUserRow.total_deposits + deltaAmount
@@ -733,6 +742,10 @@ async function placeBinaryBet(
   const params = API.bet.props.parse(req.body)
   const db = getSupabaseAdminClient()
   await releaseExpiredMexasOrders(db, { userId })
+  await releaseUnbackedMexasOrders(db, {
+    userId,
+    requireBalanceRead: true,
+  })
 
   const [
     { data: userRow, error: userError },
@@ -783,6 +796,13 @@ async function placeBinaryBet(
         contractId: params.contractId,
         requireBalanceRead: true,
       })
+      const latestSyncedUserRow = await syncMexasWalletBalance(
+        db,
+        syncedUserRow as Row<'users'>
+      )
+      if (latestSyncedUserRow.balance < params.amount) {
+        throw new APIError(403, 'Insufficient balance.')
+      }
       bet = createMexasOpenLimitBet(
         lockedContract as MarketContract & { prob: number },
         params,

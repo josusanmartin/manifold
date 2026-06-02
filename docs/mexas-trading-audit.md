@@ -11,8 +11,12 @@ y Arbitrum solo para leer el balance ERC-20 del usuario.
 - Las ordenes MEXAS requieren autenticacion Privy server-side.
 - Las ordenes MEXAS solo aceptan ordenes limite.
 - Cada orden abierta descuenta saldo interno y guarda `mexasFundsReserved`.
+- El saldo disponible se sincroniza como MEX on-chain menos reservas abiertas;
+  no se calcula por delta bruto cuando hay ordenes pendientes.
 - Las ordenes expiradas se cancelan y devuelven solo la reserva pendiente.
 - Las ordenes abiertas sin respaldo on-chain se cancelan sin reembolso interno.
+- Al cancelar una orden, la ruta local rechaza cambios mientras haya lock de
+  order book o resolucion en curso, y el reembolso usa clave idempotente.
 - El matching usa price-time priority: mejor precio primero, luego orden mas vieja,
   luego `bet_id` como desempate determinista.
 - La colocacion de ordenes toma un lock por mercado y usa CAS por fila de orden,
@@ -37,6 +41,18 @@ Para no crear saldos internos no respaldados, el API bloquea:
 
 Abrir ordenes limite que no cruzan sigue permitido, porque esas ordenes pueden
 cancelarse si el balance on-chain deja de respaldarlas.
+
+## Superficie publica MEXAS
+
+El proxy publico de `mexas-manifold.vercel.app/api/v0/*` bloquea endpoints
+heredados que no forman parte del producto MEXAS: comentarios, posts, boosts,
+manalinks, Mana stats, cashout/checkout GIDX, iDenfy, loans, liquidez/bounties,
+MCP, Predictle, sweepstakes, charity giveaways, shop/merch/tickets y compra
+MEXAS por Daimo/tesoreria.
+
+La superficie que queda disponible para el frontend MEXAS es trading local
+MEXAS, consulta de ordenes, busqueda/lectura de mercados, usuarios, txns,
+revalidacion y resolucion de mercados MEXAS por el creador.
 
 ## Requisito para produccion real
 

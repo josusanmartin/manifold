@@ -74,3 +74,45 @@ export async function updateMexasUserBalanceCas(
 
   throw new APIError(503, 'Balance changed. Please try again.')
 }
+
+export async function setMexasUserBalanceCas(
+  db: SupabaseClient,
+  userId: string,
+  balance: number,
+  options?: {
+    dataPatch?: Record<string, unknown>
+  }
+) {
+  for (let attempt = 0; attempt < BALANCE_UPDATE_ATTEMPTS; attempt++) {
+    const { data: userRow, error: readError } = await db
+      .from('users')
+      .select('id,balance,data')
+      .eq('id', userId)
+      .single()
+
+    if (readError) throw readError
+    if (!userRow) throw new APIError(404, 'User not found.')
+
+    const nextBalance = Math.max(0, balance)
+    const nextData: Record<string, unknown> = {
+      ...getUserData(userRow),
+      ...(options?.dataPatch ?? {}),
+    }
+
+    const { data: updatedUserRow, error: updateError } = await db
+      .from('users')
+      .update({
+        balance: nextBalance,
+        data: nextData as any,
+      })
+      .eq('id', userId)
+      .eq('balance', userRow.balance)
+      .select('id,balance,data')
+      .maybeSingle()
+
+    if (updateError) throw updateError
+    if (updatedUserRow) return updatedUserRow
+  }
+
+  throw new APIError(503, 'Balance changed. Please try again.')
+}
