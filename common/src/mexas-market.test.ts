@@ -1,6 +1,7 @@
 import {
   getMexasAvailableBalance,
   getMexasSyncedAvailableBalance,
+  hasActiveMexasReservation,
   isMexasOrderBookOnlyContract,
   getTotalMexasRemainingReservedAmount,
   getUnbackedMexasOrderIds,
@@ -12,6 +13,8 @@ function order(
 ): MexasReservedOrderData & { id: string } {
   return {
     amount: 0,
+    mexasFundsReserved: true,
+    mexasFundsReleased: false,
     orderAmount: 10,
     ...props,
   }
@@ -59,6 +62,32 @@ describe('MEXAS reserved order backing', () => {
         order({ id: 'c', mexasReservedAmount: 8, amount: 2 }),
       ])
     ).toBe(18)
+  })
+
+  test('ignores released or unreserved orders when summing active reservations', () => {
+    const active = order({ id: 'active', orderAmount: 10, amount: 3 })
+    const released = order({
+      id: 'released',
+      orderAmount: 10,
+      amount: 0,
+      mexasFundsReleased: true,
+    })
+    const unreserved = order({
+      id: 'unreserved',
+      orderAmount: 10,
+      amount: 0,
+      mexasFundsReserved: false,
+    })
+
+    expect(hasActiveMexasReservation(active)).toBe(true)
+    expect(hasActiveMexasReservation(released)).toBe(false)
+    expect(hasActiveMexasReservation(unreserved)).toBe(false)
+    expect(
+      getTotalMexasRemainingReservedAmount([active, released, unreserved])
+    ).toBe(7)
+    expect(getUnbackedMexasOrderIds([active, released, unreserved], 0)).toEqual(
+      ['active']
+    )
   })
 
   test('does not cancel orders when on-chain backing covers reserves', () => {

@@ -748,6 +748,12 @@ async function placeBinaryBet(
           db,
           syncedUserRow as Row<'users'>
         )
+        if (lockedContract.closeTime && Date.now() >= lockedContract.closeTime) {
+          throw new APIError(403, 'Trading is closed.')
+        }
+        if (lockedContract.isResolved) {
+          throw new APIError(403, 'Market is resolved.')
+        }
         if (latestSyncedUserRow.balance < params.amount) {
           throw new APIError(403, 'Insufficient balance.')
         }

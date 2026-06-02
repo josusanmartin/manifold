@@ -265,6 +265,15 @@ describe('MEXAS flow safety guardrails', () => {
     expect(
       countOccurrences(betSource, 'Date.now() >= contract.closeTime')
     ).toBeGreaterThanOrEqual(2)
+    expectMarkersInOrder(betSource, [
+      'const lockedContract = lock.contract',
+      'const latestSyncedUserRow = await syncMexasWalletBalance(',
+      'if (lockedContract.closeTime && Date.now() >= lockedContract.closeTime)',
+      "throw new APIError(403, 'Trading is closed.')",
+      'if (lockedContract.isResolved)',
+      "throw new APIError(403, 'Market is resolved.')",
+      'bet = createMexasOpenLimitBet(',
+    ])
     expect(ordersSource).toContain(".lte('close_time', now)")
   })
 
@@ -644,6 +653,24 @@ describe('MEXAS flow safety guardrails', () => {
     expect(dangerSource).toContain('Resolver')
     expect(confirmSource).toContain('Resolver a ${label}')
     expect(panelSource).not.toContain('comments section')
+  })
+
+  test('rechecks MEXAS settlement exposure after closing but before credits', () => {
+    const source = readRepoFile(
+      'web/pages/api/v0/market/[contractId]/resolve.ts'
+    )
+
+    expect(countOccurrences(source, 'assertMexasCanResolveFilledPositions(')).toBe(
+      2
+    )
+    expectMarkersInOrder(source, [
+      'const preflightBets = await loadContractBets(db, contractId)',
+      'assertMexasCanResolveFilledPositions(',
+      'const closedContractRow = await closeContractForResolution(',
+      'const bets = await loadContractBets(db, contractId)',
+      'assertMexasCanResolveFilledPositions(',
+      'const creditEvents = getMexasResolutionCreditEvents(',
+    ])
   })
 
   test('production smoke covers the local MEXAS resolution preflight endpoint', () => {

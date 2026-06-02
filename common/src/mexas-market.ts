@@ -25,6 +25,10 @@ export type MexasReservedOrderData = {
   mexasFundsReleased?: boolean
 }
 
+export function hasActiveMexasReservation(order: MexasReservedOrderData) {
+  return order.mexasFundsReserved === true && order.mexasFundsReleased !== true
+}
+
 export function getMexasRemainingReservedAmount(order: MexasReservedOrderData) {
   const reservedAmount =
     typeof order.mexasReservedAmount === 'number'
@@ -39,7 +43,11 @@ export function getTotalMexasRemainingReservedAmount(
   orders: MexasReservedOrderData[]
 ) {
   return orders.reduce(
-    (total, order) => total + getMexasRemainingReservedAmount(order),
+    (total, order) =>
+      total +
+      (hasActiveMexasReservation(order)
+        ? getMexasRemainingReservedAmount(order)
+        : 0),
     0
   )
 }
@@ -85,7 +93,11 @@ export function getUnbackedMexasOrderIds(
   if (excess <= 1e-9) return []
 
   const newestFirst = [...orders]
-    .filter((order) => getMexasRemainingReservedAmount(order) > 1e-9)
+    .filter(
+      (order) =>
+        hasActiveMexasReservation(order) &&
+        getMexasRemainingReservedAmount(order) > 1e-9
+    )
     .sort((a, b) => {
       const timeDiff = (b.createdTime ?? 0) - (a.createdTime ?? 0)
       if (timeDiff !== 0) return timeDiff

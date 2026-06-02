@@ -414,6 +414,9 @@ async function resolveMexasMarket(
     requireBalanceRead: true,
   })
   const bets = await loadContractBets(db, contractId)
+  assertMexasCanResolveFilledPositions(
+    getMexasSettlementAudit(bets.map((entry) => entry.bet))
+  )
   const creditEvents = getMexasResolutionCreditEvents(
     bets.map((entry) => entry.bet),
     outcome
