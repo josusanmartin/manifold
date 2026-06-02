@@ -495,7 +495,15 @@ describe('MEXAS flow safety guardrails', () => {
       "settings.escrowImplementation === 'onchain-transfer'",
       'export function canMexasMatchCrossingOrders',
       'hasOperationalMexasEscrow(settings)',
+      'export function canMexasResolveFilledPositions',
+      'return hasOperationalMexasEscrow(settings)',
     ])
+    expect(source).not.toContain(
+      "settings.allowUnescrowedMatching === 'true'"
+    )
+    expect(source).not.toContain(
+      "settings.allowUnescrowedResolution === 'true'"
+    )
   })
 
   test('uses the Supabase RPC matcher instead of the in-process simulator on live orders', () => {

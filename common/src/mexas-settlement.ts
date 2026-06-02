@@ -110,16 +110,12 @@ export function getMissingMexasEscrowCapabilities() {
 export function canMexasMatchCrossingOrders(settings: MexasSettlementSettings) {
   return (
     hasTransactionalMexasMatchingEngine(settings) &&
-    (hasOperationalMexasEscrow(settings) ||
-      settings.allowUnescrowedMatching === 'true')
+    hasOperationalMexasEscrow(settings)
   )
 }
 
 export function canMexasResolveFilledPositions(
   settings: MexasSettlementSettings
 ) {
-  return (
-    hasOperationalMexasEscrow(settings) ||
-    settings.allowUnescrowedResolution === 'true'
-  )
+  return hasOperationalMexasEscrow(settings)
 }
