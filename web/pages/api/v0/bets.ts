@@ -8,7 +8,10 @@ import {
   type SupabaseClient,
 } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { releaseExpiredMexasOrders } from 'web/lib/api/mexas-orders'
+import {
+  releaseExpiredMexasOrders,
+  releaseUnbackedMexasOrders,
+} from 'web/lib/api/mexas-orders'
 import { z } from 'zod'
 
 type ErrorResponse = { message: string; details?: unknown }
@@ -84,6 +87,10 @@ export default async function handler(
     const singleContractId = Array.isArray(contractId) ? undefined : contractId
     if (params.kinds === 'open-limit' && (singleContractId || userId)) {
       await releaseExpiredMexasOrders(db, {
+        contractId: singleContractId,
+        userId,
+      })
+      await releaseUnbackedMexasOrders(db, {
         contractId: singleContractId,
         userId,
       })

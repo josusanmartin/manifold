@@ -31,7 +31,10 @@ import { removeUndefinedProps } from 'common/util/object'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { isAddress, type Address } from 'viem'
 import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
-import { releaseExpiredMexasOrders } from 'web/lib/api/mexas-orders'
+import {
+  releaseExpiredMexasOrders,
+  releaseUnbackedMexasOrders,
+} from 'web/lib/api/mexas-orders'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
 
@@ -599,6 +602,10 @@ async function matchMexasOrder(
     const remainingAmount = getMexasOpenOrderAmount(updatedTaker)
     if (remainingAmount <= EPSILON) break
 
+    await releaseUnbackedMexasOrders(db, {
+      contractId: updatedTaker.contractId,
+      requireBalanceRead: true,
+    })
     const makerRows = await loadMexasCrossingOrderRows(
       db,
       updatedTaker.contractId,
@@ -622,6 +629,10 @@ async function matchMexasOrder(
     )
     if (!makerRow) continue
 
+    await releaseUnbackedMexasOrders(db, {
+      userId: candidate.maker.userId,
+      requireBalanceRead: true,
+    })
     const committedMaker = await updateLimitBetCas(
       db,
       makerRow.row,
@@ -766,6 +777,11 @@ async function placeBinaryBet(
 
     try {
       const lockedContract = lock.contract
+      await releaseExpiredMexasOrders(db, { contractId: params.contractId })
+      await releaseUnbackedMexasOrders(db, {
+        contractId: params.contractId,
+        requireBalanceRead: true,
+      })
       bet = createMexasOpenLimitBet(
         lockedContract as MarketContract & { prob: number },
         params,

@@ -18,6 +18,10 @@ import {
 } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
+import {
+  releaseExpiredMexasOrders,
+  releaseUnbackedMexasOrders,
+} from 'web/lib/api/mexas-orders'
 import { z } from 'zod'
 
 type ErrorResponse = { message: string; details?: unknown }
@@ -259,6 +263,11 @@ async function resolveMexasMarket(
     initialContractRow,
     outcome
   )
+  await releaseExpiredMexasOrders(db, { contractId })
+  await releaseUnbackedMexasOrders(db, {
+    contractId,
+    requireBalanceRead: true,
+  })
   const bets = await loadContractBets(db, contractId)
   const creditEvents = getMexasResolutionCreditEvents(
     bets.map((entry) => entry.bet),

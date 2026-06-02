@@ -13,6 +13,7 @@ import { convertContract } from 'common/supabase/contracts'
 import { createClient, type Row } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
+import { releaseUnbackedMexasOrders } from 'web/lib/api/mexas-orders'
 
 type ErrorResponse = { message: string }
 const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
@@ -137,6 +138,10 @@ export default async function handler(
     if (!betId) throw new APIError(400, 'Missing betId.')
 
     const db = getSupabaseAdminClient()
+    await releaseUnbackedMexasOrders(db, {
+      userId,
+      requireBalanceRead: true,
+    })
     const { data: betRow, error: readError } = await db
       .from('contract_bets')
       .select('*')
