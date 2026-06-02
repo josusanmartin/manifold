@@ -881,7 +881,12 @@ describe('MEXAS flow safety guardrails', () => {
       'if (needsLaunchSql)',
       'Launch SQL is missing and no local Postgres connection env is set.',
       'apply:mexas-launch-sql --print-sql',
+      'Service-role REST cannot apply this',
     ])
+    expect(source).toContain(
+      'contracts_token_check still needs the launch SQL'
+    )
+    expect(source).toContain('RPC/index DDL require Postgres SQL access')
   })
 
   test('launch readiness validates the MEXAS treasury wallet env pair', () => {

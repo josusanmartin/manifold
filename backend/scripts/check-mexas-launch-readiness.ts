@@ -989,13 +989,26 @@ async function runChecks() {
         }
         return failures
       })
+      const tokenConstraintLikelyBlocksMex = (requiredContracts ?? []).some(
+        (row) => {
+          const data =
+            row.data && typeof row.data === 'object' && !Array.isArray(row.data)
+              ? (row.data as Record<string, unknown>)
+              : {}
+          return row.token !== 'MEX' && data.token === 'MEX'
+        }
+      )
       if (contractFailures.length) needsLaunchSql = true
 
       checks.push(
         contractFailures.length
           ? fail(
               'required MEXAS contracts',
-              `Invalid rows: ${contractFailures.join('; ')}`
+              `Invalid rows: ${contractFailures.join('; ')}${
+                tokenConstraintLikelyBlocksMex
+                  ? '; contracts_token_check still needs the launch SQL so SQL token can be set to MEX'
+                  : ''
+              }`
             )
           : pass(
               'required MEXAS contracts',
@@ -1036,7 +1049,7 @@ async function runChecks() {
             'launch SQL apply access',
             `Launch SQL is missing and no local Postgres connection env is set. Set one of ${LAUNCH_SQL_APPLY_ENVS.join(
               ', '
-            )}, or run "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts apply:mexas-launch-sql --print-sql" and paste it into Supabase SQL Editor.`
+            )}, or run "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts apply:mexas-launch-sql --print-sql" and paste it into Supabase SQL Editor. Service-role REST cannot apply this because contracts_token_check and RPC/index DDL require Postgres SQL access.`
           )
     )
   } else {
