@@ -226,6 +226,15 @@ async function fetchText(path: string) {
   return { response, text }
 }
 
+async function fetchManual(path: string, init?: RequestInit) {
+  const response = await fetch(`${SITE_URL}${path}`, {
+    redirect: 'manual',
+    ...init,
+  })
+  const text = await response.text()
+  return { response, text }
+}
+
 async function checkRedirect(path: string, destination: string) {
   const response = await fetch(`${SITE_URL}${path}`, { redirect: 'manual' })
   const location = response.headers.get('location') ?? ''
@@ -354,6 +363,35 @@ async function checkBlockedBets(contractId: string) {
     : fail(`blocked bets ${contractId}`, `${response.status}`)
 }
 
+async function checkBetsArray(path: string, name: string) {
+  const { response, text } = await fetchText(path)
+  if (response.status < 200 || response.status >= 400) {
+    return fail(name, `${response.status}`)
+  }
+
+  try {
+    const data = JSON.parse(text)
+    return Array.isArray(data)
+      ? pass(name, `${data.length} rows`)
+      : fail(name, 'Response is not an array.')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return fail(name, message)
+  }
+}
+
+async function checkExpectedStatus(
+  name: string,
+  path: string,
+  expectedStatus: number,
+  init?: RequestInit
+) {
+  const { response } = await fetchManual(path, init)
+  return response.status === expectedStatus
+    ? pass(name, `${expectedStatus}`)
+    : fail(name, `${response.status}`)
+}
+
 async function checkBlockedApi(path: string) {
   const response = await fetch(`${SITE_URL}${path}`, { redirect: 'manual' })
   return response.status === 404
@@ -378,9 +416,49 @@ async function runSmoke() {
   results.push(await checkOrderBook('ukrwarend26a'))
   results.push(await checkResolutionReadiness('mexwcwin26a'))
   results.push(await checkResolutionReadiness('ukrwarend26a'))
+  results.push(
+    await checkBetsArray(
+      '/api/v0/bets?contractId=mexwcwin26a&kinds=open-limit',
+      'bets mexwcwin26a open-limit'
+    )
+  )
+  results.push(
+    await checkBetsArray(
+      '/api/v0/bets?contractSlug=ganara-mexico-la-copa-mundial-2026&kinds=open-limit',
+      'bets mexico slug open-limit'
+    )
+  )
   results.push(await checkBlockedOrderBook('not-a-mexas-market'))
   results.push(await checkBlockedBets('not-a-mexas-market'))
+  results.push(
+    await checkExpectedStatus(
+      'blocked bets unknown username',
+      '/api/v0/bets?username=__mexas_missing_user__',
+      404
+    )
+  )
   results.push(await checkBlockedResolutionReadiness('not-a-mexas-market'))
+  results.push(
+    await checkExpectedStatus('method bets POST', '/api/v0/bets', 405, {
+      method: 'POST',
+    })
+  )
+  results.push(
+    await checkExpectedStatus(
+      'method orderbook POST',
+      '/api/mexas-order-book?contractId=mexwcwin26a',
+      405,
+      { method: 'POST' }
+    )
+  )
+  results.push(
+    await checkExpectedStatus(
+      'method resolution readiness POST',
+      '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
+      405,
+      { method: 'POST' }
+    )
+  )
   return results
 }
 

@@ -663,6 +663,31 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('production smoke covers allowed MEXAS API endpoints and method guards', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-production-smoke.ts'
+    )
+
+    expectMarkersInOrder(source, [
+      'async function checkBetsArray',
+      '/api/v0/bets?contractId=mexwcwin26a&kinds=open-limit',
+      'bets mexwcwin26a open-limit',
+      '/api/v0/bets?contractSlug=ganara-mexico-la-copa-mundial-2026&kinds=open-limit',
+      'bets mexico slug open-limit',
+      'blocked bets unknown username',
+      '/api/v0/bets?username=__mexas_missing_user__',
+    ])
+    expectMarkersInOrder(source, [
+      'async function checkExpectedStatus',
+      'method bets POST',
+      '/api/v0/bets',
+      'method orderbook POST',
+      '/api/mexas-order-book?contractId=mexwcwin26a',
+      'method resolution readiness POST',
+      '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
+    ])
+  })
+
   test('production smoke covers broad legacy API blockers', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'
