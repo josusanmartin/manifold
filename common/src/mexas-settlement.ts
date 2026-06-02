@@ -5,7 +5,24 @@ import {
 } from './mexas-resolution'
 
 const EPSILON = 1e-9
-export const MEXAS_ONCHAIN_ESCROW_IMPLEMENTED = false
+
+export type MexasEscrowCapability =
+  | 'captureOrderStake'
+  | 'releaseOpenOrderStake'
+  | 'payoutResolvedPositions'
+
+export const MEXAS_ONCHAIN_ESCROW_CAPABILITIES: Record<
+  MexasEscrowCapability,
+  boolean
+> = {
+  captureOrderStake: false,
+  releaseOpenOrderStake: false,
+  payoutResolvedPositions: false,
+}
+
+export const MEXAS_ONCHAIN_ESCROW_IMPLEMENTED = Object.values(
+  MEXAS_ONCHAIN_ESCROW_CAPABILITIES
+).every(Boolean)
 
 export type MexasSettlementAudit = {
   filledBetCount: number
@@ -82,6 +99,12 @@ export function hasOperationalMexasEscrow(settings: MexasSettlementSettings) {
     settings.settlementMode === 'escrow' &&
     settings.escrowImplementation === 'onchain-transfer'
   )
+}
+
+export function getMissingMexasEscrowCapabilities() {
+  return Object.entries(MEXAS_ONCHAIN_ESCROW_CAPABILITIES)
+    .filter(([, implemented]) => !implemented)
+    .map(([capability]) => capability as MexasEscrowCapability)
 }
 
 export function canMexasMatchCrossingOrders(settings: MexasSettlementSettings) {

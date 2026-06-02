@@ -376,7 +376,11 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('common/src/mexas-settlement.ts')
 
     expectMarkersInOrder(source, [
-      'export const MEXAS_ONCHAIN_ESCROW_IMPLEMENTED = false',
+      'export const MEXAS_ONCHAIN_ESCROW_CAPABILITIES',
+      'captureOrderStake: false',
+      'releaseOpenOrderStake: false',
+      'payoutResolvedPositions: false',
+      'export const MEXAS_ONCHAIN_ESCROW_IMPLEMENTED',
       'export function hasTransactionalMexasMatchingEngine',
       "return settings.matchingEngineMode === 'rpc'",
       'export function hasOperationalMexasEscrow',
@@ -715,16 +719,25 @@ describe('MEXAS flow safety guardrails', () => {
     )
 
     expect(source).toContain(
-      "import { hasOperationalMexasEscrow } from 'common/mexas-settlement'"
+      'getMissingMexasEscrowCapabilities'
     )
     expectMarkersInOrder(source, [
       'const hasOperationalEscrow = hasOperationalMexasEscrow',
       'escrowImplementation,',
       'settlementMode,',
+      'const missingEscrowCapabilities = getMissingMexasEscrowCapabilities()',
       'hasOperationalEscrow',
       'MEXAS on-chain escrow implementation is enabled and implemented.',
-      'order escrow/release code is not implemented yet',
+      'escrow capabilities are missing:',
     ])
+
+    const settlementSource = readRepoFile('common/src/mexas-settlement.ts')
+    expect(settlementSource).toContain(
+      'export const MEXAS_ONCHAIN_ESCROW_CAPABILITIES'
+    )
+    expect(settlementSource).toContain('captureOrderStake: false')
+    expect(settlementSource).toContain('releaseOpenOrderStake: false')
+    expect(settlementSource).toContain('payoutResolvedPositions: false')
   })
 
   test('MEXAS deposit receipt verification uses the shared ERC20 transfer parser', () => {

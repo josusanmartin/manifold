@@ -2,7 +2,10 @@ import { execFileSync } from 'child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
-import { hasOperationalMexasEscrow } from 'common/mexas-settlement'
+import {
+  getMissingMexasEscrowCapabilities,
+  hasOperationalMexasEscrow,
+} from 'common/mexas-settlement'
 import { createClient } from 'common/supabase/utils'
 
 type CheckStatus = 'pass' | 'warn' | 'fail'
@@ -429,6 +432,7 @@ async function runChecks() {
     escrowImplementation,
     settlementMode,
   })
+  const missingEscrowCapabilities = getMissingMexasEscrowCapabilities()
   checks.push(
     matchingMode === 'rpc'
       ? pass('matching mode', 'MEXAS_MATCHING_ENGINE_MODE=rpc.')
@@ -454,7 +458,9 @@ async function runChecks() {
       : fail(
           'escrow implementation',
           escrowImplementation === 'onchain-transfer'
-            ? 'MEXAS_ESCROW_IMPLEMENTATION=onchain-transfer is configured, but the order escrow/release code is not implemented yet.'
+            ? `MEXAS_ESCROW_IMPLEMENTATION=onchain-transfer is configured, but escrow capabilities are missing: ${missingEscrowCapabilities.join(
+                ', '
+              )}.`
             : 'MEXAS_ESCROW_IMPLEMENTATION must be onchain-transfer before live matching or resolving filled MEXAS positions.'
         )
   )

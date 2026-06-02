@@ -2,6 +2,7 @@ import { Bet, LimitBet } from './bet'
 import {
   canMexasMatchCrossingOrders,
   canMexasResolveFilledPositions,
+  getMissingMexasEscrowCapabilities,
   getMexasSettlementAudit,
   hasOperationalMexasEscrow,
   hasMexasFilledExposure,
@@ -170,6 +171,11 @@ describe('MEXAS settlement audit', () => {
       })
     ).toBe(false)
     expect(MEXAS_ONCHAIN_ESCROW_IMPLEMENTED).toBe(false)
+    expect(getMissingMexasEscrowCapabilities()).toEqual([
+      'captureOrderStake',
+      'releaseOpenOrderStake',
+      'payoutResolvedPositions',
+    ])
   })
 
   test('allows resolution with operational escrow or explicit unescrowed override', () => {
