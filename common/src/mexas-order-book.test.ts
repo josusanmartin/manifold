@@ -57,6 +57,18 @@ describe('MEXAS order book matching', () => {
     ])
   })
 
+  test('sorts exact timestamp ties by id', () => {
+    const makers = [
+      order({ id: 'b', outcome: 'NO', limitProb: 0.6, createdTime: 2 }),
+      order({ id: 'a', outcome: 'NO', limitProb: 0.6, createdTime: 2 }),
+    ]
+
+    expect(sortMexasMakersForTaker('YES', makers).map((o) => o.id)).toEqual([
+      'a',
+      'b',
+    ])
+  })
+
   test('matches a YES order against crossing NO asks at maker price', () => {
     const maker = order({
       id: 'ask-70',

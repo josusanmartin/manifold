@@ -1,5 +1,6 @@
 import { ChartBarIcon, UserIcon } from '@heroicons/react/solid'
 import { Contract } from 'common/contract'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { formatWithToken, shortFormatNumber } from 'common/util/format'
 import { Row } from 'web/components/layout/row'
 import { MoneyDisplay } from '../bet/money-display'
@@ -18,6 +19,7 @@ export function ContractSummaryStats(props: {
 }) {
   const { financeContract: contract, editable, isCashContract } = props
   const { outcomeType } = contract
+  const isMexasMarket = isMexasOrderBookOnlyContract(contract)
   return (
     <>
       {outcomeType == 'BOUNTIED_QUESTION' ? (
@@ -37,12 +39,17 @@ export function ContractSummaryStats(props: {
             <UserIcon className="text-ink-500 h-4 w-4" />
             <div>{shortFormatNumber(contract.uniqueBettorCount ?? 0)}</div>
           </Tooltip>
-          <LiquidityTooltip contract={contract} iconClassName="text-ink-500" />
+          {!isMexasMarket && (
+            <LiquidityTooltip
+              contract={contract}
+              iconClassName="text-ink-500"
+            />
+          )}
           {!!contract.volume && (
             <Tooltip
               text={`Volumen total operado: ${formatWithToken({
                 amount: contract.volume,
-                token: isCashContract ? 'CASH' : 'M$',
+                token: isCashContract ? 'CASH' : isMexasMarket ? 'MEX' : 'M$',
               })}`}
               placement="bottom"
               className="flex flex-row items-center gap-0.5"
@@ -53,6 +60,7 @@ export function ContractSummaryStats(props: {
                 amount={contract.volume}
                 isCashContract={!!isCashContract}
                 numberType="short"
+                token={isMexasMarket ? 'MEX' : undefined}
               />
             </Tooltip>
           )}

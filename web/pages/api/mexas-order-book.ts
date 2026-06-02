@@ -2,6 +2,7 @@ import type { Bet } from 'common/bet'
 import { convertBet } from 'common/supabase/bets'
 import { createClient, type Row } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { releaseExpiredMexasOrders } from 'web/lib/api/mexas-orders'
 
 type ErrorResponse = { message: string }
 
@@ -49,6 +50,8 @@ export default async function handler(
   try {
     const db = getSupabaseAdminClient()
     const now = new Date().toISOString()
+    await releaseExpiredMexasOrders(db, { contractId })
+
     const { data, error } = await db
       .from('contract_bets')
       .select('*')

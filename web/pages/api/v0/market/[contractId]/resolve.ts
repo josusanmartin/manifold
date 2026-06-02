@@ -17,12 +17,14 @@ import {
   type SupabaseClient,
 } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
 import { z } from 'zod'
 
 type ErrorResponse = { message: string; details?: unknown }
 
-const BALANCE_UPDATE_ATTEMPTS = 5
 const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
+const CONTRACT_BETS_PAGE_SIZE = 1000
+const ORDER_LOCK_TIMEOUT_MS = 30 * 1000
 
 let privyClient: PrivyClient | undefined
 
@@ -94,36 +96,19 @@ function hasFreshResolutionLock(data: Record<string, unknown>) {
   return resolving && Date.now() - since < RESOLUTION_LOCK_TIMEOUT_MS
 }
 
-async function addUserBalanceCas(
-  db: SupabaseClient,
-  userId: string,
-  amount: number
-) {
-  if (amount <= 0) return
+function hasFreshOrderLock(data: Record<string, unknown>) {
+  const locked = data.mexasOrderLock === true
+  const since =
+    typeof data.mexasOrderLockSince === 'number' ? data.mexasOrderLockSince : 0
 
-  for (let attempt = 0; attempt < BALANCE_UPDATE_ATTEMPTS; attempt++) {
-    const { data: userRow, error: userReadError } = await db
-      .from('users')
-      .select('id,balance')
-      .eq('id', userId)
-      .single()
+  return locked && Date.now() - since < ORDER_LOCK_TIMEOUT_MS
+}
 
-    if (userReadError) throw userReadError
-    if (!userRow) throw new APIError(404, 'User not found.')
-
-    const { data: updatedUserRow, error: userUpdateError } = await db
-      .from('users')
-      .update({ balance: userRow.balance + amount })
-      .eq('id', userId)
-      .eq('balance', userRow.balance)
-      .select('id')
-      .maybeSingle()
-
-    if (userUpdateError) throw userUpdateError
-    if (updatedUserRow) return
-  }
-
-  throw new APIError(503, 'Balance changed. Please try again.')
+function getResolutionLockOutcome(data: Record<string, unknown>) {
+  const outcome = data.mexasResolvingOutcome
+  return outcome === 'YES' || outcome === 'NO' || outcome === 'CANCEL'
+    ? outcome
+    : undefined
 }
 
 function getResolvedBetPayout(bet: Bet, outcome: resolution) {
@@ -156,7 +141,8 @@ async function loadContractRows(db: SupabaseClient, contractId: string) {
 
 async function closeContractForResolution(
   db: SupabaseClient,
-  contractRow: Row<'contracts'>
+  contractRow: Row<'contracts'>,
+  outcome: resolution
 ) {
   const contractData = getRowData(contractRow)
   const now = Date.now()
@@ -170,6 +156,7 @@ async function closeContractForResolution(
         lastUpdatedTime: now,
         mexasResolving: true,
         mexasResolvingSince: now,
+        mexasResolvingOutcome: outcome,
       } as any,
       last_updated_time: millisToTs(now),
     })
@@ -190,17 +177,24 @@ async function closeContractForResolution(
 }
 
 async function loadContractBets(db: SupabaseClient, contractId: string) {
-  const { data, error } = await db
-    .from('contract_bets')
-    .select('*')
-    .eq('contract_id', contractId)
-    .order('created_time', { ascending: true })
-    .limit(5000)
+  const rows: Row<'contract_bets'>[] = []
 
-  if (error) throw error
-  return (data ?? []).map((row) => ({
-    row: row as Row<'contract_bets'>,
-    bet: convertBet(row as Row<'contract_bets'>),
+  for (let from = 0; ; from += CONTRACT_BETS_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('contract_bets')
+      .select('*')
+      .eq('contract_id', contractId)
+      .order('created_time', { ascending: true })
+      .range(from, from + CONTRACT_BETS_PAGE_SIZE - 1)
+
+    if (error) throw error
+    rows.push(...((data ?? []) as Row<'contract_bets'>[]))
+    if ((data ?? []).length < CONTRACT_BETS_PAGE_SIZE) break
+  }
+
+  return rows.map((row) => ({
+    row,
+    bet: convertBet(row),
   }))
 }
 
@@ -261,13 +255,25 @@ async function resolveMexasMarket(
   if (contract.isResolved) {
     throw new APIError(403, 'Contract already resolved.')
   }
-  if (hasFreshResolutionLock(getRowData(initialContractRow))) {
+  const initialContractData = getRowData(initialContractRow)
+  const lockedOutcome = getResolutionLockOutcome(initialContractData)
+  if (lockedOutcome && lockedOutcome !== outcome) {
+    throw new APIError(
+      403,
+      `Resolution is already locked for ${lockedOutcome}.`
+    )
+  }
+  if (hasFreshOrderLock(initialContractData)) {
+    throw new APIError(503, 'Order placement is in progress. Please retry.')
+  }
+  if (hasFreshResolutionLock(initialContractData)) {
     throw new APIError(503, 'Resolution already in progress. Please retry.')
   }
 
   const closedContractRow = await closeContractForResolution(
     db,
-    initialContractRow
+    initialContractRow,
+    outcome
   )
   const bets = await loadContractBets(db, contractId)
   const payoutsByUser = new Map<string, number>()
@@ -285,7 +291,9 @@ async function resolveMexasMarket(
   }
 
   for (const [payUserId, payout] of payoutsByUser) {
-    await addUserBalanceCas(db, payUserId, payout)
+    await updateMexasUserBalanceCas(db, payUserId, payout, {
+      creditKey: `mexas-resolution:${contractId}:${outcome}`,
+    })
   }
 
   await Promise.all(bets.map((entry) => releaseOpenOrder(db, entry)))

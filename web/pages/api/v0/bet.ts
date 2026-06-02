@@ -28,6 +28,8 @@ import {
 import { removeUndefinedProps } from 'common/util/object'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { isAddress, type Address } from 'viem'
+import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
+import { releaseExpiredMexasOrders } from 'web/lib/api/mexas-orders'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
 
@@ -37,6 +39,11 @@ const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
 const BALANCE_UPDATE_ATTEMPTS = 5
 const MATCH_ATTEMPTS = 50
+const ORDER_PAGE_SIZE = 1000
+const ORDER_LOCK_ATTEMPTS = 20
+const ORDER_LOCK_RETRY_MS = 100
+const ORDER_LOCK_TIMEOUT_MS = 30 * 1000
+const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
 const EPSILON = 1e-9
 
 let privyClient: PrivyClient | undefined
@@ -98,6 +105,26 @@ function getUserData(row: Row<'users'> | null) {
 function getContractData(row: Row<'contracts'> | null) {
   const data = row?.data
   return data && typeof data === 'object' && !Array.isArray(data) ? data : {}
+}
+
+function hasFreshMexasOrderLock(data: Record<string, unknown>) {
+  const locked = data.mexasOrderLock === true
+  const since =
+    typeof data.mexasOrderLockSince === 'number' ? data.mexasOrderLockSince : 0
+
+  return locked && Date.now() - since < ORDER_LOCK_TIMEOUT_MS
+}
+
+function hasFreshMexasResolutionLock(data: Record<string, unknown>) {
+  const locked = data.mexasResolving === true
+  const since =
+    typeof data.mexasResolvingSince === 'number' ? data.mexasResolvingSince : 0
+
+  return locked && Date.now() - since < RESOLUTION_LOCK_TIMEOUT_MS
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function parseSyncedMexasUnits(data: Record<string, unknown>) {
@@ -262,11 +289,12 @@ function createMexasOpenLimitBet(
 async function refundMexasReservation(
   db: SupabaseClient,
   userId: string,
-  amount: number
+  amount: number,
+  creditKey: string
 ) {
   if (amount <= 0) return
 
-  await updateUserBalanceCas(db, userId, amount)
+  await updateMexasUserBalanceCas(db, userId, amount, { creditKey })
 }
 
 async function updateUserBalanceCas(
@@ -311,6 +339,107 @@ async function updateUserBalanceCas(
   }
 
   throw new APIError(503, 'Balance changed. Please try again.')
+}
+
+async function acquireMexasOrderLock(db: SupabaseClient, contractId: string) {
+  const lockOwner = getNewBetId()
+
+  for (let attempt = 0; attempt < ORDER_LOCK_ATTEMPTS; attempt++) {
+    const { data: contractRow, error: readError } = await db
+      .from('contracts')
+      .select('*')
+      .eq('id', contractId)
+      .single()
+
+    if (readError) throw readError
+    if (!contractRow) throw new APIError(404, 'Contract not found.')
+
+    const typedContractRow = contractRow as Row<'contracts'>
+    const contract = convertContract(typedContractRow) as MarketContract
+    const contractData = getContractData(typedContractRow)
+
+    if (contract.closeTime && Date.now() > contract.closeTime) {
+      throw new APIError(403, 'Trading is closed.')
+    }
+    if (contract.isResolved) throw new APIError(403, 'Market is resolved.')
+    if (hasFreshMexasResolutionLock(contractData)) {
+      throw new APIError(503, 'Market resolution is in progress.')
+    }
+    if (hasFreshMexasOrderLock(contractData)) {
+      await sleep(ORDER_LOCK_RETRY_MS)
+      continue
+    }
+
+    const now = Date.now()
+    let query = db
+      .from('contracts')
+      .update({
+        data: {
+          ...contractData,
+          mexasOrderLock: true,
+          mexasOrderLockOwner: lockOwner,
+          mexasOrderLockSince: now,
+          lastUpdatedTime: now,
+        } as any,
+        last_updated_time: millisToTs(now),
+      })
+      .eq('id', contractId)
+
+    query = typedContractRow.last_updated_time
+      ? query.eq('last_updated_time', typedContractRow.last_updated_time)
+      : query.is('last_updated_time', null)
+
+    const { data: lockedRow, error: updateError } = await query
+      .select()
+      .maybeSingle()
+
+    if (updateError) throw updateError
+    if (lockedRow) {
+      return {
+        contract: convertContract(
+          lockedRow as Row<'contracts'>
+        ) as MarketContract,
+        contractRow: lockedRow as Row<'contracts'>,
+        lockOwner,
+      }
+    }
+
+    await sleep(ORDER_LOCK_RETRY_MS)
+  }
+
+  throw new APIError(503, 'Order book is busy. Please try again.')
+}
+
+async function releaseMexasOrderLock(
+  db: SupabaseClient,
+  contractId: string,
+  lockOwner: string
+) {
+  const { data: contractRow, error: readError } = await db
+    .from('contracts')
+    .select('*')
+    .eq('id', contractId)
+    .single()
+
+  if (readError || !contractRow) return
+
+  const data = getContractData(contractRow as Row<'contracts'>)
+  if (data.mexasOrderLockOwner !== lockOwner) return
+
+  const now = Date.now()
+  await db
+    .from('contracts')
+    .update({
+      data: {
+        ...data,
+        mexasOrderLock: false,
+        mexasOrderLockOwner: null,
+        mexasOrderLockSince: null,
+        lastUpdatedTime: now,
+      } as any,
+      last_updated_time: millisToTs(now),
+    })
+    .eq('id', contractId)
 }
 
 function getContractUpdate(
@@ -381,18 +510,25 @@ async function loadMexasCrossingOrderRows(
   outcome: MexasOutcome,
   limitProb: number
 ) {
-  const { data, error } = await db
-    .from('contract_bets')
-    .select('*')
-    .eq('contract_id', contractId)
-    .eq('is_filled', false)
-    .eq('is_cancelled', false)
-    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
-    .limit(500)
+  const data: Row<'contract_bets'>[] = []
+  const now = new Date().toISOString()
 
-  if (error) throw error
+  for (let from = 0; ; from += ORDER_PAGE_SIZE) {
+    const { data: page, error } = await db
+      .from('contract_bets')
+      .select('*')
+      .eq('contract_id', contractId)
+      .eq('is_filled', false)
+      .eq('is_cancelled', false)
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .range(from, from + ORDER_PAGE_SIZE - 1)
 
-  const rows = (data ?? [])
+    if (error) throw error
+    data.push(...((page ?? []) as Row<'contract_bets'>[]))
+    if ((page ?? []).length < ORDER_PAGE_SIZE) break
+  }
+
+  const rows = data
     .map((row) => ({
       row: row as Row<'contract_bets'>,
       bet: convertBet(row as Row<'contract_bets'>),
@@ -582,6 +718,7 @@ async function placeBinaryBet(
   const userId = await getPrivyUserId(req)
   const params = API.bet.props.parse(req.body)
   const db = getSupabaseAdminClient()
+  await releaseExpiredMexasOrders(db, { userId })
 
   const [
     { data: userRow, error: userError },
@@ -619,59 +756,82 @@ async function placeBinaryBet(
   }
 
   if (isMexasOrderBookOnlyContract(contract)) {
-    const bet = createMexasOpenLimitBet(
-      contract as MarketContract & { prob: number },
-      params,
-      userId
-    ) as LimitBet & { outcome: MexasOutcome }
-
-    if (params.dryRun) {
-      const makerRows = await loadMexasCrossingOrderRows(
-        db,
-        params.contractId,
-        bet.outcome,
-        bet.limitProb
-      )
-      const simulated = matchMexasLimitOrder({
-        amount: bet.orderAmount,
-        limitProb: bet.limitProb,
-        makers: makerRows.map((entry) => entry.bet),
-        outcome: bet.outcome,
-        takerBetId: 'dry-run',
-        timestamp: Date.now(),
-      })
-      return res.status(200).json({
-        ...bet,
-        amount: simulated.takerAmount,
-        shares: simulated.takerShares,
-        fills: simulated.takerFills,
-        isFilled: simulated.remainingAmount <= EPSILON,
-        betId: 'dry-run',
-      })
-    }
-
-    const reservedAmount = getMexasRemainingReservedAmount(bet)
-    await updateUserBalanceCas(db, userId, -reservedAmount, {
-      lastBetTime: bet.createdTime,
-    })
+    const lock = await acquireMexasOrderLock(db, params.contractId)
+    let bet: (LimitBet & { outcome: MexasOutcome }) | undefined
+    let reservedAmount = 0
+    let debited = false
+    let inserted = false
 
     try {
+      const lockedContract = lock.contract
+      bet = createMexasOpenLimitBet(
+        lockedContract as MarketContract & { prob: number },
+        params,
+        userId
+      ) as LimitBet & { outcome: MexasOutcome }
+
+      if (params.dryRun) {
+        const makerRows = await loadMexasCrossingOrderRows(
+          db,
+          params.contractId,
+          bet.outcome,
+          bet.limitProb
+        )
+        const simulated = matchMexasLimitOrder({
+          amount: bet.orderAmount,
+          limitProb: bet.limitProb,
+          makers: makerRows.map((entry) => entry.bet),
+          outcome: bet.outcome,
+          takerBetId: 'dry-run',
+          timestamp: Date.now(),
+        })
+        return res.status(200).json({
+          ...bet,
+          amount: simulated.takerAmount,
+          shares: simulated.takerShares,
+          fills: simulated.takerFills,
+          isFilled: simulated.remainingAmount <= EPSILON,
+          betId: 'dry-run',
+        })
+      }
+
+      reservedAmount = getMexasRemainingReservedAmount(bet)
+      await updateUserBalanceCas(db, userId, -reservedAmount, {
+        lastBetTime: bet.createdTime,
+      })
+      debited = true
+
       const { error: betError } = await db
         .from('contract_bets')
         .insert(betToRow(bet))
       if (betError) throw betError
+      inserted = true
+
+      const matchedBet = await matchMexasOrder(db, bet)
+      await updateMexasContractAfterOrder(
+        db,
+        lock.contractRow,
+        lockedContract,
+        matchedBet
+      )
+
+      return res.status(200).json({
+        ...matchedBet,
+        betId: matchedBet.id,
+      } as LimitBet)
     } catch (error) {
-      await refundMexasReservation(db, userId, reservedAmount)
+      if (debited && !inserted && bet) {
+        await refundMexasReservation(
+          db,
+          userId,
+          reservedAmount,
+          `mexas-insert-refund:${bet.id}`
+        )
+      }
       throw error
+    } finally {
+      await releaseMexasOrderLock(db, params.contractId, lock.lockOwner)
     }
-
-    const matchedBet = await matchMexasOrder(db, bet)
-    await updateMexasContractAfterOrder(db, contractRow, contract, matchedBet)
-
-    return res.status(200).json({
-      ...matchedBet,
-      betId: matchedBet.id,
-    } as LimitBet)
   }
 
   const unfilledBets = await loadUnfilledLimitBets(

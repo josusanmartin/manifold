@@ -19,7 +19,7 @@ const formatterWithFraction = new Intl.NumberFormat('en-US', {
 
 export const SWEEPIES_MONIKER = '𝕊'
 
-export type InputTokenType = 'M$' | 'SPICE' | 'CASH' | 'MANA'
+export type InputTokenType = 'M$' | 'SPICE' | 'CASH' | 'MANA' | 'MEX'
 
 export function formatWithToken(variables: {
   amount: number
@@ -30,6 +30,17 @@ export function formatWithToken(variables: {
   const { amount, token, toDecimal, short } = variables
   if (token === 'CASH') {
     return formatSweepies(amount, { toDecimal, short })
+  }
+  if (token === 'MEX') {
+    const formatted = short
+      ? formatLargeNumber(amount)
+      : toDecimal
+      ? amount.toLocaleString('en-US', {
+          maximumFractionDigits: toDecimal,
+          minimumFractionDigits: toDecimal,
+        })
+      : formatNumber(getMoneyNumber(amount))
+    return `MEX ${formatted}`
   }
   if (toDecimal) {
     return formatMoneyWithDecimals(amount)

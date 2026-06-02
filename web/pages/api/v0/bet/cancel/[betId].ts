@@ -11,10 +11,9 @@ import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import { createClient, type Row } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
 
 type ErrorResponse = { message: string }
-const BALANCE_UPDATE_ATTEMPTS = 5
-const EPSILON = 1e-9
 
 let privyClient: PrivyClient | undefined
 
@@ -76,41 +75,34 @@ function getBetData(row: Row<'contract_bets'>) {
   return data && typeof data === 'object' && !Array.isArray(data) ? data : {}
 }
 
-async function addUserBalanceCas(
+async function releaseMexasCancelledOrderFunds(
   db: ReturnType<typeof getSupabaseAdminClient>,
+  betRow: Row<'contract_bets'>,
   userId: string,
-  amount: number
+  refundAmount: number,
+  creditKey: string
 ) {
-  if (amount <= 0) return
-
-  for (let attempt = 0; attempt < BALANCE_UPDATE_ATTEMPTS; attempt++) {
-    const { data: userRow, error: userReadError } = await db
-      .from('users')
-      .select('id,balance')
-      .eq('id', userId)
-      .single()
-
-    if (userReadError) throw userReadError
-    if (!userRow) throw new APIError(404, 'User not found.')
-
-    const nextBalance = userRow.balance + amount
-    if (nextBalance < -EPSILON) {
-      throw new APIError(403, 'Invalid balance update.')
-    }
-
-    const { data: updatedUserRow, error: userUpdateError } = await db
-      .from('users')
-      .update({ balance: nextBalance })
-      .eq('id', userId)
-      .eq('balance', userRow.balance)
-      .select('id')
-      .maybeSingle()
-
-    if (userUpdateError) throw userUpdateError
-    if (updatedUserRow) return
+  if (refundAmount > 0) {
+    await updateMexasUserBalanceCas(db, userId, refundAmount, { creditKey })
   }
 
-  throw new APIError(503, 'Balance changed. Please try again.')
+  const data = getBetData(betRow)
+  const { data: releasedBetRow, error } = await db
+    .from('contract_bets')
+    .update({
+      data: {
+        ...data,
+        isCancelled: true,
+        mexasFundsReleased: true,
+        mexasReleaseCreditKey: refundAmount > 0 ? creditKey : undefined,
+      } as any,
+    })
+    .eq('bet_id', betRow.bet_id)
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  return (releasedBetRow ?? betRow) as Row<'contract_bets'>
 }
 
 export default async function handler(
@@ -137,7 +129,8 @@ export default async function handler(
     if (readError) throw readError
     if (!betRow) throw new APIError(404, 'Bet not found.')
 
-    const bet = convertBet(betRow as Row<'contract_bets'>)
+    const typedBetRow = betRow as Row<'contract_bets'>
+    const bet = convertBet(typedBetRow)
     if (bet.userId !== userId) {
       throw new APIError(403, 'You can only cancel your own orders.')
     }
@@ -145,10 +138,6 @@ export default async function handler(
       throw new APIError(403, 'Not a limit order. Cannot cancel.')
     }
     const limitBet = bet as LimitBet
-    if (bet.isCancelled) throw new APIError(403, 'Order already cancelled.')
-    if (limitBet.isFilled || limitBet.amount >= limitBet.orderAmount) {
-      throw new APIError(403, 'Order already filled.')
-    }
 
     const { data: contractRow, error: contractError } = await db
       .from('contracts')
@@ -163,9 +152,8 @@ export default async function handler(
     if (contract.isResolved) {
       throw new APIError(403, 'Market is resolved.')
     }
-    const betData = getBetData(
-      betRow as Row<'contract_bets'>
-    ) as MexasReservedOrderData & Record<string, unknown>
+    const betData = getBetData(typedBetRow) as MexasReservedOrderData &
+      Record<string, unknown>
     const shouldReleaseMexasFunds =
       isMexasOrderBookOnlyContract(contract) &&
       betData.mexasFundsReserved === true &&
@@ -177,6 +165,24 @@ export default async function handler(
           mexasReservedAmount: betData.mexasReservedAmount,
         })
       : 0
+    const creditKey = `mexas-cancel:${bet.id}`
+
+    if (bet.isCancelled) {
+      if (shouldReleaseMexasFunds) {
+        const releasedBetRow = await releaseMexasCancelledOrderFunds(
+          db,
+          typedBetRow,
+          userId,
+          refundAmount,
+          creditKey
+        )
+        return res.status(200).json(convertBet(releasedBetRow) as LimitBet)
+      }
+      throw new APIError(403, 'Order already cancelled.')
+    }
+    if (limitBet.isFilled || limitBet.amount >= limitBet.orderAmount) {
+      throw new APIError(403, 'Order already filled.')
+    }
 
     const { data: updatedBetRow, error: updateError } = await db
       .from('contract_bets')
@@ -185,13 +191,11 @@ export default async function handler(
         data: {
           ...betData,
           isCancelled: true,
-          mexasFundsReleased: shouldReleaseMexasFunds
-            ? true
-            : betData.mexasFundsReleased,
+          mexasFundsReleased: betData.mexasFundsReleased,
         },
       })
       .eq('bet_id', betId)
-      .eq('updated_time', (betRow as Row<'contract_bets'>).updated_time)
+      .eq('updated_time', typedBetRow.updated_time)
       .eq('is_cancelled', false)
       .select()
       .maybeSingle()
@@ -201,13 +205,19 @@ export default async function handler(
       throw new APIError(503, 'Order changed. Please refresh and try again.')
     }
 
-    if (refundAmount > 0) {
-      await addUserBalanceCas(db, userId, refundAmount)
-    }
+    const releasedBetRow = shouldReleaseMexasFunds
+      ? await releaseMexasCancelledOrderFunds(
+          db,
+          updatedBetRow as Row<'contract_bets'>,
+          userId,
+          refundAmount,
+          creditKey
+        )
+      : (updatedBetRow as Row<'contract_bets'>)
 
     return res
       .status(200)
-      .json(convertBet(updatedBetRow as Row<'contract_bets'>) as LimitBet)
+      .json(convertBet(releasedBetRow as Row<'contract_bets'>) as LimitBet)
   } catch (error) {
     console.error('MEXAS cancel order failed', error)
 

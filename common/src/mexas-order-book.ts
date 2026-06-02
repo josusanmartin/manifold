@@ -75,7 +75,9 @@ export function sortMexasMakersForTaker(
         : b.limitProb - a.limitProb
 
     if (Math.abs(priceDiff) > EPSILON) return priceDiff
-    return a.createdTime - b.createdTime
+    const timeDiff = a.createdTime - b.createdTime
+    if (timeDiff !== 0) return timeDiff
+    return a.id.localeCompare(b.id)
   })
 }
 

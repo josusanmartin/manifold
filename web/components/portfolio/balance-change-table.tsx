@@ -714,13 +714,13 @@ const txnTitle = (change: TxnBalanceChange) => {
       return `Redeem prize points for MEX`
     case 'CONVERT_CASH':
     case 'CONVERT_CASH_DONE':
-      return 'Redeem sweepcash for mana'
+      return 'Convert sweepcash to MEX'
     case 'CASH_OUT':
       return 'Redemption request'
     case 'CASH_BONUS':
       return 'Sweepcash bonus'
     case 'KYC_BONUS':
-      return 'ID verification bonus'
+      return 'Account bonus'
     case 'CONTRACT_RESOLUTION_FEE':
     case 'UNDO_CONTRACT_RESOLUTION_FEE':
       return ''

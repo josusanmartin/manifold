@@ -24,20 +24,17 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import { UserBetsTable } from 'web/components/bet/user-bets-table'
-import { FollowButton } from 'web/components/buttons/follow-button'
 import { TextButton } from 'web/components/buttons/text-button'
 import { UserSettingButton } from 'web/components/buttons/user-settings-button'
 import { BackButton } from 'web/components/contract/back-button'
 import { FollowList } from 'web/components/follow-list'
 import { JsonLd } from 'web/components/JsonLd'
-import { ManaCircleIcon } from 'web/components/icons/mana-circle-icon'
 import { Col } from 'web/components/layout/col'
 import { Modal } from 'web/components/layout/modal'
 import { Page } from 'web/components/layout/page'
 import { Row } from 'web/components/layout/row'
 import { Spacer } from 'web/components/layout/spacer'
 import { QueryUncontrolledTabs, Tabs } from 'web/components/layout/tabs'
-import { SendMessageButton } from 'web/components/messaging/send-message-button'
 import { BalanceChangeTable } from 'web/components/portfolio/balance-change-table'
 import { PortfolioSummary } from 'web/components/portfolio/portfolio-summary'
 import { PortfolioValueSection } from 'web/components/portfolio/portfolio-value-section'
@@ -47,7 +44,6 @@ import { UserContractsList } from 'web/components/profile/user-contracts-list'
 import { UserLikedContractsButton } from 'web/components/profile/user-liked-contracts-button'
 import { UserWatchedContractsButton } from 'web/components/notifications/watched-markets'
 import { SEO } from 'web/components/SEO'
-import { UserHandles } from 'web/components/user/user-handles'
 import { Avatar } from 'web/components/widgets/avatar'
 import { FullscreenConfetti } from 'web/components/widgets/fullscreen-confetti'
 import ImageWithBlurredShadow from 'web/components/widgets/image-with-blurred-shadow'
@@ -200,11 +196,11 @@ function UserProfile(props: {
   const { ref: titleRef, headerStuck } = useHeaderIsStuck()
 
   useEffect(() => {
-    const claimedMana = router.query['claimed-mana'] === 'yes'
-    setShowConfetti(claimedMana)
+    const claimedMex = router.query['claimed-mex'] === 'yes'
+    setShowConfetti(claimedMex)
     const query = { ...router.query }
-    if (query.claimedMana || query.show) {
-      const queriesToDelete = ['claimed-mana', 'show', 'badge']
+    if (query['claimed-mex'] || query.show) {
+      const queriesToDelete = ['claimed-mex', 'show', 'badge']
       queriesToDelete.forEach((key) => delete query[key])
       router.replace(
         {
@@ -374,12 +370,6 @@ function UserProfile(props: {
           )}
 
           <Row className={'items-center gap-1 sm:gap-2'}>
-            {!isCurrentUser && (
-              <>
-                <SendMessageButton toUser={user} currentUser={currentUser} />
-                <FollowButton userId={user.id} />
-              </>
-            )}
             {!isMobile && <UserSettingButton user={user} />}
           </Row>
         </Row>
@@ -391,12 +381,6 @@ function UserProfile(props: {
                 <Linkify text={user.bio}></Linkify>
               </div>
             )}
-            <UserHandles
-              website={user.website}
-              twitterHandle={user.twitterHandle}
-              discordHandle={user.discordHandle}
-              className="mt-2"
-            />
           </Col>
         )}
 
@@ -418,16 +402,16 @@ function UserProfile(props: {
             }
             tabs={buildArray(
               {
-                title: 'Summary',
+                title: 'Resumen',
                 queryString: 'summary',
                 prerender: true,
                 stackedTabIcon: <PresentationChartLineIcon className="h-5" />,
                 content: <PortfolioSummary className="mt-4" user={user} />,
               },
               !!user.lastBetTime && {
-                title: 'Trades',
+                title: 'Operaciones',
                 prerender: true,
-                stackedTabIcon: <ManaCircleIcon className="h-5 w-5" />,
+                stackedTabIcon: <ViewListIcon className="h-5 w-5" />,
                 content: (
                   <>
                     <Spacer h={2} />
@@ -441,7 +425,7 @@ function UserProfile(props: {
                         />
 
                         <div className="text-ink-800 border-ink-300 mx-2 mt-6 gap-2 border-t pt-4 text-xl font-semibold lg:mx-0">
-                          Trades
+                          Operaciones
                         </div>
 
                         <Spacer h={4} />
@@ -452,7 +436,7 @@ function UserProfile(props: {
                 ),
               },
               hasCreatedQuestion && {
-                title: 'Questions',
+                title: 'Mercados',
                 prerender: true,
                 stackedTabIcon: <ScaleIcon className="h-5" />,
                 content: (
@@ -468,7 +452,7 @@ function UserProfile(props: {
                 ),
               },
               {
-                title: 'Balance log',
+                title: 'Movimientos',
                 stackedTabIcon: <ViewListIcon className="h-5" />,
                 content: <BalanceChangeTable user={user} />,
                 queryString: balanceChangesKey,
@@ -523,13 +507,13 @@ function ProfilePublicStats(props: {
         <span className={clsx('font-semibold')}>
           {followingIds?.length ?? ''}
         </span>{' '}
-        Following
+        Siguiendo
       </TextButton>
       <TextButton onClick={() => openFollowsDialog('followers')}>
         <span className={clsx('font-semibold')}>
           {followerIds?.length ?? ''}
         </span>{' '}
-        Followers
+        Seguidores
       </TextButton>
 
       {isCurrentUser && <UserLikedContractsButton user={user} />}
@@ -552,11 +536,6 @@ function ProfilePublicStats(props: {
           Rank {leagueInfo.rank}
         </Link>
       )}
-
-      <Link className={linkClass} href={`/${user.username}/calibration`}>
-        <PresentationChartLineIcon className="mb-1 mr-1 inline h-4 w-4" />
-        Calibration
-      </Link>
 
       {/* {isCurrentUser && (
         <Link href={`/${user.username}/partner`} className={linkClass}>
