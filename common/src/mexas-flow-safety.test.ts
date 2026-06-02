@@ -649,6 +649,37 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('production smoke covers broad legacy API blockers', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-production-smoke.ts'
+    )
+
+    for (const path of [
+      '/api/v0/comment',
+      '/api/v0/comments',
+      '/api/v0/create-post-comment',
+      '/api/v0/purchase-boost',
+      '/api/v0/get-mana-supply',
+      '/api/v0/get-mana-summary-stats',
+      '/api/v0/manalink',
+      '/api/v0/claimmanalink',
+      '/api/v0/create-idenfy-session',
+      '/api/v0/get-verification-status-gidx',
+      '/api/v0/get-market-loan-max',
+      '/api/v0/market/mexwcwin26a/add-liquidity',
+      '/api/v0/market/mexwcwin26a/add-bounty',
+      '/api/v0/get-predictle-result',
+      '/api/v0/admin-create-sweepstakes',
+      '/api/v0/buy-sweepstakes-tickets',
+      '/api/v0/shop-purchase',
+    ]) {
+      expect(source).toContain(`'${path}'`)
+    }
+    expect(source).toContain(
+      'Promise.all(BLOCKED_API_PATHS.map(checkBlockedApi))'
+    )
+  })
+
   test('renders order book remaining sizes from canonical filled amount', () => {
     const panelSource = readRepoFile(
       'web/components/contract/order-book-panel.tsx'

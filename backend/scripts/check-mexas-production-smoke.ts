@@ -119,11 +119,76 @@ const REDIRECTS = [
 
 const BLOCKED_API_PATHS = [
   '/api/v0/comment',
+  '/api/v0/comments',
+  '/api/v0/comment-thread',
+  '/api/v0/comment-reactions',
+  '/api/v0/create-post-comment',
+  '/api/v0/create-post',
+  '/api/v0/edit-comment',
+  '/api/v0/hide-comment',
+  '/api/v0/pin-comment',
+  '/api/v0/post',
+  '/api/v0/record-comment-view',
+  '/api/v0/react',
+  '/api/v0/update-post',
+  '/api/v0/user-comments',
+  '/api/v0/create-public-chat-message',
+  '/api/v0/follow-contract',
+  '/api/v0/follow-post',
+  '/api/v0/get-feed',
+  '/api/v0/get-channel-messages',
+  '/api/v0/get-unified-feed',
+  '/api/v0/purchase-boost',
+  '/api/v0/remove-boost',
+  '/api/v0/get-boost-history',
+  '/api/v0/managram',
+  '/api/v0/managrams',
+  '/api/v0/manalink',
+  '/api/v0/claimmanalink',
   '/api/v0/deployment-id',
+  '/api/v0/get-mana-supply',
   '/api/v0/get-mana-summary-stats',
+  '/api/v0/get-active-user-mana-stats',
+  '/api/v0/convert-cash-to-mana',
+  '/api/v0/convert-sp-to-mana',
+  '/api/v0/create-daimo-session',
+  '/api/v0/get-crypto-purchase-status',
+  '/api/v0/record-mexas-purchase',
+  '/api/v0/create-idenfy-session',
+  '/api/v0/get-idenfy-status',
+  '/api/v0/get-verification-status-gidx',
+  '/api/v0/get-verification-documents-gidx',
+  '/api/v0/register-gidx',
+  '/api/v0/upload-document-gidx',
+  '/api/v0/claim-free-loan',
+  '/api/v0/get-free-loan-available',
   '/api/v0/get-market-loan-max',
+  '/api/v0/get-next-loan-amount',
+  '/api/v0/get-total-loan-amount',
+  '/api/v0/repay-loan',
+  '/api/v0/request-loan',
   '/api/v0/search-markets-full',
   '/api/v0/user/by-id/balance',
+  '/api/v0/market/mexwcwin26a/add-liquidity',
+  '/api/v0/market/mexwcwin26a/remove-liquidity',
+  '/api/v0/market/mexwcwin26a/add-bounty',
+  '/api/v0/market/mexwcwin26a/award-bounty',
+  '/api/v0/market/mexwcwin26a/answer',
+  '/api/v0/get-predictle-result',
+  '/api/v0/save-predictle-result',
+  '/api/v0/admin-create-charity-giveaway',
+  '/api/v0/admin-create-sweepstakes',
+  '/api/v0/admin-get-prize-claims',
+  '/api/v0/buy-charity-giveaway-tickets',
+  '/api/v0/buy-sweepstakes-tickets',
+  '/api/v0/claim-free-sweepstakes-ticket',
+  '/api/v0/claim-sweepstakes-prize',
+  '/api/v0/get-charity-giveaway',
+  '/api/v0/get-sweepstakes',
+  '/api/v0/get-sweepstakes-prize-claim',
+  '/api/v0/get-ticket-stock',
+  '/api/v0/shop-purchase',
+  '/api/v0/toggle-merch-stock',
 ]
 
 function pass(name: string, details: string): SmokeResult {
@@ -307,9 +372,7 @@ async function runSmoke() {
     results.push(await checkRedirect(redirect.path, redirect.destination))
   }
 
-  for (const path of BLOCKED_API_PATHS) {
-    results.push(await checkBlockedApi(path))
-  }
+  results.push(...(await Promise.all(BLOCKED_API_PATHS.map(checkBlockedApi))))
 
   results.push(await checkOrderBook('mexwcwin26a'))
   results.push(await checkOrderBook('ukrwarend26a'))
