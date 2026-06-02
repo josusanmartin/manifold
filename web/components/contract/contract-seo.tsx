@@ -7,6 +7,7 @@ import { JsonLd } from 'web/components/JsonLd'
 import { SEO } from 'web/components/SEO'
 import { buildMarketQAPage, buildBreadcrumbs } from 'web/lib/json-ld'
 import { MEXAS_SITE_URL } from 'web/lib/mexas-brand'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 
 export function ContractSEO(props: {
   contract: Contract
@@ -54,7 +55,10 @@ export function ContractSEO(props: {
     resolutionTime: contract.resolutionTime ?? undefined,
     resolution: contract.resolution ?? undefined,
     outcomeType: contract.outcomeType,
-    probability: 'prob' in contract ? (contract as any).prob : undefined,
+    probability:
+      'prob' in contract && !isMexasOrderBookOnlyContract(contract)
+        ? (contract as any).prob
+        : undefined,
     uniqueBettorCount: contract.uniqueBettorCount ?? 0,
     answers,
     lastUpdatedTime: contract.lastUpdatedTime,

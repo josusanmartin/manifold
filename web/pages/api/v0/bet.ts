@@ -4,6 +4,7 @@ import { APIError } from 'common/api/utils'
 import { getNewBetId, LimitBet, type Bet } from 'common/bet'
 import { getCpmmProbability } from 'common/calculate-cpmm'
 import { MarketContract } from 'common/contract'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { getBinaryCpmmBetInfo } from 'common/new-bet'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
@@ -266,6 +267,15 @@ async function placeBinaryBet(
     throw new APIError(403, 'Trading is closed.')
   }
   if (contract.isResolved) throw new APIError(403, 'Market is resolved.')
+  if (
+    isMexasOrderBookOnlyContract(contract) &&
+    params.limitProb === undefined
+  ) {
+    throw new APIError(
+      400,
+      'Los mercados MEXAS solo aceptan órdenes límite.'
+    )
+  }
   const syncedUserRow = await syncMexasWalletBalance(db, userRow)
   if (syncedUserRow.balance < params.amount) {
     throw new APIError(403, 'Insufficient balance.')

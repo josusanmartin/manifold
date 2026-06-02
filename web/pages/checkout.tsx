@@ -46,7 +46,6 @@ function MarketHeader() {
 
 function PriceButton(props: {
   side: 'yes' | 'no'
-  price: number
   href?: string
 }) {
   const yes = props.side === 'yes'
@@ -60,7 +59,7 @@ function PriceButton(props: {
           : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-200 dark:text-slate-950 dark:hover:bg-white'
       )}
     >
-      Comprar {yes ? 'Sí' : 'No'} {props.price.toFixed(1)}c
+      Orden {yes ? 'Sí' : 'No'}
     </Link>
   )
 }
@@ -84,7 +83,7 @@ function SimpleMarketCard() {
               diciembre de 2026?
             </h2>
           </Col>
-          <div className="text-ink-900 text-2xl font-semibold">30%</div>
+          <div className="text-ink-900 text-2xl font-semibold">Sin precio</div>
         </Row>
       </div>
 
@@ -95,8 +94,8 @@ function SimpleMarketCard() {
           <span>Libro de órdenes activo</span>
         </Row>
         <Row className="flex-wrap gap-2">
-          <PriceButton side="yes" price={30} href={UKRAINE_MARKET_URL} />
-          <PriceButton side="no" price={70} href={UKRAINE_MARKET_URL} />
+          <PriceButton side="yes" href={UKRAINE_MARKET_URL} />
+          <PriceButton side="no" href={UKRAINE_MARKET_URL} />
         </Row>
         <Link
           href={UKRAINE_MARKET_URL}
@@ -120,17 +119,11 @@ function FeaturedMarketTable() {
             <div className="text-ink-900 text-sm font-semibold">México</div>
             <div className="text-ink-500 text-xs">MEX 0 Vol.</div>
           </Col>
-          <div className="text-ink-900 text-2xl font-semibold">3%</div>
+          <div className="text-ink-900 text-2xl font-semibold">Sin precio</div>
         </Row>
-        <div className="bg-ink-100 h-1.5 overflow-hidden rounded-full">
-          <div
-            className="h-full rounded-full bg-teal-500"
-            style={{ width: '3%' }}
-          />
-        </div>
         <Row className="flex-wrap gap-2">
-          <PriceButton side="yes" price={3} />
-          <PriceButton side="no" price={97} />
+          <PriceButton side="yes" />
+          <PriceButton side="no" />
         </Row>
       </Col>
       <div className="border-ink-200 bg-canvas-50 border-t px-4 py-3 sm:px-5">

@@ -45,6 +45,7 @@ import {
   formatWithToken,
 } from 'common/util/format'
 import { floatingEqual } from 'common/util/math'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { removeUndefinedProps } from 'common/util/object'
 import { useFocus } from 'web/hooks/use-focus'
 import { useIsMobile } from 'web/hooks/use-is-mobile'
@@ -121,6 +122,7 @@ export function BuyPanel(
   const customNoText = getCustomNoButtonText(user?.entitlements)
   const isPseudoNumeric = contract.outcomeType === 'PSEUDO_NUMERIC'
   const isStonk = contract.outcomeType === 'STONK'
+  const orderBookOnly = isMexasOrderBookOnlyContract(contract)
 
   const [outcome, setOutcome] = useState<BinaryOutcomes>(initialOutcome)
   const [isPanelBodyVisible, setIsPanelBodyVisible] = useState(false)
@@ -167,20 +169,24 @@ export function BuyPanel(
                 onOutcomeChoice(choice)
               }}
               yesLabel={
-                isPseudoNumeric
+                orderBookOnly
+                  ? 'Orden SÍ'
+                  : isPseudoNumeric
                   ? 'MÁS ALTO'
                   : isStonk
                   ? STONK_YES
                   : customYesText ?? 'SÍ'
               }
               noLabel={
-                isPseudoNumeric
+                orderBookOnly
+                  ? 'Orden NO'
+                  : isPseudoNumeric
                   ? 'MÁS BAJO'
                   : isStonk
                   ? STONK_NO
                   : customNoText ?? 'NO'
               }
-              includeWordBet={!isStonk && !customYesText}
+              includeWordBet={!orderBookOnly && !isStonk && !customYesText}
             />
           </Row>
         </Col>
@@ -381,9 +387,14 @@ export const BuyPanelBody = (
     }
   }, [updatedBet, submittedBet])
 
+  const orderBookOnly = isMexasOrderBookOnlyContract(contract)
   const [betTypeSetting, setBetTypeSetting] = useState<'Market' | 'Limit'>(
-    'Market'
+    orderBookOnly ? 'Limit' : 'Market'
   )
+
+  useEffect(() => {
+    if (orderBookOnly) setBetTypeSetting('Limit')
+  }, [orderBookOnly])
 
   // State for prefilled limit order from order book click
   const [prefillLimitOrder, setPrefillLimitOrder] = useState<{
@@ -633,7 +644,7 @@ export const BuyPanelBody = (
     isCashContract &&
     PROMPT_USER_VERIFICATION_MESSAGES.includes(verificationMessage)
 
-  const betType = isStonk ? 'Market' : betTypeSetting
+  const betType = orderBookOnly ? 'Limit' : isStonk ? 'Market' : betTypeSetting
   const isMobile = useIsMobile()
 
   const handlePayoutEdited = useEvent(() => {
@@ -719,7 +730,7 @@ export const BuyPanelBody = (
             />
           </Row>
           <Row className="items-center justify-end gap-2">
-            {!isStonk && (
+            {!isStonk && !orderBookOnly && (
               <ChoicesToggleGroup
                 currentChoice={betType}
                 color="gray"
@@ -1049,15 +1060,17 @@ export const BuyPanelBody = (
           bets={unfilledBetsMatchingAnswer}
         />
       )}
-      <OrderBookPanel
-        contract={contract}
-        limitBets={unfilledBets.filter(
-          (b) => b.answerId === multiProps?.answerToBuy?.id
-        )}
-        answer={multiProps?.answerToBuy}
-        pseudonym={props.pseudonym}
-        onOrderClick={handleOrderClick}
-      />
+      {!orderBookOnly && (
+        <OrderBookPanel
+          contract={contract}
+          limitBets={unfilledBets.filter(
+            (b) => b.answerId === multiProps?.answerToBuy?.id
+          )}
+          answer={multiProps?.answerToBuy}
+          pseudonym={props.pseudonym}
+          onOrderClick={handleOrderClick}
+        />
+      )}
     </>
   )
 }

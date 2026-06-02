@@ -15,14 +15,14 @@ import {
 import { TRADE_TERM } from 'common/envs/constants'
 import { CandidateBet } from 'common/new-bet'
 import { getPseudoProbability } from 'common/pseudo-numeric'
-import { formatOutcomeLabel, formatPercent } from 'common/util/format'
+import { formatPercent } from 'common/util/format'
 import { removeUndefinedProps } from 'common/util/object'
 import { DAY_MS, HOUR_MS, MINUTE_MS, MONTH_MS, WEEK_MS } from 'common/util/time'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import dayjs from 'dayjs'
-import { capitalize, clamp } from 'lodash'
+import { clamp } from 'lodash'
 import { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { LuShare } from 'react-icons/lu'
 import { Input } from 'web/components/widgets/input'
 import { usePersistentLocalState } from 'web/hooks/use-persistent-local-state'
 import { api } from 'web/lib/api/api'
@@ -39,16 +39,15 @@ import { InfoTooltip } from '../widgets/info-tooltip'
 import { ProbabilitySlider } from '../widgets/probability-input'
 import { sliderColors } from '../widgets/slider'
 import { MoneyDisplay } from './money-display'
-import { ShareBetModal } from './share-bet'
 
 const expirationOptions = [
-  { label: 'Never expires', value: 0 },
-  { label: 'Expires immediately', value: 1 },
-  { label: 'Expires in 1 hour', value: HOUR_MS },
-  { label: 'Expires in 1 day', value: DAY_MS },
-  { label: 'Expires in 1 week', value: WEEK_MS },
-  { label: 'Expires in 1 month', value: MONTH_MS },
-  { label: 'Custom time...', value: -1 },
+  { label: 'Nunca', value: 0 },
+  { label: 'Expira inmediatamente', value: 1 },
+  { label: 'Expira en 1 hora', value: HOUR_MS },
+  { label: 'Expira en 1 día', value: DAY_MS },
+  { label: 'Expira en 1 semana', value: WEEK_MS },
+  { label: 'Expira en 1 mes', value: MONTH_MS },
+  { label: 'Fecha personalizada...', value: -1 },
 ]
 
 const WAIT_TO_DISMISS = 3000
@@ -108,6 +107,7 @@ export default function LimitOrderPanel(props: {
   const isPseudoNumeric = contract.outcomeType === 'PSEUDO_NUMERIC'
 
   const isCashContract = contract.token === 'CASH'
+  const orderBookOnly = isMexasOrderBookOnlyContract(contract)
 
   const [betAmount, setBetAmount] = useState<number | undefined>(
     props.betAmount
@@ -128,7 +128,6 @@ export default function LimitOrderPanel(props: {
   const [selectedExpiration, setSelectedExpiration] =
     usePersistentLocalState<number>(0, 'limit-order-expiration')
 
-  const [isSharing, setIsSharing] = useState(false)
   const [lastBetDetails, setLastBetDetails] = useState<Bet | null>(null)
 
   // State for editing payout
@@ -138,7 +137,7 @@ export default function LimitOrderPanel(props: {
   )
 
   const callOnBuySuccess = useEvent(() => {
-    if (onBuySuccess && !isSharing) {
+    if (onBuySuccess) {
       onBuySuccess()
     }
   })
@@ -169,7 +168,9 @@ export default function LimitOrderPanel(props: {
 
   const initialProb =
     props.initialProb ??
-    (isBinaryMC && outcome === 'YES'
+    (orderBookOnly
+      ? undefined
+      : isBinaryMC && outcome === 'YES'
       ? multiProps!.answerToBuy.prob
       : isBinaryMC && outcome === 'NO'
       ? 1 - multiProps!.answerToBuy.prob
@@ -178,7 +179,7 @@ export default function LimitOrderPanel(props: {
       : getProbability(contract))
 
   const [limitProbInt, setLimitProbInt] = useState<number | undefined>(
-    Math.round(initialProb * 100)
+    initialProb === undefined ? undefined : Math.round(initialProb * 100)
   )
 
   // Track the last applied prefill timestamp to avoid re-applying or resetting
@@ -330,7 +331,6 @@ export default function LimitOrderPanel(props: {
         token: contract.token,
       })
       setLastBetDetails(fullBet)
-      setIsSharing(false)
       setTimeout(() => {
         callOnBuySuccess()
       }, WAIT_TO_DISMISS)
@@ -375,7 +375,7 @@ export default function LimitOrderPanel(props: {
     console.error('Error in calculateCpmmMultiArbitrage:', err)
     setError(
       err?.message ??
-        `An error occurred during ${TRADE_TERM} calculation, try again.`
+        `Error al calcular la orden. Inténtalo de nuevo.`
     )
   }
   const returnPercent = formatPercent(currentReturn)
@@ -391,7 +391,7 @@ export default function LimitOrderPanel(props: {
     <>
       <Col className=" gap-1">
         <Row className={'text-ink-600 items-center space-x-3'}>
-          {capitalize(TRADE_TERM)} amount
+          Cantidad
         </Row>
         <BuyAmountInput
           parentClassName="max-w-full mt-1"
@@ -407,7 +407,7 @@ export default function LimitOrderPanel(props: {
       </Col>
       <Col className="relative mt-6 w-full gap-1">
         <div className="text-ink-600">
-          {isPseudoNumeric ? 'Value' : `Probability (%)`}
+          {isPseudoNumeric ? 'Valor' : `Probabilidad (%)`}
         </div>
         <Row>
           <label className="font-sm md:font-lg relative w-full">
@@ -537,7 +537,7 @@ export default function LimitOrderPanel(props: {
               ) : (
                 !hideYesNo && <BinaryOutcomeLabel outcome={outcome} />
               )}{' '}
-              {hideYesNo ? 'Filled' : 'filled'} now
+              {hideYesNo ? 'Ejecutado' : 'ejecutado'} ahora
             </div>
             <div className="whitespace-nowrap">
               <MoneyDisplay
@@ -561,8 +561,8 @@ export default function LimitOrderPanel(props: {
                   'Shares'
                 ) : (
                   <>
-                    Max {!hideYesNo && <BinaryOutcomeLabel outcome={outcome} />}{' '}
-                    payout
+                    Pago máximo{' '}
+                    {!hideYesNo && <BinaryOutcomeLabel outcome={outcome} />}
                     {isCashContract && (
                       <InfoTooltip
                         text="Manifold takes a 10% cut of profits on sweepstakes markets."
@@ -632,21 +632,21 @@ export default function LimitOrderPanel(props: {
                   onClick={submitBet}
                 >
                   {isSubmitting ? (
-                    'Submitting...'
+                    'Enviando...'
                   ) : !outcome ? (
-                    'Choose YES or NO'
+                    'Elige SÍ o NO'
                   ) : !limitProb ? (
-                    'Enter a probability'
+                    'Ingresa una probabilidad'
                   ) : !betAmount ? (
-                    'Enter an amount'
+                    'Ingresa una cantidad'
                   ) : (
                     <span>
-                      Buy{' '}
+                      Abrir orden por{' '}
                       <MoneyDisplay
                         amount={betAmount}
                         isCashContract={isCashContract}
                       />{' '}
-                      {!binaryMCOutcome && !pseudonymName ? outcome : ''} at{' '}
+                      {!binaryMCOutcome && !pseudonymName ? outcome : ''} a{' '}
                       {formatPercent(
                         binaryMCOutcome || pseudonymName
                           ? preLimitProb ?? 0
@@ -676,51 +676,10 @@ export default function LimitOrderPanel(props: {
                       </svg>
                     </div>
                     <span className="text-ink-600 text-sm">
-                      {isSubmitting ? 'Placing trade...' : 'Trade placed'}
+                      {isSubmitting ? 'Enviando orden...' : 'Orden enviada'}
                     </span>
                   </Row>
-                  <button
-                    className="text-primary-600 hover:text-primary-700 flex items-center gap-1.5 text-sm font-medium transition-colors"
-                    onClick={() => setIsSharing(true)}
-                  >
-                    <LuShare className="h-4 w-4" aria-hidden />
-                    Share
-                  </button>
                 </Row>
-              )}
-
-              {lastBetDetails && isSharing && user && (
-                <ShareBetModal
-                  open={isSharing}
-                  setOpen={setIsSharing}
-                  questionText={contract.question}
-                  outcome={formatOutcomeLabel(
-                    contract,
-                    lastBetDetails.outcome as 'YES' | 'NO'
-                  )}
-                  answer={multiProps?.answerToBuy.text}
-                  avgPrice={formatPercent(lastBetDetails.limitProb ?? 0)}
-                  betAmount={
-                    lastBetDetails.orderAmount ?? lastBetDetails.amount
-                  }
-                  winAmount={
-                    lastBetDetails.limitProb !== undefined &&
-                    lastBetDetails.orderAmount !== undefined
-                      ? lastBetDetails.outcome === 'YES'
-                        ? lastBetDetails.orderAmount / lastBetDetails.limitProb
-                        : lastBetDetails.orderAmount /
-                          (1 - lastBetDetails.limitProb)
-                      : lastBetDetails.shares
-                  }
-                  bettor={{
-                    id: user.id,
-                    name: user.name,
-                    username: user.username,
-                    avatarUrl: user.avatarUrl,
-                  }}
-                  isLimitBet={true}
-                  orderAmount={lastBetDetails.orderAmount}
-                />
               )}
             </>
           ) : (
@@ -732,7 +691,7 @@ export default function LimitOrderPanel(props: {
               })}
               className="mb-2 flex-grow"
             >
-              Sign up to {TRADE_TERM}
+              Inicia sesión para operar
             </Button>
           )}
         </Col>

@@ -7,6 +7,7 @@ import { getFormattedNumberExpectedValue } from 'common/number'
 import { sortAnswers } from './answer'
 import { getFormattedExpectedValue } from './multi-numeric'
 import { getFormattedExpectedDate } from './multi-date'
+import { isMexasOrderBookOnlyContract } from './mexas-market'
 
 export const getContractOGProps = (
   contract: Contract
@@ -29,7 +30,7 @@ export const getContractOGProps = (
       : undefined
 
   const probPercent =
-    outcomeType === 'BINARY'
+    outcomeType === 'BINARY' && !isMexasOrderBookOnlyContract(contract)
       ? formatPercent(getDisplayProbability(contract))
       : topAnswer
       ? formatPercent(
@@ -88,7 +89,8 @@ export function getSeoDescription(contract: Contract) {
 
   const prefix = resolution
     ? `Resuelto ${getResolvedValue(contract) || resolution}. `
-    : contract.outcomeType === 'BINARY'
+    : contract.outcomeType === 'BINARY' &&
+      !isMexasOrderBookOnlyContract(contract)
     ? `${formatPercent(getDisplayProbability(contract))} de probabilidad. `
     : contract.outcomeType === 'PSEUDO_NUMERIC'
     ? `${getFormattedMappedValue(

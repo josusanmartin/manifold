@@ -7,6 +7,7 @@ import { shortFormatNumber } from 'common/util/format'
 import { orderBy, sumBy } from 'lodash'
 import { useEffect, useState } from 'react'
 import { useUser } from 'web/hooks/use-user'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { YourOrders } from '../bet/order-book'
 import { Col } from '../layout/col'
 import { Row } from '../layout/row'
@@ -16,7 +17,7 @@ type OrderBookContract = BinaryOrPseudoNumericContract | CPMMMultiContract
 type MarketRow = {
   answerId?: string
   name: string
-  prob: number
+  prob?: number
 }
 
 type Level = {
@@ -39,6 +40,7 @@ function remainingOrderAmount(bet: LimitBet) {
 }
 
 function getMarkets(contract: OrderBookContract): MarketRow[] {
+  const hideReferencePrice = isMexasOrderBookOnlyContract(contract)
   if ('answers' in contract) {
     return orderBy(
       contract.answers
@@ -46,14 +48,14 @@ function getMarkets(contract: OrderBookContract): MarketRow[] {
         .map((answer) => ({
           answerId: answer.id,
           name: answer.text,
-          prob: answer.prob,
+          prob: hideReferencePrice ? undefined : answer.prob,
         })),
       ['prob'],
       ['desc']
     ).slice(0, 8)
   }
 
-  return [{ name: 'SÍ', prob: contract.prob }]
+  return [{ name: 'SÍ', prob: hideReferencePrice ? undefined : contract.prob }]
 }
 
 function getLevels(orders: LimitBet[], outcome: 'YES' | 'NO') {
@@ -105,6 +107,7 @@ export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
   const primaryMarket = markets[0]
   const primaryBook = getBookForMarket(openOrders, primaryMarket)
   const hasOpenOrders = openOrders.length > 0
+  const orderBookOnly = isMexasOrderBookOnlyContract(contract)
 
   return (
     <Col className="border-ink-200 bg-canvas-0 mt-4 overflow-hidden rounded-md border">
@@ -129,13 +132,15 @@ export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
           market={primaryMarket}
           bids={primaryBook.bids}
           asks={primaryBook.asks}
+          showReferencePrice={!orderBookOnly}
         />
       )}
 
       {!hasOpenOrders && !loading && (
         <div className="border-ink-200 text-ink-500 border-t px-4 py-3 text-sm">
-          Aún no hay órdenes límite abiertas. El precio actual del mercado se
-          muestra arriba; las órdenes nuevas aparecerán aquí.
+          {orderBookOnly
+            ? 'Aún no hay precio. Abre la primera orden límite para crear el libro.'
+            : 'Aún no hay órdenes límite abiertas. El precio actual del mercado se muestra arriba; las órdenes nuevas aparecerán aquí.'}
         </div>
       )}
 
@@ -204,29 +209,33 @@ function BinaryMarketBook(props: {
   market: MarketRow
   bids: Level[]
   asks: Level[]
+  showReferencePrice: boolean
 }) {
-  const { market, bids, asks } = props
+  const { market, bids, asks, showReferencePrice } = props
   const visibleAsks = asks.slice(0, 5).reverse()
   const visibleBids = bids.slice(0, 5)
 
   return (
     <Col>
       <Row className="text-ink-500 bg-canvas-50 border-ink-200 border-b px-4 py-2 text-xs font-medium uppercase">
-        <span className="flex-1">Precio</span>
+        <span className="w-20">Resultado</span>
+        <span className="flex-1 text-right">Precio</span>
         <span className="w-24 text-right">Tamaño</span>
       </Row>
       <Col className="divide-ink-100 divide-y">
         {visibleAsks.map((level) => (
           <BookLevel key={`ask-${level.price}`} level={level} side="ask" />
         ))}
-        <Row className="bg-canvas-50 items-center justify-between px-4 py-3">
-          <span className="text-ink-900 text-sm font-semibold">
-            {market.name}
-          </span>
-          <span className="text-ink-1000 text-lg font-semibold">
-            {priceLabel(market.prob)}
-          </span>
-        </Row>
+        {showReferencePrice && (
+          <Row className="bg-canvas-50 items-center justify-between px-4 py-3">
+            <span className="text-ink-900 text-sm font-semibold">
+              {market.name}
+            </span>
+            <span className="text-ink-1000 text-lg font-semibold">
+              {priceLabel(market.prob)}
+            </span>
+          </Row>
+        )}
         {visibleBids.map((level) => (
           <BookLevel key={`bid-${level.price}`} level={level} side="bid" />
         ))}
@@ -248,11 +257,14 @@ function BookLevel(props: { level: Level; side: 'bid' | 'ask' }) {
         }
         style={{ width: `${Math.min(90, Math.max(8, level.size / 20))}%` }}
       />
+      <span className="text-ink-900 relative w-20 font-semibold">
+        {side === 'bid' ? 'SÍ' : 'NO'}
+      </span>
       <span
         className={
           side === 'bid'
-            ? 'relative font-semibold text-teal-700 dark:text-teal-300'
-            : 'text-scarlet-600 relative font-semibold'
+            ? 'relative flex-1 text-right font-semibold text-teal-700 dark:text-teal-300'
+            : 'text-scarlet-600 relative flex-1 text-right font-semibold'
         }
       >
         {priceLabel(level.price)}

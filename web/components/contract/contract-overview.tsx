@@ -25,6 +25,7 @@ import {
   tradingAllowed,
 } from 'common/contract'
 import { isAdminId, isModId } from 'common/envs/constants'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { Period, periodDurations } from 'common/period'
 import { getIsLive } from 'common/sports-info'
 import { NEW_GRAPH_COLOR } from 'common/src/number'
@@ -265,13 +266,14 @@ export const BinaryOverview = (props: {
   } = useChartPositions(contract, graphUser, setGraphUser)
 
   const isMobile = useIsMobile()
+  const orderBookOnly = isMexasOrderBookOnlyContract(contract)
   return (
     <>
       <Row className="items-end justify-between gap-2 sm:gap-4">
         <Col>
           <Row className="items-baseline">
             <BinaryResolutionOrChance contract={contract} />
-            {!!dayProbChange(contract) && (
+            {!orderBookOnly && !!dayProbChange(contract) && (
               <Tooltip text={`1-day probability change`}>
                 <Row
                   className={clsx(
@@ -293,49 +295,53 @@ export const BinaryOverview = (props: {
           </Row>
           {resolutionRating}
         </Col>
-        <Row className={'gap-1'}>
-          {loading && !isMobile && (
-            <LoadingIndicator spinnerColor="border-ink-400" size="sm" />
-          )}
-          <UserPositionSearchButton
-            currentUser={currentUser}
-            displayUser={displayUser}
-            contract={contract}
-            setDisplayUser={setDisplayUser}
-          />
-          {enableAdd && (
-            <EditChartAnnotationsButton
-              pointerMode={pointerMode}
-              setPointerMode={setPointerMode}
+        {!orderBookOnly && (
+          <Row className={'gap-1'}>
+            {loading && !isMobile && (
+              <LoadingIndicator spinnerColor="border-ink-400" size="sm" />
+            )}
+            <UserPositionSearchButton
+              currentUser={currentUser}
+              displayUser={displayUser}
+              contract={contract}
+              setDisplayUser={setDisplayUser}
             />
-          )}
-          <TimeRangePicker
-            currentTimePeriod={currentTimePeriod}
-            setCurrentTimePeriod={setTimePeriod}
-            maxRange={maxRange}
-            color="green"
-            ignoreLabels={isMobile ? ['6H'] : undefined}
-          />
-        </Row>
+            {enableAdd && (
+              <EditChartAnnotationsButton
+                pointerMode={pointerMode}
+                setPointerMode={setPointerMode}
+              />
+            )}
+            <TimeRangePicker
+              currentTimePeriod={currentTimePeriod}
+              setCurrentTimePeriod={setTimePeriod}
+              maxRange={maxRange}
+              color="green"
+              ignoreLabels={isMobile ? ['6H'] : undefined}
+            />
+          </Row>
+        )}
       </Row>
 
       {tradingAllowed(contract) && <MarketOrderBookPanel contract={contract} />}
 
-      <SizedBinaryChart
-        showZoomer={showZoomer}
-        showAnnotations={true}
-        zoomParams={zoomParams}
-        betPoints={points}
-        contract={contract}
-        hoveredAnnotation={hoveredAnnotation}
-        setHoveredAnnotation={setHoveredAnnotation}
-        pointerMode={pointerMode}
-        chartAnnotations={chartAnnotations}
-        chartPositions={chartPositions}
-        hoveredChartPosition={hoveredChartPosition}
-        setHoveredChartPosition={setHoveredChartPosition}
-        zoomY={zoomY}
-      />
+      {!orderBookOnly && (
+        <SizedBinaryChart
+          showZoomer={showZoomer}
+          showAnnotations={true}
+          zoomParams={zoomParams}
+          betPoints={points}
+          contract={contract}
+          hoveredAnnotation={hoveredAnnotation}
+          setHoveredAnnotation={setHoveredAnnotation}
+          pointerMode={pointerMode}
+          chartAnnotations={chartAnnotations}
+          chartPositions={chartPositions}
+          hoveredChartPosition={hoveredChartPosition}
+          setHoveredChartPosition={setHoveredChartPosition}
+          zoomY={zoomY}
+        />
+      )}
       {tradingAllowed(contract) && <BinaryBetPanel contract={contract} />}
     </>
   )

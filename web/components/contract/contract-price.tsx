@@ -10,6 +10,7 @@ import {
   StonkContract,
 } from 'common/contract'
 import { ENV_CONFIG } from 'common/envs/constants'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { formatExpectedDate, getExpectedDate } from 'common/multi-date'
 import { formatExpectedValue, getExpectedValue } from 'common/multi-numeric'
 import { getMappedValue } from 'common/pseudo-numeric'
@@ -40,6 +41,7 @@ export function BinaryResolutionOrChance(props: {
   const { contract, className, subtextClassName, isCol } = props
   const { resolution } = contract
   const textColor = getTextColor(contract)
+  const orderBookOnly = isMexasOrderBookOnlyContract(contract)
 
   const spring = useAnimatedNumber(getDisplayProbability(contract))
 
@@ -65,7 +67,9 @@ export function BinaryResolutionOrChance(props: {
       ) : (
         <>
           <animated.div className={textColor}>
-            {spring.to((val) => formatPercent(val))}
+            {orderBookOnly
+              ? 'Sin precio'
+              : spring.to((val) => formatPercent(val))}
           </animated.div>
           <div
             className={clsx(
@@ -74,7 +78,7 @@ export function BinaryResolutionOrChance(props: {
               subtextClassName
             )}
           >
-            probabilidad
+            {orderBookOnly ? 'solo órdenes límite' : 'probabilidad'}
           </div>
         </>
       )}
