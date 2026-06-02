@@ -39,7 +39,7 @@ export default function CheckedDropdownMenu(props: {
       buttonDisabled={buttonDisabled}
       buttonContent={(open) => (
         <>
-          <span className="sr-only">Open options</span>
+          <span className="sr-only">Abrir opciones</span>
           {buttonContent(open)}
         </>
       )}

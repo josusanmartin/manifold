@@ -66,7 +66,7 @@ export default function DropdownMenu(props: {
             )}
             disabled={buttonDisabled}
           >
-            <span className="sr-only">Open options</span>
+            <span className="sr-only">Abrir opciones</span>
             {!buttonContent ? (
               <DotsHorizontalIcon className="h-5 w-5" aria-hidden="true" />
             ) : typeof buttonContent === 'function' ? (

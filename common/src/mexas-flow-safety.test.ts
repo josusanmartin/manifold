@@ -397,6 +397,12 @@ describe('MEXAS flow safety guardrails', () => {
   test('keeps profile tabs and wallet payments on the Spanish MEXAS surface', () => {
     const profileSource = readRepoFile('web/pages/[username]/index.tsx')
     const paymentsSource = readRepoFile('web/pages/payments.tsx')
+    const dropdownSource = readRepoFile(
+      'web/components/widgets/dropdown-menu.tsx'
+    )
+    const checkedDropdownSource = readRepoFile(
+      'web/components/widgets/checked-dropdown.tsx'
+    )
 
     expectMarkersInOrder(profileSource, [
       "title: 'Resumen'",
@@ -425,6 +431,10 @@ describe('MEXAS flow safety guardrails', () => {
     expect(paymentsSource).not.toContain('Send Mana')
     expect(paymentsSource).not.toContain('Default Amount')
     expect(paymentsSource).not.toContain('Default Message')
+    expect(dropdownSource).toContain('Abrir opciones')
+    expect(checkedDropdownSource).toContain('Abrir opciones')
+    expect(dropdownSource).not.toContain('Open options')
+    expect(checkedDropdownSource).not.toContain('Open options')
   })
 
   test('renders and validates MEX order amounts as MEX, not MANA or M$', () => {
@@ -444,6 +454,15 @@ describe('MEXAS flow safety guardrails', () => {
       '<MoneyDisplay',
       'token={displayToken}',
     ])
+    expect(limitSource).toContain('Error al enviar la orden')
+    expect(limitSource).toContain('Participaciones')
+    expect(limitSource).toContain("              de{' '}")
+    expect(limitSource).not.toContain(
+      'Order will expire immediately after placement'
+    )
+    expect(limitSource).not.toContain('Error placing ${TRADE_TERM}')
+    expect(limitSource).not.toContain("              of{' '}")
+    expect(limitSource).not.toContain("'Shares'")
     expectMarkersInOrder(betPanelSource, [
       "const displayToken = orderBookOnly ? 'MEX'",
       "error === 'Saldo insuficiente' || error === 'Insufficient balance'",

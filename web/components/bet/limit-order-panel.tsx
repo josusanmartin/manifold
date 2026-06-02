@@ -401,7 +401,7 @@ export default function LimitOrderPanel(props: {
       )
       console.log(`placed ${TRADE_TERM}. Result:`, bet)
       if (expiresMillisAfter === 1) {
-        toast.success('Order will expire immediately after placement')
+        toast.success('La orden expirara inmediatamente despues de enviarse')
       }
       const fullBet: Bet = {
         ...(bet as CandidateBet<LimitBet>),
@@ -430,7 +430,7 @@ export default function LimitOrderPanel(props: {
         setError(e.message.toString())
       } else {
         console.error(e)
-        setError(`Error placing ${TRADE_TERM}`)
+        setError(`Error al enviar la orden`)
       }
     } finally {
       setIsSubmitting(false)
@@ -635,7 +635,7 @@ export default function LimitOrderPanel(props: {
                 isCashContract={isCashContract}
                 token={displayToken}
               />{' '}
-              of{' '}
+              de{' '}
               <MoneyDisplay
                 amount={orderAmount}
                 isCashContract={isCashContract}
@@ -650,7 +650,7 @@ export default function LimitOrderPanel(props: {
             <Row className="text-ink-600 flex-nowrap items-center gap-2 whitespace-nowrap">
               <div>
                 {isPseudoNumeric ? (
-                  'Shares'
+                  'Participaciones'
                 ) : (
                   <>
                     Pago máximo{' '}
