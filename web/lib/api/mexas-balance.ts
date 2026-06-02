@@ -5,7 +5,7 @@ import type { SupabaseClient } from 'common/supabase/utils'
 const BALANCE_UPDATE_ATTEMPTS = 5
 const BALANCE_LOCK_ATTEMPTS = 30
 const BALANCE_LOCK_RETRY_MS = 100
-const BALANCE_LOCK_TIMEOUT_MS = 30 * 1000
+const BALANCE_LOCK_TIMEOUT_MS = 2 * 60 * 1000
 const EPSILON = 1e-9
 const MEXAS_BALANCE_CREDIT_KEYS = 'mexasBalanceCreditKeys'
 const MEXAS_BALANCE_LOCK_KEY = 'mexasBalanceLock'

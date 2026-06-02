@@ -10,6 +10,7 @@ import {
 } from 'common/contract'
 import { ContractMetric, getMaxSharesOutcome } from 'common/contract-metric'
 import { noFees } from 'common/fees'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { User } from 'common/user'
 import { useState } from 'react'
 import { BinaryMultiSellRow } from 'web/components/answers/answer-components'
@@ -71,6 +72,7 @@ export function BetsSummary(props: {
 
   const isBinary = outcomeType === 'BINARY'
   const isStonk = outcomeType === 'STONK'
+  const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)
   const mainBinaryMCAnswer = getMainBinaryMCAnswer(contract)
   const prob = contract.mechanism === 'cpmm-1' ? getProbability(contract) : 0
   const expectation = prob * yesWinnings + (1 - prob) * noWinnings
@@ -226,6 +228,7 @@ export function BetsSummary(props: {
         )}
 
         {includeSellButton &&
+          !isMexasOrderBookOnly &&
           !resolution &&
           (contract.mechanism !== 'cpmm-multi-1' ||
             isBinaryMulti(contract)) && (
@@ -243,6 +246,7 @@ export function BetsSummary(props: {
           bettor &&
           !areYourBets &&
           !resolution &&
+          !isMexasOrderBookOnly &&
           maxSharesOutcome &&
           (yesWinnings > 1 || noWinnings > 1) &&
           contract.mechanism === 'cpmm-1' && (

@@ -55,7 +55,7 @@ const BALANCE_UPDATE_ATTEMPTS = 5
 const ORDER_PAGE_SIZE = 1000
 const ORDER_LOCK_ATTEMPTS = 20
 const ORDER_LOCK_RETRY_MS = 100
-const ORDER_LOCK_TIMEOUT_MS = 30 * 1000
+const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000
 const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
 const EPSILON = 1e-9
 
@@ -360,7 +360,32 @@ async function refundMexasReservation(
 ) {
   if (amount <= 0) return
 
-  await updateMexasUserBalanceCas(db, userId, amount, { creditKey })
+  await updateMexasUserBalanceCas(db, userId, amount, {
+    creditKey,
+    dataPatch: await getOpenReservedMexasDataPatch(db, userId),
+  })
+}
+
+async function getOpenReservedMexasDataPatch(
+  db: SupabaseClient,
+  userId: string
+) {
+  return {
+    [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]:
+      await getOpenReservedMexasAmount(db, { userId }),
+  }
+}
+
+async function refreshMexasOpenReservedAmount(
+  db: SupabaseClient,
+  userId: string
+) {
+  await updateUserBalanceCas(
+    db,
+    userId,
+    0,
+    await getOpenReservedMexasDataPatch(db, userId)
+  )
 }
 
 async function cancelInsertedMexasOrderAndRefund(
@@ -807,6 +832,9 @@ async function placeBinaryBet(
           .insert(betToRow(bet))
         if (betError) throw betError
         inserted = true
+        if (!hasCrossingOrders) {
+          await refreshMexasOpenReservedAmount(db, userId)
+        }
 
         const matchedBet = hasCrossingOrders
           ? await matchMexasOrderbookLimitOrderRpc(db, bet.id)

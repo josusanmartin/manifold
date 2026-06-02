@@ -47,6 +47,12 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('acquires the MEXAS order lock with predicates against same-millisecond lock races', () => {
     const source = readRepoFile('web/pages/api/v0/bet.ts')
+    const balanceSource = readRepoFile('web/lib/api/mexas-balance.ts')
+
+    expect(source).toContain('const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000')
+    expect(balanceSource).toContain(
+      'const BALANCE_LOCK_TIMEOUT_MS = 2 * 60 * 1000'
+    )
 
     expectMarkersInOrder(source, [
       'function getMexasOrderLockPredicates',
@@ -484,6 +490,51 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('activar escrow on-chain')
   })
 
+  test('does not expose legacy CPMM sell controls on MEXAS markets', () => {
+    const summarySource = readRepoFile(
+      'web/components/bet/user-bet-summary.tsx'
+    )
+    const sellRowSource = readRepoFile('web/components/bet/sell-row.tsx')
+    const sellPanelSource = readRepoFile('web/components/bet/sell-panel.tsx')
+    const apiSurfaceSource = readRepoFile('common/src/mexas-api-surface.ts')
+    const smokeSource = readRepoFile(
+      'backend/scripts/check-mexas-production-smoke.ts'
+    )
+
+    expectMarkersInOrder(summarySource, [
+      'const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)',
+      'includeSellButton &&',
+      '!isMexasOrderBookOnly',
+      '<SellRow',
+    ])
+    expectMarkersInOrder(summarySource, [
+      'isAdmin &&',
+      '!isMexasOrderBookOnly',
+      '<SellSharesModal',
+    ])
+    expectMarkersInOrder(sellRowSource, [
+      'const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)',
+      'if (isMexasOrderBookOnly) return null',
+      'if (sharesOutcome && user && mechanism ===',
+    ])
+    expectMarkersInOrder(sellRowSource, [
+      'if (isMexasOrderBookOnlyContract(contract))',
+      'Venta no disponible',
+      'No se usa el flujo legacy de venta CPMM.',
+    ])
+    expectMarkersInOrder(sellPanelSource, [
+      'const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)',
+      'const betDisabled =',
+      'isMexasOrderBookOnly',
+      'async function submitSell()',
+      'if (isMexasOrderBookOnly)',
+      'Las ventas legacy no están disponibles en mercados MEX.',
+      "await api('market/:contractId/sell'",
+    ])
+    expect(apiSurfaceSource).toContain('/^v0\\/market\\/[^/]+\\/sell$/')
+    expect(smokeSource).toContain("'/api/v0/market/mexwcwin26a/sell'")
+  })
+
   test('does not overstate live MEXAS execution before escrow is implemented', () => {
     const checkoutSource = readRepoFile('web/pages/checkout.tsx')
     const aboutSource = readRepoFile('web/components/about-manifold.tsx')
@@ -519,6 +570,24 @@ describe('MEXAS flow safety guardrails', () => {
     expect(betSource).toContain('getMexasSyncedAvailableBalance')
     expect(betSource).toContain('currentBalance: latestUserRow.balance')
     expect(betSource).toContain('onChainDeltaAmount: deltaAmount')
+    expectMarkersInOrder(betSource, [
+      'async function refundMexasReservation',
+      'dataPatch: await getOpenReservedMexasDataPatch(db, userId)',
+    ])
+    expectMarkersInOrder(betSource, [
+      'async function getOpenReservedMexasDataPatch',
+      '[MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]:',
+      'async function refreshMexasOpenReservedAmount',
+      'await updateUserBalanceCas(',
+    ])
+    expectMarkersInOrder(betSource, [
+      ".from('contract_bets')",
+      '.insert(betToRow(bet))',
+      'inserted = true',
+      'if (!hasCrossingOrders)',
+      'await refreshMexasOpenReservedAmount(db, userId)',
+      'const matchedBet = hasCrossingOrders',
+    ])
     expect(ordersSource).toContain(".select('id,balance,data')")
     expect(ordersSource).toContain('currentBalance: userRowById.get(userId)?.balance ?? 0')
     expect(ordersSource).toContain('onChainDeltaAmount: 0')

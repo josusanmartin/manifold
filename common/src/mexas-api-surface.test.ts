@@ -69,6 +69,7 @@ describe('MEXAS public API surface', () => {
     'v0/request-loan',
     'v0/market/mexwcwin26a/add-liquidity',
     'v0/market/mexwcwin26a/remove-liquidity',
+    'v0/market/mexwcwin26a/sell',
     'v0/market/mexwcwin26a/add-bounty',
     'v0/market/mexwcwin26a/award-bounty',
     'v0/market/mexwcwin26a/answer',
@@ -116,7 +117,6 @@ describe('MEXAS public API surface', () => {
     'v0/search-markets-full',
     'v0/txns',
     'v0/me/update',
-    'v0/market/mexwcwin26a/sell',
   ])('blocks unknown external proxy endpoint %s by default', (path) => {
     expect(isBlockedMexasApiProxyPath(path)).toBe(false)
     expect(isAllowedMexasApiProxyPath(path)).toBe(false)

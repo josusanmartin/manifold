@@ -13,6 +13,7 @@ import {
 import { ContractMetric } from 'common/contract-metric'
 import { TRADE_TERM } from 'common/envs/constants'
 import { Fees, getFeeTotal } from 'common/fees'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { getFormattedMappedValue, getMappedValue } from 'common/pseudo-numeric'
 import { getSaleResult, getSaleResultMultiSumsToOne } from 'common/sell-bet'
 import { getSharesFromStonkShares, getStonkDisplayShares } from 'common/stonk'
@@ -69,6 +70,7 @@ export function SellPanel(props: {
   const { outcomeType } = contract
   const isPseudoNumeric = outcomeType === 'PSEUDO_NUMERIC'
   const isStonk = outcomeType === 'STONK'
+  const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)
   const isMultiSumsToOne =
     contract.mechanism === 'cpmm-multi-1' && contract.shouldAnswersSumToOne
   const answer =
@@ -125,7 +127,10 @@ export function SellPanel(props: {
   const [wasSubmitted, setWasSubmitted] = useState(false)
 
   const betDisabled =
-    isSubmitting || !amount || (error && error.includes('Maximum'))
+    isMexasOrderBookOnly ||
+    isSubmitting ||
+    !amount ||
+    (error && error.includes('Maximum'))
 
   // Sell all shares if remaining shares would be < 1
   const isSellingAllShares = amount === Math.floor(shares)
@@ -145,6 +150,10 @@ export function SellPanel(props: {
 
   async function submitSell() {
     if (!user || !amount) return
+    if (isMexasOrderBookOnly) {
+      toast.error('Las ventas legacy no están disponibles en mercados MEX.')
+      return
+    }
 
     setError(undefined)
     setIsSubmitting(true)
@@ -285,6 +294,13 @@ export function SellPanel(props: {
       <div className="text-error mt-1 h-4 text-xs">{error}</div>
 
       <Col className="mt-2 w-full gap-2.5 text-sm">
+        {isMexasOrderBookOnly && (
+          <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+            Las posiciones MEX se liquidan mediante el libro de órdenes y la
+            resolución del mercado.
+          </div>
+        )}
+
         {!isStonk && (
           <Row className="items-center justify-between">
             <span className="text-ink-500">Sale value</span>

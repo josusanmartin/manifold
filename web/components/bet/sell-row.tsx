@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { CPMMContract, MultiContract } from 'common/contract'
 import { ContractMetric } from 'common/contract-metric'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { getStonkDisplayShares } from 'common/stonk'
 import { User } from 'common/user'
 import { formatShares } from 'common/util/format'
@@ -36,6 +37,9 @@ export function SellRow(props: {
 
   const { mechanism } = contract
   const isCashContract = contract.token === 'CASH'
+  const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)
+
+  if (isMexasOrderBookOnly) return null
 
   if (sharesOutcome && user && mechanism === 'cpmm-1') {
     return (
@@ -132,6 +136,27 @@ export function SellSharesModal(props: {
   const isStonk = contract.outcomeType === 'STONK'
   const isCashContract = contract.token === 'CASH'
   const { answer } = useAnswer(answerId)
+
+  if (isMexasOrderBookOnlyContract(contract)) {
+    return (
+      <Modal open={true} setOpen={setOpen}>
+        <Col
+          className={clsx(
+            'bg-canvas-0 rounded-xl px-6 py-5 sm:px-8 sm:py-6',
+            className
+          )}
+        >
+          <h2 className="text-ink-900 mb-4 text-xl font-semibold">
+            Venta no disponible
+          </h2>
+          <p className="text-ink-600 text-sm leading-relaxed">
+            Las posiciones MEX se liquidan mediante el libro de órdenes y la
+            resolución del mercado. No se usa el flujo legacy de venta CPMM.
+          </p>
+        </Col>
+      </Modal>
+    )
+  }
 
   return (
     <Modal open={true} setOpen={setOpen}>

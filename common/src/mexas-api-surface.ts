@@ -72,6 +72,7 @@ const BLOCKED_MEXAS_PROXY_PATH_PATTERNS = [
   /^v0\/market\/[^/]+\/answer$/,
   /^v0\/market\/[^/]+\/award-bounty$/,
   /^v0\/market\/[^/]+\/remove-liquidity$/,
+  /^v0\/market\/[^/]+\/sell$/,
   /^v0\/mcp$/,
   /^v0\/get-predictle-/,
   /^v0\/save-predictle-/,

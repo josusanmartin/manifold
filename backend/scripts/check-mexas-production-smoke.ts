@@ -178,6 +178,7 @@ const BLOCKED_API_PATHS = [
   '/api/v0/user/by-id/balance',
   '/api/v0/market/mexwcwin26a/add-liquidity',
   '/api/v0/market/mexwcwin26a/remove-liquidity',
+  '/api/v0/market/mexwcwin26a/sell',
   '/api/v0/market/mexwcwin26a/add-bounty',
   '/api/v0/market/mexwcwin26a/award-bounty',
   '/api/v0/market/mexwcwin26a/answer',
