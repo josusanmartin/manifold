@@ -227,6 +227,50 @@ async function checkOrderBook(contractId: string) {
   }
 }
 
+async function checkResolutionReadiness(contractId: string) {
+  const { response, text } = await fetchText(
+    `/api/v0/market/${encodeURIComponent(
+      contractId
+    )}/mexas-resolution-readiness`
+  )
+  if (response.status < 200 || response.status >= 400) {
+    return fail(`resolution readiness ${contractId}`, `${response.status}`)
+  }
+
+  try {
+    const data = JSON.parse(text)
+    const valid =
+      data &&
+      typeof data === 'object' &&
+      typeof data.canResolve === 'boolean' &&
+      typeof data.requiresEscrow === 'boolean' &&
+      Number.isFinite(data.filledBetCount)
+    return valid
+      ? pass(
+          `resolution readiness ${contractId}`,
+          `canResolve=${data.canResolve}, requiresEscrow=${data.requiresEscrow}, filled=${data.filledBetCount}`
+        )
+      : fail(
+          `resolution readiness ${contractId}`,
+          'Response does not include readiness booleans.'
+        )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return fail(`resolution readiness ${contractId}`, message)
+  }
+}
+
+async function checkBlockedResolutionReadiness(contractId: string) {
+  const { response } = await fetchText(
+    `/api/v0/market/${encodeURIComponent(
+      contractId
+    )}/mexas-resolution-readiness`
+  )
+  return response.status === 404
+    ? pass(`blocked resolution readiness ${contractId}`, '404')
+    : fail(`blocked resolution readiness ${contractId}`, `${response.status}`)
+}
+
 async function checkBlockedOrderBook(contractId: string) {
   const { response } = await fetchText(
     `/api/mexas-order-book?contractId=${encodeURIComponent(contractId)}`
@@ -269,8 +313,11 @@ async function runSmoke() {
 
   results.push(await checkOrderBook('mexwcwin26a'))
   results.push(await checkOrderBook('ukrwarend26a'))
+  results.push(await checkResolutionReadiness('mexwcwin26a'))
+  results.push(await checkResolutionReadiness('ukrwarend26a'))
   results.push(await checkBlockedOrderBook('not-a-mexas-market'))
   results.push(await checkBlockedBets('not-a-mexas-market'))
+  results.push(await checkBlockedResolutionReadiness('not-a-mexas-market'))
   return results
 }
 

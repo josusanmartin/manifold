@@ -472,6 +472,8 @@ describe('MEXAS flow safety guardrails', () => {
     )
 
     expectMarkersInOrder(apiSource, [
+      '.maybeSingle()',
+      "throw new APIError(404, 'Contract not found.')",
       'getMexasSettlementAudit(',
       'await loadContractBets(db, contractId)',
       'audit.filledBetCount === 0',
@@ -501,6 +503,23 @@ describe('MEXAS flow safety guardrails', () => {
     expect(dangerSource).toContain('Resolver')
     expect(confirmSource).toContain('Resolver a ${label}')
     expect(panelSource).not.toContain('comments section')
+  })
+
+  test('production smoke covers the local MEXAS resolution preflight endpoint', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-production-smoke.ts'
+    )
+
+    expectMarkersInOrder(source, [
+      'async function checkResolutionReadiness',
+      '/mexas-resolution-readiness',
+      'typeof data.canResolve ===',
+      'typeof data.requiresEscrow ===',
+      'Number.isFinite(data.filledBetCount)',
+      "results.push(await checkResolutionReadiness('mexwcwin26a'))",
+      "results.push(await checkResolutionReadiness('ukrwarend26a'))",
+      "results.push(await checkBlockedResolutionReadiness('not-a-mexas-market'))",
+    ])
   })
 
   test('renders order book remaining sizes from canonical filled amount', () => {

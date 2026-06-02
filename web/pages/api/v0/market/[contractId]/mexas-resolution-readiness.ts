@@ -66,7 +66,7 @@ async function loadContractRow(db: SupabaseClient, contractId: string) {
     .from('contracts')
     .select('*')
     .eq('id', contractId)
-    .single()
+    .maybeSingle()
 
   if (error) throw error
   if (!data) throw new APIError(404, 'Contract not found.')
