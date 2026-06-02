@@ -219,7 +219,9 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expectMarkersInOrder(source, [
       'async function getMexasWalletSync',
-      'await releasePendingMexasOrderReleases(db',
+      'await releaseClosedMexasMarketOrders(db',
+      'await releaseExpiredMexasOrders(db',
+      'await releaseUnbackedMexasOrders(db',
       'const openReservedAmount = await getOpenReservedMexasAmount',
     ])
   })

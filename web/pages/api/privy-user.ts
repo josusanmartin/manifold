@@ -17,7 +17,9 @@ import { isAddress, type Address } from 'viem'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import {
   getOpenReservedMexasAmount,
-  releasePendingMexasOrderReleases,
+  releaseClosedMexasMarketOrders,
+  releaseExpiredMexasOrders,
+  releaseUnbackedMexasOrders,
 } from 'web/lib/api/mexas-orders'
 import {
   acquireMexasUserBalanceLock,
@@ -167,8 +169,17 @@ async function getMexasWalletSync(
     const previousUnits = parseSyncedMexasUnits(data)
     const deltaAmount = mexasUnitsDeltaToAmount(currentUnits - previousUnits)
     const onChainAmount = mexasUnitsToAmount(currentUnits)
-    await releasePendingMexasOrderReleases(db, {
+    await releaseClosedMexasMarketOrders(db, {
       userId: row.id,
+      skipUserBalanceLock: true,
+    })
+    await releaseExpiredMexasOrders(db, {
+      userId: row.id,
+      skipUserBalanceLock: true,
+    })
+    await releaseUnbackedMexasOrders(db, {
+      userId: row.id,
+      requireBalanceRead: true,
       skipUserBalanceLock: true,
     })
     const openReservedAmount = await getOpenReservedMexasAmount(db, {
