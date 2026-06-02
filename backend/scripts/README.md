@@ -51,3 +51,14 @@ $ yarn --cwd backend/scripts check:mexas-launch
 ```
 
 This script loads local `.env` files, checks production Vercel env names, verifies the Supabase matching health RPC, checks required settlement flags, and smoke-tests the main public MEXAS pages. A failing result means production is not ready to launch with live matching.
+
+For a narrower production UI/API smoke test that should pass before every deploy,
+run:
+
+```shell
+$ yarn --cwd backend/scripts check:mexas-smoke
+```
+
+This checks public page status codes, required Spanish MEXAS copy, absence of
+visible legacy Manifold/Mana/comment/verification UI strings, and the public
+MEXAS orderbook endpoint.

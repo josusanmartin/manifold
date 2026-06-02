@@ -6,6 +6,7 @@
   },
   "scripts": {
     "check:mexas-launch": "ts-node check-mexas-launch-readiness.ts",
+    "check:mexas-smoke": "ts-node check-mexas-production-smoke.ts",
     "code": "ts-node manicode.ts"
   },
   "dependencies": {
