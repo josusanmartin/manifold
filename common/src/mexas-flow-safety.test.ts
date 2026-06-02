@@ -751,6 +751,34 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('launch readiness checks open MEXAS order backing against Privy wallet balances', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('async function checkOpenMexasOrderBacking')
+    expectMarkersInOrder(source, [
+      'async function loadMexasOrderbookContractIds',
+      ".contains('data', { token: 'MEX' } as any)",
+      'isMexasOrderBookOnlyContract(contract)',
+      'async function loadOpenReservedMexasOrders',
+      ".eq('data->>mexasFundsReserved', 'true')",
+      'getMexasRemainingReservedAmount',
+      'walletUnits < backing.requiredUnits',
+      "checks.push(await checkOpenMexasOrderBacking(db))",
+    ])
+    expectMarkersInOrder(source, [
+      'async function readMexasWalletBalanceUnits',
+      "method: 'eth_call'",
+      'encodeBalanceOfCall(address)',
+      'return BigInt(payload.result)',
+    ])
+    expect(source).toContain('ERC20_BALANCE_OF_SELECTOR')
+    expect(source).toContain('privyWalletAddress')
+    expect(source).toContain('open order backing')
+    expect(source).not.toContain('PRIVATE_KEY')
+  })
+
   test('launch readiness cannot be passed by setting the escrow env before escrow code exists', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'

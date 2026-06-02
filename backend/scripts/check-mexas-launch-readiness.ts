@@ -6,7 +6,15 @@ import {
   getMissingMexasEscrowCapabilities,
   hasOperationalMexasEscrow,
 } from 'common/mexas-settlement'
+import { MEXAS_PUBLIC_RPC_URL, MEXAS_TOKEN } from 'common/crypto/mexas'
+import {
+  getMexasRemainingReservedAmount,
+  isMexasOrderBookOnlyContract,
+} from 'common/mexas-market'
+import { convertBet } from 'common/supabase/bets'
+import { convertContract } from 'common/supabase/contracts'
 import { createClient } from 'common/supabase/utils'
+import type { Row, SupabaseClient } from 'common/supabase/utils'
 
 type CheckStatus = 'pass' | 'warn' | 'fail'
 
@@ -48,6 +56,22 @@ const REQUIRED_MEXAS_CONTRACTS = [
     slug: 'will-the-russia-ukraine-war-end-by-december-31-2026',
   },
 ]
+
+const CONTRACT_PAGE_SIZE = 1000
+const OPEN_ORDER_PAGE_SIZE = 1000
+const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
+const ERC20_BALANCE_OF_SELECTOR = '0x70a08231'
+
+type OpenMexasOrder = {
+  betId: string
+  remainingReservedUnits: bigint
+  userId: string
+}
+
+type UserBacking = {
+  orderIds: string[]
+  requiredUnits: bigint
+}
 
 function parseEnvAssignment(line: string) {
   const trimmed = line.trim()
@@ -260,6 +284,217 @@ function getSupabaseAdminKey() {
   )
 }
 
+function getRowData(row: { data: unknown } | null): Record<string, unknown> {
+  const data = row?.data
+  return data && typeof data === 'object' && !Array.isArray(data)
+    ? (data as Record<string, unknown>)
+    : {}
+}
+
+function mexasAmountToUnits(amount: number) {
+  return BigInt(Math.round(Math.max(0, amount) * 10 ** MEXAS_TOKEN.decimals))
+}
+
+function formatMexasUnits(units: bigint) {
+  const divisor = 10n ** BigInt(MEXAS_TOKEN.decimals)
+  const whole = units / divisor
+  const fraction = units % divisor
+  if (fraction === 0n) return whole.toString()
+
+  const padded = fraction.toString().padStart(MEXAS_TOKEN.decimals, '0')
+  return `${whole}.${padded.replace(/0+$/, '')}`
+}
+
+function encodeBalanceOfCall(address: string) {
+  return `${ERC20_BALANCE_OF_SELECTOR}${address
+    .toLowerCase()
+    .replace(/^0x/, '')
+    .padStart(64, '0')}`
+}
+
+async function readMexasWalletBalanceUnits(address: string) {
+  const response = await fetch(
+    process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL || MEXAS_PUBLIC_RPC_URL,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        id: 1,
+        jsonrpc: '2.0',
+        method: 'eth_call',
+        params: [
+          {
+            data: encodeBalanceOfCall(address),
+            to: MEXAS_TOKEN.address,
+          },
+          'latest',
+        ],
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(`Arbitrum RPC returned HTTP ${response.status}`)
+  }
+
+  const payload = (await response.json()) as {
+    error?: { message?: string }
+    result?: string
+  }
+  if (payload.error) {
+    throw new Error(payload.error.message ?? 'Arbitrum RPC returned an error')
+  }
+  if (!payload.result || !/^0x[0-9a-fA-F]+$/.test(payload.result)) {
+    throw new Error('Arbitrum RPC returned an invalid balance result')
+  }
+
+  return BigInt(payload.result)
+}
+
+async function loadMexasOrderbookContractIds(db: SupabaseClient) {
+  const ids = new Set(REQUIRED_MEXAS_CONTRACTS.map((contract) => contract.id))
+
+  for (let from = 0; ; from += CONTRACT_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('contracts')
+      .select('data, importance_score, token')
+      .contains('data', { token: 'MEX' } as any)
+      .range(from, from + CONTRACT_PAGE_SIZE - 1)
+
+    if (error) throw error
+
+    for (const row of (data ?? []) as Row<'contracts'>[]) {
+      const contract = convertContract(row)
+      if (isMexasOrderBookOnlyContract(contract)) ids.add(contract.id)
+    }
+    if ((data ?? []).length < CONTRACT_PAGE_SIZE) break
+  }
+
+  return [...ids]
+}
+
+async function loadOpenReservedMexasOrders(
+  db: SupabaseClient,
+  contractIds: string[]
+) {
+  if (!contractIds.length) return []
+
+  const now = new Date().toISOString()
+  const orders: OpenMexasOrder[] = []
+
+  for (let from = 0; ; from += OPEN_ORDER_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('contract_bets')
+      .select('*')
+      .in('contract_id', contractIds)
+      .eq('is_filled', false)
+      .eq('is_cancelled', false)
+      .eq('data->>mexasFundsReserved', 'true')
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
+
+    if (error) throw error
+
+    for (const row of (data ?? []) as Row<'contract_bets'>[]) {
+      const bet = convertBet(row)
+      if ((bet as any).mexasFundsReleased === true) continue
+
+      const remainingReservedAmount = getMexasRemainingReservedAmount(bet as any)
+      const remainingReservedUnits = mexasAmountToUnits(remainingReservedAmount)
+      if (remainingReservedUnits <= 0n) continue
+
+      orders.push({
+        betId: bet.id,
+        remainingReservedUnits,
+        userId: bet.userId,
+      })
+    }
+    if ((data ?? []).length < OPEN_ORDER_PAGE_SIZE) break
+  }
+
+  return orders
+}
+
+async function checkOpenMexasOrderBacking(
+  db: SupabaseClient
+): Promise<CheckResult> {
+  try {
+    const contractIds = await loadMexasOrderbookContractIds(db)
+    const orders = await loadOpenReservedMexasOrders(db, contractIds)
+    if (!orders.length) {
+      return pass(
+        'open order backing',
+        'No open reserved MEXAS orders require on-chain backing.'
+      )
+    }
+
+    const backingByUserId = new Map<string, UserBacking>()
+    for (const order of orders) {
+      const backing = backingByUserId.get(order.userId) ?? {
+        orderIds: [],
+        requiredUnits: 0n,
+      }
+      backing.orderIds.push(order.betId)
+      backing.requiredUnits += order.remainingReservedUnits
+      backingByUserId.set(order.userId, backing)
+    }
+
+    const { data: users, error } = await db
+      .from('users')
+      .select('id,data')
+      .in('id', [...backingByUserId.keys()])
+
+    if (error) throw error
+
+    const userById = new Map(
+      ((users ?? []) as Row<'users'>[]).map((row) => [row.id, row])
+    )
+    const failures: string[] = []
+
+    for (const [userId, backing] of backingByUserId) {
+      const userRow = userById.get(userId)
+      const walletAddress = getRowData(userRow ?? null).privyWalletAddress
+
+      if (typeof walletAddress !== 'string') {
+        failures.push(`${userId} has no Privy wallet for ${backing.orderIds[0]}`)
+        continue
+      }
+      if (!EVM_ADDRESS_PATTERN.test(walletAddress)) {
+        failures.push(
+          `${userId} has invalid Privy wallet for ${backing.orderIds[0]}`
+        )
+        continue
+      }
+
+      const walletUnits = await readMexasWalletBalanceUnits(walletAddress)
+      if (walletUnits < backing.requiredUnits) {
+        failures.push(
+          `${userId} reserves ${formatMexasUnits(
+            backing.requiredUnits
+          )} MEX but wallet has ${formatMexasUnits(walletUnits)} MEX`
+        )
+      }
+    }
+
+    if (failures.length) {
+      return fail(
+        'open order backing',
+        `${failures.slice(0, 5).join('; ')}${
+          failures.length > 5 ? `; ${failures.length - 5} more` : ''
+        }`
+      )
+    }
+
+    return pass(
+      'open order backing',
+      `${orders.length} open reserved MEXAS orders are covered by users' on-chain MEX.`
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return fail('open order backing', message)
+  }
+}
+
 async function checkUrl(url: string) {
   const response = await fetch(url, { redirect: 'follow' })
   return response.status
@@ -395,6 +630,8 @@ async function runChecks() {
         ? pass('matching RPC health', 'Matching health RPC reports ready.')
         : fail('matching RPC health', 'Matching health RPC returned false.')
     )
+
+    checks.push(await checkOpenMexasOrderBacking(db))
   }
 
   if (needsLaunchSql) {
