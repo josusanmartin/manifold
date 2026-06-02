@@ -218,6 +218,21 @@ function UserProfile(props: {
   }, [])
 
   useEffect(() => {
+    if (!router.isReady) return
+    const tab = router.query.tab
+    if (tab !== 'achievements' && tab !== 'comments') return
+
+    router.replace(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, tab: 'summary' },
+      },
+      undefined,
+      { shallow: true }
+    )
+  }, [router.isReady, router.query.tab])
+
+  useEffect(() => {
     if (currentUser && currentUser.id !== user.id) {
       db.from('user_follows')
         .select('user_id')
