@@ -14,6 +14,11 @@ import {
   type SupabaseClient,
 } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
+import {
+  releaseClosedMexasMarketOrders,
+  releaseExpiredMexasOrders,
+  releaseUnbackedMexasOrders,
+} from 'web/lib/api/mexas-orders'
 
 type ErrorResponse = { message: string; details?: unknown }
 
@@ -112,6 +117,12 @@ export default async function handler(
       throw new APIError(404, 'Market is not available on MEXAS.')
     }
 
+    await releaseClosedMexasMarketOrders(db, { contractId })
+    await releaseExpiredMexasOrders(db, { contractId })
+    await releaseUnbackedMexasOrders(db, {
+      contractId,
+      requireBalanceRead: true,
+    })
     const audit = getMexasSettlementAudit(
       await loadContractBets(db, contractId)
     )

@@ -601,6 +601,10 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(apiSource, [
       '.maybeSingle()',
       "throw new APIError(404, 'Contract not found.')",
+      'await releaseClosedMexasMarketOrders(db, { contractId })',
+      'await releaseExpiredMexasOrders(db, { contractId })',
+      'await releaseUnbackedMexasOrders(db, {',
+      'requireBalanceRead: true',
       'getMexasSettlementAudit(',
       'await loadContractBets(db, contractId)',
       'audit.filledBetCount === 0',
@@ -844,7 +848,7 @@ describe('MEXAS flow safety guardrails', () => {
     )
   })
 
-  test('SQL matcher credits any unused reserved MEX before marking filled order funds released', () => {
+  test('SQL matcher idempotently credits any unused reserved MEX before marking filled order funds released', () => {
     const source = readRepoFile(
       'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
     )
@@ -852,11 +856,17 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'v_taker_reserved_amount := coalesce',
       'v_taker_unused_refund := case',
+      "v_taker_refund_credit_key := 'mexas-order-price-improvement:' || v_taker.bet_id",
       'update public.users',
-      'set balance = round(balance + v_taker_unused_refund, 8)',
+      "-> 'mexasBalanceCreditKeys'",
+      '? v_taker_refund_credit_key',
+      'else round(balance + v_taker_unused_refund, 8)',
+      'jsonb_set(',
+      "'{mexasBalanceCreditKeys}'",
+      'to_jsonb(v_taker_refund_credit_key)',
       'where id = v_taker.user_id',
       "'mexasReleaseCreditKey'",
-      "'mexas-order-price-improvement:' || v_taker.bet_id",
+      'v_taker_refund_credit_key',
       "'mexasReleaseReason'",
       "'price-improvement'",
       'update public.contract_bets',
@@ -865,13 +875,25 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'v_maker_reserved_amount := coalesce',
       'v_maker_unused_refund := case',
+      "v_maker_refund_credit_key := 'mexas-order-price-improvement:' || v_maker.bet_id",
       'update public.users',
-      'set balance = round(balance + v_maker_unused_refund, 8)',
+      "-> 'mexasBalanceCreditKeys'",
+      '? v_maker_refund_credit_key',
+      'else round(balance + v_maker_unused_refund, 8)',
+      'jsonb_set(',
+      "'{mexasBalanceCreditKeys}'",
+      'to_jsonb(v_maker_refund_credit_key)',
       'where id = v_maker.user_id',
-      "'mexas-order-price-improvement:' || v_maker.bet_id",
+      'v_maker_refund_credit_key',
       'update public.contract_bets',
       'amount = v_maker_amount',
     ])
+    expect(source).not.toContain(
+      'set balance = round(balance + v_taker_unused_refund, 8)'
+    )
+    expect(source).not.toContain(
+      'set balance = round(balance + v_maker_unused_refund, 8)'
+    )
   })
 
   test('the SQL matcher rejects non-MEXAS markets, closed/resolved markets, and expired orders', () => {

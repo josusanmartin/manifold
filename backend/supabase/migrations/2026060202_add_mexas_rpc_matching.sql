@@ -27,12 +27,14 @@ declare
   v_taker_amount numeric;
   v_taker_shares numeric;
   v_taker_unused_refund numeric := 0;
+  v_taker_refund_credit_key text;
   v_maker_limit_prob numeric;
   v_maker_order_amount numeric;
   v_maker_reserved_amount numeric;
   v_maker_amount numeric;
   v_maker_shares numeric;
   v_maker_unused_refund numeric := 0;
+  v_maker_refund_credit_key text;
   v_remaining_amount numeric;
   v_maker_remaining_amount numeric;
   v_price numeric;
@@ -232,8 +234,25 @@ begin
     );
 
     if v_maker_unused_refund > v_epsilon then
+      v_maker_refund_credit_key := 'mexas-order-price-improvement:' || v_maker.bet_id;
+
       update public.users
-      set balance = round(balance + v_maker_unused_refund, 8)
+      set
+        balance = case
+          when coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) ? v_maker_refund_credit_key
+            then balance
+          else round(balance + v_maker_unused_refund, 8)
+        end,
+        data = case
+          when coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) ? v_maker_refund_credit_key
+            then data
+          else jsonb_set(
+            coalesce(data, '{}'::jsonb),
+            '{mexasBalanceCreditKeys}',
+            coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) || to_jsonb(v_maker_refund_credit_key),
+            true
+          )
+        end
       where id = v_maker.user_id;
 
       if not found then
@@ -271,7 +290,7 @@ begin
     if v_maker_unused_refund > v_epsilon then
       v_maker_data := v_maker_data || jsonb_build_object(
         'mexasReleaseCreditKey',
-        'mexas-order-price-improvement:' || v_maker.bet_id,
+        v_maker_refund_credit_key,
         'mexasReleaseReason',
         'price-improvement',
         'mexasUnusedReservationRefund',
@@ -319,8 +338,25 @@ begin
   end;
 
   if v_taker_unused_refund > v_epsilon then
+    v_taker_refund_credit_key := 'mexas-order-price-improvement:' || v_taker.bet_id;
+
     update public.users
-    set balance = round(balance + v_taker_unused_refund, 8)
+    set
+      balance = case
+        when coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) ? v_taker_refund_credit_key
+          then balance
+        else round(balance + v_taker_unused_refund, 8)
+      end,
+      data = case
+        when coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) ? v_taker_refund_credit_key
+          then data
+        else jsonb_set(
+          coalesce(data, '{}'::jsonb),
+          '{mexasBalanceCreditKeys}',
+          coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) || to_jsonb(v_taker_refund_credit_key),
+          true
+        )
+      end
     where id = v_taker.user_id;
 
     if not found then
@@ -347,7 +383,7 @@ begin
   if v_taker_unused_refund > v_epsilon then
     v_taker_data := v_taker_data || jsonb_build_object(
       'mexasReleaseCreditKey',
-      'mexas-order-price-improvement:' || v_taker.bet_id,
+      v_taker_refund_credit_key,
       'mexasReleaseReason',
       'price-improvement',
       'mexasUnusedReservationRefund',
