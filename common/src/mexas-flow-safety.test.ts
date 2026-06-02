@@ -1020,6 +1020,30 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('CANCEL ${audit.cancelPayout} MEX')
   })
 
+  test('provides a read-only MEXAS settlement exposure audit script', () => {
+    const packageJson = readRepoFile('backend/scripts/package.json')
+    const source = readRepoFile('backend/scripts/audit-mexas-settlement.ts')
+
+    expect(packageJson).toContain('"audit:mexas-settlement"')
+    expectMarkersInOrder(source, [
+      'async function loadMexasOrderbookContracts',
+      ".contains('data', { token: 'MEX' } as any)",
+      ".is('resolution_time', null)",
+      'async function loadContractBets',
+      ".eq('is_cancelled', false)",
+      'const filledBets = bets.filter(hasMexasFilledExposure)',
+      'printTextReport(exposures)',
+      'if (exposures.length) process.exitCode = 1',
+    ])
+    expect(source).toContain('Remediation options:')
+    expect(source).toContain('Implement on-chain escrow')
+    expect(source).toContain('manually unwind after reviewing the JSON report')
+    expect(source).not.toContain(".update(")
+    expect(source).not.toContain(".insert(")
+    expect(source).not.toContain(".delete(")
+    expect(source).not.toContain(".rpc(")
+  })
+
   test('launch readiness cannot be passed by setting the escrow env before escrow code exists', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'

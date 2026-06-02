@@ -6,6 +6,7 @@
   },
   "scripts": {
     "apply:mexas-launch-sql": "ts-node apply-mexas-launch-sql.ts",
+    "audit:mexas-settlement": "ts-node audit-mexas-settlement.ts",
     "check:mexas-launch": "ts-node check-mexas-launch-readiness.ts",
     "check:mexas-smoke": "ts-node check-mexas-production-smoke.ts",
     "code": "ts-node manicode.ts"
