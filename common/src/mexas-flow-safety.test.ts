@@ -880,6 +880,7 @@ describe('MEXAS flow safety guardrails', () => {
       'auth resolve POST',
       '/api/v0/market/mexwcwin26a/resolve',
     ])
+    expect(source).toContain("'Open options'")
   })
 
   test('production smoke covers broad legacy API blockers', () => {

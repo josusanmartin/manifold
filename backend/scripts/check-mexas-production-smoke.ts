@@ -30,6 +30,7 @@ const FORBIDDEN_VISIBLE_COPY = [
   'Prize Drawain',
   'Predictle',
   'Preedictle',
+  'Open options',
 ]
 
 const PAGES = [
