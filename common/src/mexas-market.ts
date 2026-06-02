@@ -11,7 +11,7 @@ export function isMexasOrderBookOnlyContract(
   if (contract.takerAPIOrdersDisabled) return true
 
   return (
-    contract.token !== 'CASH' &&
+    contract.token === 'MEX' &&
     contract.mechanism === 'cpmm-1' &&
     contract.outcomeType === 'BINARY'
   )

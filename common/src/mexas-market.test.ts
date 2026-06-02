@@ -1,5 +1,6 @@
 import {
   getMexasAvailableBalance,
+  isMexasOrderBookOnlyContract,
   getTotalMexasRemainingReservedAmount,
   getUnbackedMexasOrderIds,
   type MexasReservedOrderData,
@@ -16,6 +17,31 @@ function order(
 }
 
 describe('MEXAS reserved order backing', () => {
+  test('identifies only MEX binary CPMM or explicitly flagged contracts', () => {
+    expect(
+      isMexasOrderBookOnlyContract({
+        token: 'MEX',
+        mechanism: 'cpmm-1',
+        outcomeType: 'BINARY',
+      })
+    ).toBe(true)
+    expect(
+      isMexasOrderBookOnlyContract({
+        token: 'MANA',
+        mechanism: 'cpmm-1',
+        outcomeType: 'BINARY',
+      })
+    ).toBe(false)
+    expect(
+      isMexasOrderBookOnlyContract({
+        token: 'MANA',
+        mechanism: 'cpmm-1',
+        outcomeType: 'BINARY',
+        takerAPIOrdersDisabled: true,
+      })
+    ).toBe(true)
+  })
+
   test('sums remaining reserved amount across open orders', () => {
     expect(
       getTotalMexasRemainingReservedAmount([
