@@ -14,6 +14,7 @@ import {
   type ConnectedWallet,
 } from '@privy-io/react-auth'
 import { MEXAS_TOKEN } from 'common/crypto/mexas'
+import { type UserAndPrivateUser } from 'common/user'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -183,7 +184,7 @@ export function MexasWalletSummary(props: { className?: string }) {
 }
 
 function MexasWalletPanelInner() {
-  const { ready, authenticated, login } = usePrivy()
+  const { ready, authenticated, login, getAccessToken } = usePrivy()
   const { createWallet } = useCreateWallet()
   const { wallets, ready: walletsReady } = useWallets()
   const user = useUser()
@@ -196,11 +197,18 @@ function MexasWalletPanelInner() {
   const [withdrawError, setWithdrawError] = useState<string | null>(null)
   const [withdrawHash, setWithdrawHash] = useState<Hex | null>(null)
   const [withdrawing, setWithdrawing] = useState(false)
+  const [internalAvailableAmount, setInternalAvailableAmount] = useState<
+    number | undefined
+  >(user?.balance)
 
   const wallet = wallets.find(
     (wallet) => wallet.walletClientType === 'privy'
   ) as ConnectedWallet | undefined
   const walletAddress = wallet?.address as Address | undefined
+
+  useEffect(() => {
+    setInternalAvailableAmount(user?.balance)
+  }, [user?.balance])
 
   const refreshBalance = useCallback(async () => {
     if (!walletAddress) return
@@ -216,6 +224,34 @@ function MexasWalletPanelInner() {
   useEffect(() => {
     refreshBalance()
   }, [refreshBalance])
+
+  const syncInternalWalletBalance = useCallback(async () => {
+    if (!walletAddress) return
+
+    try {
+      const token = await getAccessToken()
+      if (!token) return
+
+      const response = await fetch('/api/privy-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ walletAddress }),
+      })
+      if (!response.ok) return
+
+      const syncedUser = (await response.json()) as UserAndPrivateUser
+      setInternalAvailableAmount(syncedUser.user.balance)
+    } catch (error) {
+      console.error('Failed to sync internal MEX balance', error)
+    }
+  }, [getAccessToken, walletAddress])
+
+  const refreshWalletState = useCallback(async () => {
+    await Promise.all([refreshBalance(), syncInternalWalletBalance()])
+  }, [refreshBalance, syncInternalWalletBalance])
 
   const createPrivyWallet = async () => {
     setLoadingWallet(true)
@@ -240,8 +276,10 @@ function MexasWalletPanelInner() {
   }, [withdrawAmount])
 
   const internalAvailableUnits = useMemo(() => {
-    return user ? mexasAmountToUnits(user.balance) : null
-  }, [user])
+    return internalAvailableAmount === undefined
+      ? null
+      : mexasAmountToUnits(internalAvailableAmount)
+  }, [internalAvailableAmount])
   const withdrawableUnits =
     balanceUnits !== null && internalAvailableUnits !== null
       ? minUnits(balanceUnits, internalAvailableUnits)
@@ -301,7 +339,7 @@ function MexasWalletPanelInner() {
       setWithdrawHash(hash)
       setWithdrawAmount('')
       setWithdrawAddress('')
-      setTimeout(refreshBalance, 4000)
+      setTimeout(refreshWalletState, 4000)
     } catch (error) {
       console.error('Failed to withdraw MEX', error)
       setWithdrawError(
@@ -376,11 +414,11 @@ function MexasWalletPanelInner() {
             </span>
           </Row>
           <div className="text-ink-500 text-sm">
-            Disponible para órdenes: {getDisplayAmount(user?.balance)}{' '}
+            Disponible para órdenes: {getDisplayAmount(internalAvailableAmount)}{' '}
             {MEXAS_TOKEN.symbol}
           </div>
         </Col>
-        <Button color="gray-white" size="sm" onClick={refreshBalance}>
+        <Button color="gray-white" size="sm" onClick={refreshWalletState}>
           <RefreshIcon className="mr-1 h-4 w-4" />
           Actualizar
         </Button>

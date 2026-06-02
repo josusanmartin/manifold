@@ -16,6 +16,10 @@ import {
 import { isAddress, type Address } from 'viem'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getOpenReservedMexasAmount } from 'web/lib/api/mexas-orders'
+import {
+  acquireMexasUserBalanceLock,
+  releaseMexasUserBalanceLock,
+} from 'web/lib/api/mexas-balance'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
 
@@ -298,55 +302,60 @@ async function updateExistingUser(params: {
     throw new Error('Could not update Privy user.')
   }
 
-  let latestUserRow = userRow
-  for (let attempt = 0; attempt < USER_UPDATE_ATTEMPTS; attempt++) {
-    const walletSync = await getMexasWalletSync(
-      db,
-      latestUserRow,
-      walletAddress
-    )
-    const userData = {
-      ...getUserData(latestUserRow),
-      ...(walletSync?.data ?? {}),
-      privyUserId: latestUserRow.id,
-      ...(walletAddress ? { privyWalletAddress: walletAddress } : {}),
-    }
-
-    const { data: updatedUser, error: userError } = await db
-      .from('users')
-      .update({
-        data: userData,
-        ...(walletSync
-          ? {
-              balance: walletSync.balance,
-              total_deposits: walletSync.totalDeposits,
-            }
-          : {}),
-      })
-      .eq('id', latestUserRow.id)
-      .eq('balance', latestUserRow.balance)
-      .select()
-      .maybeSingle()
-
-    if (userError) throw userError
-    if (updatedUser) {
-      return {
-        user: convertUser(updatedUser),
-        privateUser: convertPrivateUser(updatedPrivateUser),
+  const balanceLockOwner = await acquireMexasUserBalanceLock(db, userRow.id)
+  try {
+    let latestUserRow = userRow
+    for (let attempt = 0; attempt < USER_UPDATE_ATTEMPTS; attempt++) {
+      const walletSync = await getMexasWalletSync(
+        db,
+        latestUserRow,
+        walletAddress
+      )
+      const userData = {
+        ...getUserData(latestUserRow),
+        ...(walletSync?.data ?? {}),
+        privyUserId: latestUserRow.id,
+        ...(walletAddress ? { privyWalletAddress: walletAddress } : {}),
       }
+
+      const { data: updatedUser, error: userError } = await db
+        .from('users')
+        .update({
+          data: userData,
+          ...(walletSync
+            ? {
+                balance: walletSync.balance,
+                total_deposits: walletSync.totalDeposits,
+              }
+            : {}),
+        })
+        .eq('id', latestUserRow.id)
+        .eq('balance', latestUserRow.balance)
+        .select()
+        .maybeSingle()
+
+      if (userError) throw userError
+      if (updatedUser) {
+        return {
+          user: convertUser(updatedUser),
+          privateUser: convertPrivateUser(updatedPrivateUser),
+        }
+      }
+
+      const { data: refetchedUserRow, error: refetchError } = await db
+        .from('users')
+        .select()
+        .eq('id', latestUserRow.id)
+        .single()
+
+      if (refetchError) throw refetchError
+      latestUserRow = refetchedUserRow
     }
 
-    const { data: refetchedUserRow, error: refetchError } = await db
-      .from('users')
-      .select()
-      .eq('id', latestUserRow.id)
-      .single()
-
-    if (refetchError) throw refetchError
-    latestUserRow = refetchedUserRow
+    throw new Error('Could not update Privy user balance.')
+  } finally {
+    await releaseMexasUserBalanceLock(db, userRow.id, balanceLockOwner)
   }
-
-  throw new Error('Could not update Privy user balance.')
 }
 
 async function createPrivyManifoldUser(params: {

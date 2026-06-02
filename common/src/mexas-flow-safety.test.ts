@@ -69,6 +69,17 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('syncs Privy wallet balances under the user balance lock', () => {
+    const source = readRepoFile('web/pages/api/privy-user.ts')
+
+    expectMarkersInOrder(source, [
+      'const balanceLockOwner = await acquireMexasUserBalanceLock(db, userRow.id)',
+      'const walletSync = await getMexasWalletSync',
+      ".eq('balance', latestUserRow.balance)",
+      'await releaseMexasUserBalanceLock(db, userRow.id, balanceLockOwner)',
+    ])
+  })
+
   test('keeps live crossing matches blocked until a transactional MEXAS engine exists', () => {
     const source = readRepoFile('common/src/mexas-settlement.ts')
 
