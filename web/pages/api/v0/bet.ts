@@ -4,7 +4,10 @@ import { APIError } from 'common/api/utils'
 import { getNewBetId, LimitBet, type Bet } from 'common/bet'
 import { getCpmmProbability } from 'common/calculate-cpmm'
 import { MarketContract } from 'common/contract'
-import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+import {
+  getMexasRemainingReservedAmount,
+  isMexasOrderBookOnlyContract,
+} from 'common/mexas-market'
 import { getBinaryCpmmBetInfo } from 'common/new-bet'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
@@ -215,9 +218,35 @@ function createMexasOpenLimitBet(
     isFilled: false,
     isCancelled: false,
     fills: [],
+    mexasFundsReserved: true,
+    mexasFundsReleased: false,
+    mexasReservedAmount: params.amount,
     expiresAt: getLimitOrderExpiresAt(params),
     silent: params.silent,
   }) as LimitBet
+}
+
+async function refundMexasReservation(
+  db: SupabaseClient,
+  userId: string,
+  amount: number
+) {
+  if (amount <= 0) return
+
+  const { data: userRow, error: readError } = await db
+    .from('users')
+    .select('id,balance')
+    .eq('id', userId)
+    .single()
+
+  if (readError) throw readError
+
+  const { error: updateError } = await db
+    .from('users')
+    .update({ balance: userRow.balance + amount })
+    .eq('id', userId)
+
+  if (updateError) throw updateError
 }
 
 function getContractUpdate(
@@ -368,22 +397,22 @@ async function placeBinaryBet(
         ? contractRow.data
         : {}
 
-    const [
-      { error: userUpdateError },
-      { error: betError },
-      { error: contractUpdateError },
-    ] = await Promise.all([
-      db
-        .from('users')
-        .update({
-          data: {
-            ...getUserData(syncedUserRow),
-            lastBetTime: bet.createdTime,
-          },
-        })
-        .eq('id', userId),
-      db.from('contract_bets').insert(betToRow(bet)),
-      db
+    const reservedAmount = getMexasRemainingReservedAmount(bet)
+    const { error: userUpdateError } = await db
+      .from('users')
+      .update({
+        balance: syncedUserRow.balance - reservedAmount,
+        data: {
+          ...getUserData(syncedUserRow),
+          lastBetTime: bet.createdTime,
+        },
+      })
+      .eq('id', userId)
+
+    if (userUpdateError) throw userUpdateError
+
+    try {
+      const { error: contractUpdateError } = await db
         .from('contracts')
         .update({
           data: {
@@ -392,12 +421,18 @@ async function placeBinaryBet(
           },
           last_updated_time: millisToTs(bet.createdTime),
         })
-        .eq('id', contract.id),
-    ])
+        .eq('id', contract.id)
 
-    if (userUpdateError) throw userUpdateError
-    if (betError) throw betError
-    if (contractUpdateError) throw contractUpdateError
+      if (contractUpdateError) throw contractUpdateError
+
+      const { error: betError } = await db
+        .from('contract_bets')
+        .insert(betToRow(bet))
+      if (betError) throw betError
+    } catch (error) {
+      await refundMexasReservation(db, userId, reservedAmount)
+      throw error
+    }
 
     return res.status(200).json({ ...bet, betId: bet.id } as LimitBet)
   }

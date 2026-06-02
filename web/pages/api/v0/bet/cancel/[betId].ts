@@ -1,7 +1,14 @@
 import { PrivyClient } from '@privy-io/node'
 import { APIError } from 'common/api/utils'
 import { LimitBet } from 'common/bet'
+import { MarketContract } from 'common/contract'
+import {
+  getMexasRemainingReservedAmount,
+  isMexasOrderBookOnlyContract,
+  type MexasReservedOrderData,
+} from 'common/mexas-market'
 import { convertBet } from 'common/supabase/bets'
+import { convertContract } from 'common/supabase/contracts'
 import { createClient, type Row } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
 
@@ -101,20 +108,67 @@ export default async function handler(
       throw new APIError(403, 'Order already filled.')
     }
 
+    const { data: contractRow, error: contractError } = await db
+      .from('contracts')
+      .select('*')
+      .eq('id', bet.contractId)
+      .single()
+
+    if (contractError) throw contractError
+    if (!contractRow) throw new APIError(404, 'Contract not found.')
+
+    const contract = convertContract(contractRow) as MarketContract
+    const betData = getBetData(
+      betRow as Row<'contract_bets'>
+    ) as MexasReservedOrderData & Record<string, unknown>
+    const shouldReleaseMexasFunds =
+      isMexasOrderBookOnlyContract(contract) &&
+      betData.mexasFundsReserved === true &&
+      betData.mexasFundsReleased !== true
+    const refundAmount = shouldReleaseMexasFunds
+      ? getMexasRemainingReservedAmount({
+          amount: limitBet.amount,
+          orderAmount: limitBet.orderAmount,
+          mexasReservedAmount: betData.mexasReservedAmount,
+        })
+      : 0
+
     const { data: updatedBetRow, error: updateError } = await db
       .from('contract_bets')
       .update({
         is_cancelled: true,
         data: {
-          ...getBetData(betRow as Row<'contract_bets'>),
+          ...betData,
           isCancelled: true,
+          mexasFundsReleased: shouldReleaseMexasFunds
+            ? true
+            : betData.mexasFundsReleased,
         },
       })
       .eq('bet_id', betId)
+      .eq('is_cancelled', false)
       .select()
       .single()
 
     if (updateError) throw updateError
+
+    if (refundAmount > 0) {
+      const { data: userRow, error: userReadError } = await db
+        .from('users')
+        .select('id,balance')
+        .eq('id', userId)
+        .single()
+
+      if (userReadError) throw userReadError
+
+      const { error: userUpdateError } = await db
+        .from('users')
+        .update({ balance: userRow.balance + refundAmount })
+        .eq('id', userId)
+
+      if (userUpdateError) throw userUpdateError
+    }
+
     return res
       .status(200)
       .json(convertBet(updatedBetRow as Row<'contract_bets'>) as LimitBet)

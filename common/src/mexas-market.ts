@@ -16,3 +16,23 @@ export function isMexasOrderBookOnlyContract(
     contract.outcomeType === 'BINARY'
   )
 }
+
+export type MexasReservedOrderData = {
+  amount?: number
+  orderAmount?: number
+  mexasReservedAmount?: number
+  mexasFundsReserved?: boolean
+  mexasFundsReleased?: boolean
+}
+
+export function getMexasRemainingReservedAmount(
+  order: MexasReservedOrderData
+) {
+  const reservedAmount =
+    typeof order.mexasReservedAmount === 'number'
+      ? order.mexasReservedAmount
+      : order.orderAmount ?? 0
+  const filledAmount = order.amount ?? 0
+
+  return Math.max(0, reservedAmount - filledAmount)
+}
