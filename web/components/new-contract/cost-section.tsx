@@ -35,12 +35,12 @@ export const CostSection = (props: {
       )}
       {ante > balance && (
         <div className="mb-2 mr-auto mt-2 self-center whitespace-nowrap text-xs font-medium tracking-wide">
-          <span className="text-scarlet-500 mr-2">Insufficient balance</span>
+          <span className="text-scarlet-500 mr-2">Saldo insuficiente</span>
           <Link
             href="/wallet"
             className="rounded bg-teal-500 px-2 py-1 text-white hover:bg-teal-600"
           >
-            Open wallet
+            Abrir Wallet
           </Link>
         </div>
       )}
@@ -63,13 +63,13 @@ function PriceSection(props: {
   return (
     <Col className="w-full gap-2">
       <div className="text-ink-600 text-sm">
-        More liquidity attracts more traders but has a higher cost.{' '}
+        Mas liquidez atrae mas traders, pero cuesta mas.{' '}
         <span className="text-ink-700">
-          {formatMoney(liquidityTier)} liquidity, earn{' '}
+          {formatMoney(liquidityTier)} de liquidez, gana{' '}
           <span className="text-ink-900 font-semibold">
             {formatMoney(bonus)}
           </span>{' '}
-          for every unique trader
+          por cada trader unico
         </span>
       </div>
       <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4">

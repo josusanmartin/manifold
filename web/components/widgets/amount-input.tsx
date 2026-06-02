@@ -329,7 +329,7 @@ export function BuyAmountInput(props: {
           showBalance &&
           user && (
             <div className="text-ink-500 mt-4 whitespace-nowrap text-sm">
-              Balance{' '}
+              Saldo{' '}
               <span className="text-ink-800">
                 {formatWithToken({ amount: user.balance, token: token })}
               </span>
@@ -344,12 +344,12 @@ export function BuyAmountInput(props: {
 const BuyMoreFunds = (_props: { user: User | null | undefined }) => {
   return (
     <>
-      Not enough funds.
+      Saldo insuficiente.
       <Link
         href="/wallet"
         className="text-primary-500 hover:decoration-primary-400 ml-1 hover:underline"
       >
-        Open wallet
+        Abrir Wallet
       </Link>
     </>
   )

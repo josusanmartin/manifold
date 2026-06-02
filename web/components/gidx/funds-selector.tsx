@@ -41,13 +41,11 @@ export function FundsSelector(props: {
     <Col className="mx-auto max-w-xl">
       <Row className="mb-2 items-center gap-1 text-2xl font-semibold">
         <FaStore className="h-6 w-6" />
-        Open MEX wallet
+        Abrir Wallet MEX
       </Row>
       <div className={clsx('text-ink-700 mb-4 text-sm')}>
         <div>
-          <span>
-            Deposit MEX to your wallet to trade in your favorite questions.
-          </span>
+          <span>Deposita MEX en tu Wallet para operar mercados.</span>
           <CashoutLimitWarning user={user} className="mt-2" />
         </div>
       </div>
@@ -68,14 +66,14 @@ export function FundsSelector(props: {
           ))}
       </div>
       {isPurchaseBanned && (
-        <AlertBox title="Purchases disabled" className="my-4">
-          Your account has been restricted from wallet funding.
+        <AlertBox title="Fondos desactivados" className="my-4">
+          Tu cuenta tiene restringido el fondeo de Wallet.
         </AlertBox>
       )}
       {pastLimit && !isPurchaseBanned && (
-        <AlertBox title="Purchase limit" className="my-4">
-          You have reached your daily purchase limit of{' '}
-          {formatMoneyUSD(DOLLAR_PURCHASE_LIMIT)}. Please try again tomorrow.
+        <AlertBox title="Limite diario" className="my-4">
+          Alcanzaste tu limite diario de{' '}
+          {formatMoneyUSD(DOLLAR_PURCHASE_LIMIT)}. Intentalo de nuevo manana.
         </AlertBox>
       )}
     </Col>

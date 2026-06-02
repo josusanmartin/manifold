@@ -730,9 +730,9 @@ export function NewContractPanel(props: {
   // Add balance validation
   const hasInsufficientBalance = cost > creator.balance
   if (hasInsufficientBalance && !validation.errors.balance) {
-    validation.errors.balance = `Insufficient balance. You need ${formatMoney(
+    validation.errors.balance = `Saldo insuficiente. Necesitas ${formatMoney(
       cost
-    )} but only have ${formatMoney(creator.balance)}`
+    )} y solo tienes ${formatMoney(creator.balance)}`
   }
 
   // Handle type change
