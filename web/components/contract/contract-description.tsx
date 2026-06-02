@@ -52,7 +52,7 @@ export function ContractDescription(props: {
           )}
         >
           <LogoIcon className="h-5 w-5 text-teal-600" />
-          <span>This question is managed and resolved by MEXAS Markets.</span>
+          <span>Este mercado es gestionado y resuelto por MEXAS Markets.</span>
           <LogoIcon className="h-5 w-5 text-teal-600" />
         </div>
       </div>

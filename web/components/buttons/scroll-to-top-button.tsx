@@ -40,7 +40,7 @@ export function ScrollToTopButton(props: { className?: string }) {
     >
       <Row className="text-ink-600 gap-2 align-middle">
         <ArrowUpIcon className="text-ink-400 h-5 w-5" />
-        Scroll to top
+        Volver arriba
       </Row>
     </button>
   )

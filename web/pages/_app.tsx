@@ -192,7 +192,7 @@ function MyApp({ Component, pageProps }: AppProps<ManifoldPageProps>) {
             href="#main-content"
             className="focus:bg-primary-500 focus:text-ink-0 sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[9999] focus:rounded focus:px-4 focus:py-2"
           >
-            Skip to main content
+            Saltar al contenido principal
           </a>
           <PrivyWalletProviders>
             <AuthProvider serverUser={pageProps.auth}>

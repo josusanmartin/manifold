@@ -67,7 +67,7 @@ export default function ContractPage(props: MaybeAuthedContractParams) {
     return (
       <Page trackPageView={false}>
         <div className="flex h-[50vh] flex-col items-center justify-center">
-          <Title>Question deleted</Title>
+          <Title>Pregunta eliminada</Title>
         </div>
       </Page>
     )

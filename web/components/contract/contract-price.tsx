@@ -54,8 +54,8 @@ export function BinaryResolutionOrChance(props: {
       {resolution ? (
         <>
           <div className={'text-ink-800 text-base'}>
-            Resolved
-            {resolution === 'MKT' && ' as '}
+            Resuelto
+            {resolution === 'MKT' && ' como '}
           </div>
           <BinaryContractOutcomeLabel
             contract={contract}
@@ -74,7 +74,7 @@ export function BinaryResolutionOrChance(props: {
               subtextClassName
             )}
           >
-            chance
+            probabilidad
           </div>
         </>
       )}
@@ -100,7 +100,7 @@ export function PseudoNumericResolutionOrExpectation(props: {
     <Row className={clsx('items-baseline gap-2 text-3xl', className)}>
       {resolution ? (
         <>
-          <div className="text-base">Resolved</div>
+          <div className="text-base">Resuelto</div>
           {resolution === 'CANCEL' ? (
             <CancelLabel />
           ) : (
@@ -118,7 +118,7 @@ export function PseudoNumericResolutionOrExpectation(props: {
               {spring.to((val) => formatLargeNumber(val))}
             </animated.div>
           </Tooltip>
-          <div className="text-base">expected</div>
+          <div className="text-base">esperado</div>
         </>
       )}
     </Row>
@@ -146,7 +146,7 @@ export function NumberResolutionOrExpectation(props: {
     <Row className={clsx('items-baseline gap-2 text-3xl', className)}>
       {resolution ? (
         <>
-          <div className="text-base">Resolved</div>
+          <div className="text-base">Resuelto</div>
           {resolution === 'CANCEL' ? (
             <CancelLabel />
           ) : (
@@ -170,7 +170,7 @@ export function NumberResolutionOrExpectation(props: {
               {spring.to((val) => formatNumberExpectedValue(val, contract))}
             </animated.div>
           </Tooltip>
-          <div className="text-base">expected</div>
+          <div className="text-base">esperado</div>
         </>
       )}
     </Row>
@@ -197,7 +197,7 @@ export function MultiNumericResolutionOrExpectation(props: {
     >
       {resolution ? (
         <>
-          <div className="mr-2 text-base">Resolved</div>
+          <div className="mr-2 text-base">Resuelto</div>
           {resolution === 'CANCEL' ? (
             <CancelLabel />
           ) : (
@@ -216,7 +216,7 @@ export function MultiNumericResolutionOrExpectation(props: {
           <animated.div className={'mr-2 inline-block'}>
             {spring.to((val) => formatExpectedValue(val, contract))}
           </animated.div>
-          <span className="text-base">expected</span>
+          <span className="text-base">esperado</span>
         </>
       )}
     </span>
@@ -242,7 +242,7 @@ export function MultiDateResolutionOrExpectation(props: {
     >
       {resolution ? (
         <>
-          <div className="mr-2 text-base">Resolved</div>
+          <div className="mr-2 text-base">Resuelto</div>
           {resolution === 'CANCEL' ? (
             <CancelLabel />
           ) : (

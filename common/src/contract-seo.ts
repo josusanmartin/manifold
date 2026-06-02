@@ -87,14 +87,14 @@ export function getSeoDescription(contract: Contract) {
   const stringDesc = typeof desc === 'string' ? desc : richTextToString(desc)
 
   const prefix = resolution
-    ? `Resolved ${getResolvedValue(contract) || resolution}. `
+    ? `Resuelto ${getResolvedValue(contract) || resolution}. `
     : contract.outcomeType === 'BINARY'
-    ? `${formatPercent(getDisplayProbability(contract))} chance. `
+    ? `${formatPercent(getDisplayProbability(contract))} de probabilidad. `
     : contract.outcomeType === 'PSEUDO_NUMERIC'
     ? `${getFormattedMappedValue(
         contract,
         getDisplayProbability(contract)
-      )} expected. `
+      )} esperado. `
     : ''
 
   return prefix + stringDesc

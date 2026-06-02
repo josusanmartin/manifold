@@ -78,13 +78,13 @@ export function truncateText(text: string, maxLength: number): string {
 
 function getVagueLabel(probability: number): string {
   const p = Math.max(0, Math.min(1, probability))
-  if (p < 0.05) return 'Almost certainly not'
-  if (p < 0.2) return 'Unlikely'
-  if (p < 0.4) return 'Probably not'
-  if (p < 0.6) return 'Roughly even odds'
-  if (p < 0.8) return 'Likely'
-  if (p < 0.95) return 'Very likely'
-  return 'Almost certainly'
+  if (p < 0.05) return 'Casi seguro que no'
+  if (p < 0.2) return 'Poco probable'
+  if (p < 0.4) return 'Probablemente no'
+  if (p < 0.6) return 'Probabilidades parejas'
+  if (p < 0.8) return 'Probable'
+  if (p < 0.95) return 'Muy probable'
+  return 'Casi seguro'
 }
 
 /** Unicode-escape <, >, & to prevent XSS in inline <script> tags.
@@ -208,7 +208,7 @@ function formatMarketAnswer(input: MarketJsonLdInput): {
       key: 'suggestedAnswer',
       answer: {
         '@type': 'Answer',
-        text: `${label} — MEXAS Markets prediction market estimates a ${pct}% chance (${input.uniqueBettorCount.toLocaleString()} traders, as of ${dateLabel}).`,
+        text: `${label} — MEXAS Markets estima una probabilidad de ${pct}% (${input.uniqueBettorCount.toLocaleString()} operadores, al ${dateLabel}).`,
         url: input.url,
         dateModified: isoDate,
         author: MEXAS_ORG,
@@ -245,15 +245,15 @@ function formatMarketAnswer(input: MarketJsonLdInput): {
       top3.length === 1
         ? top3[0].text
         : top3.length === 2
-        ? `${top3[0].text} and ${top3[1].text}`
-        : `${top3[0].text}, followed by ${top3[1].text} and ${top3[2].text}`
+        ? `${top3[0].text} y ${top3[1].text}`
+        : `${top3[0].text}, seguido por ${top3[1].text} y ${top3[2].text}`
     return {
       key: 'suggestedAnswer',
       answer: {
         '@type': 'Answer',
-        text: `Per MEXAS Markets prediction market, ${names} ${
-          top3.length === 1 ? 'is' : 'are'
-        } most likely. See the market for live updates (${input.uniqueBettorCount.toLocaleString()} traders, as of ${dateLabel}).`,
+        text: `Según el mercado de predicción de MEXAS Markets, ${names} ${
+          top3.length === 1 ? 'es' : 'son'
+        } lo más probable. Consulta el mercado para actualizaciones en vivo (${input.uniqueBettorCount.toLocaleString()} operadores, al ${dateLabel}).`,
         url: input.url,
         dateModified: isoDate,
         author: MEXAS_ORG,

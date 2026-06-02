@@ -34,7 +34,7 @@ export function MarketContext(props: { contractId: string }) {
   return (
     <Col className="border-ink-200 -mx-1 mt-2 w-full rounded-lg border p-3">
       <Row className="w-full items-center justify-between">
-        <span className="font-semibold">Market context</span>
+        <span className="font-semibold">Contexto del mercado</span>
         <Button
           loading={loading}
           disabled={loading}
@@ -42,7 +42,7 @@ export function MarketContext(props: { contractId: string }) {
           onClick={handleClick}
           className="-mr-2 self-end"
         >
-          {loading ? 'Generating' : expanded ? '' : context ? '' : 'Generate'}
+          {loading ? 'Generando' : expanded ? '' : context ? '' : 'Generar'}
           {!context ? null : expanded ? (
             <ChevronUpIcon className="ml-1 h-4 w-4" />
           ) : (
@@ -54,7 +54,7 @@ export function MarketContext(props: { contractId: string }) {
         <div className={clsx(' border-ink-200 mt-2  py-2', 'text-ink-700')}>
           {error && (
             <p className="text-scarlet-500">
-              Failed to load context. Please try again later.
+              No se pudo cargar el contexto. Inténtalo de nuevo más tarde.
             </p>
           )}
 
@@ -62,7 +62,7 @@ export function MarketContext(props: { contractId: string }) {
 
           {data && !context && (
             <p className="text-ink-500 italic">
-              No additional context available for this market.
+              No hay contexto adicional disponible para este mercado.
             </p>
           )}
         </div>

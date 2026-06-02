@@ -23,7 +23,7 @@ export const Footer = ({ showAbout = false }: { showAbout?: boolean }) => (
       className="hover:underline"
       onClick={() => track('Click TOS')}
     >
-      Terms
+      Términos
     </a>
     <span className="mx-2">&bull;</span>
     <a
@@ -32,7 +32,7 @@ export const Footer = ({ showAbout = false }: { showAbout?: boolean }) => (
       className="hover:underline"
       onClick={() => track('Click Privacy')}
     >
-      Privacy
+      Privacidad
     </a>
   </footer>
 )

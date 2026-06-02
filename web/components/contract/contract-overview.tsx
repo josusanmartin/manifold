@@ -448,7 +448,7 @@ const ChoiceOverview = (props: {
       <Row className="relative justify-between gap-2">
         {contract.resolution === 'CANCEL' ? (
           <div className="flex items-end gap-2 text-2xl sm:text-3xl">
-            <span className="text-base">Resolved</span>
+            <span className="text-base">Resuelto</span>
             <CancelLabel />
           </div>
         ) : (
@@ -942,7 +942,7 @@ const BinaryChoiceOverview = (props: {
           {getIsLive(contract) && (
             <Row className="items-center  gap-2 text-base text-red-500">
               <div className="ml-2 h-2 w-2 animate-pulse rounded-full bg-red-500" />
-              Live
+              En vivo
             </Row>
           )}
         </Row>
@@ -950,7 +950,7 @@ const BinaryChoiceOverview = (props: {
       <Row className="justify-between gap-2">
         {contract.resolution === 'CANCEL' ? (
           <div className="flex items-end gap-2 text-2xl sm:text-3xl">
-            <span className="text-base">Resolved</span>
+            <span className="text-base">Resuelto</span>
             <CancelLabel />
           </div>
         ) : (
@@ -1035,7 +1035,7 @@ export const SimpleMultiOverview = (props: { contract: CPMMMultiContract }) => {
       <Row className="justify-between gap-2">
         {contract.resolution === 'CANCEL' ? (
           <div className="flex items-end gap-2 text-2xl sm:text-3xl">
-            <span className="text-base">Resolved</span>
+            <span className="text-base">Resuelto</span>
             <CancelLabel />
           </div>
         ) : (

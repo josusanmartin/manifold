@@ -65,7 +65,7 @@ export function ContractSEO(props: {
 
   const breadcrumbs = jsonLd
     ? buildBreadcrumbs([
-        { name: 'Home', url: MEXAS_SITE_URL },
+        { name: 'Inicio', url: MEXAS_SITE_URL },
         {
           name: contract.creatorName,
           url: `${MEXAS_SITE_URL}/${contract.creatorUsername}`,
