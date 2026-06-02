@@ -30,6 +30,7 @@ declare
   v_taker_refund_credit_key text;
   v_taker_user_data jsonb;
   v_taker_user_credit_keys jsonb;
+  v_taker_open_reserved_amount numeric;
   v_maker_limit_prob numeric;
   v_maker_order_amount numeric;
   v_maker_reserved_amount numeric;
@@ -39,6 +40,7 @@ declare
   v_maker_refund_credit_key text;
   v_maker_user_data jsonb;
   v_maker_user_credit_keys jsonb;
+  v_maker_open_reserved_amount numeric;
   v_remaining_amount numeric;
   v_maker_remaining_amount numeric;
   v_price numeric;
@@ -318,6 +320,42 @@ begin
     returning *
     into v_maker;
 
+    select coalesce(
+      round(
+        sum(
+          greatest(
+            0,
+            coalesce(
+              (b.data ->> 'mexasReservedAmount')::numeric,
+              (b.data ->> 'orderAmount')::numeric,
+              0
+            ) - coalesce(b.amount, 0)
+          )
+        ),
+        8
+      ),
+      0
+    )
+    into v_maker_open_reserved_amount
+    from public.contract_bets b
+    where
+      b.user_id = v_maker.user_id
+      and coalesce(b.is_cancelled, false) = false
+      and coalesce(b.is_filled, false) = false
+      and (b.expires_at is null or b.expires_at > v_now_ts)
+      and b.data ->> 'orderAmount' is not null
+      and coalesce((b.data ->> 'mexasFundsReserved')::boolean, false) = true
+      and coalesce((b.data ->> 'mexasFundsReleased')::boolean, false) = false;
+
+    update public.users
+    set data = jsonb_set(
+      coalesce(data, '{}'::jsonb),
+      '{mexasWalletOpenReservedAmount}',
+      to_jsonb(v_maker_open_reserved_amount),
+      true
+    )
+    where id = v_maker.user_id;
+
     v_matches := v_matches || jsonb_build_array(
       jsonb_build_object(
         'makerBetId',
@@ -416,6 +454,42 @@ begin
   where bet_id = v_taker.bet_id
   returning *
   into v_taker;
+
+  select coalesce(
+    round(
+      sum(
+        greatest(
+          0,
+          coalesce(
+            (b.data ->> 'mexasReservedAmount')::numeric,
+            (b.data ->> 'orderAmount')::numeric,
+            0
+          ) - coalesce(b.amount, 0)
+        )
+      ),
+      8
+    ),
+    0
+  )
+  into v_taker_open_reserved_amount
+  from public.contract_bets b
+  where
+    b.user_id = v_taker.user_id
+    and coalesce(b.is_cancelled, false) = false
+    and coalesce(b.is_filled, false) = false
+    and (b.expires_at is null or b.expires_at > v_now_ts)
+    and b.data ->> 'orderAmount' is not null
+    and coalesce((b.data ->> 'mexasFundsReserved')::boolean, false) = true
+    and coalesce((b.data ->> 'mexasFundsReleased')::boolean, false) = false;
+
+  update public.users
+  set data = jsonb_set(
+    coalesce(data, '{}'::jsonb),
+    '{mexasWalletOpenReservedAmount}',
+    to_jsonb(v_taker_open_reserved_amount),
+    true
+  )
+  where id = v_taker.user_id;
 
   return jsonb_build_object(
     'taker',

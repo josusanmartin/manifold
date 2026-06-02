@@ -90,6 +90,13 @@ describe('MEXAS flow safety guardrails', () => {
       'const data = getUserData(freshUserRow)',
       "let latestUserRow = freshUserRow as Row<'users'>",
     ])
+    expectMarkersInOrder(source, [
+      'const openReservedAmount = await getOpenReservedMexasAmount',
+      '[MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: openReservedAmount',
+    ])
+    expect(source).toContain(
+      "const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =\n  'mexasWalletOpenReservedAmount'"
+    )
     expect(source).not.toContain('let latestUserRow = userRow')
   })
 
@@ -207,10 +214,16 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'async function completePreparedMexasOrderRelease',
       'await updateMexasUserBalanceCas(db, bet.userId, refundAmount',
+      'dataPatch: await getOpenReservedMexasDataPatch(db, bet.userId)',
       'mexasFundsReleased: true',
       ".eq('is_cancelled', true)",
       ".eq('is_filled', false)",
       ".eq('updated_time', row.updated_time)",
+    ])
+    expectMarkersInOrder(source, [
+      'async function getOpenReservedMexasDataPatch',
+      '[MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]:',
+      'await getOpenReservedMexasAmount(db, { userId })',
     ])
     expectMarkersInOrder(source, [
       'export async function releasePendingMexasOrderReleases',
@@ -1019,6 +1032,35 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain(
       'set balance = round(balance + v_maker_unused_refund, 8)'
     )
+  })
+
+  test('SQL matcher refreshes wallet open reserved amounts after maker and taker fills', () => {
+    const source = readRepoFile(
+      'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
+    )
+
+    expectMarkersInOrder(source, [
+      'v_taker_open_reserved_amount numeric',
+      'v_maker_open_reserved_amount numeric',
+      'update public.contract_bets',
+      'returning *',
+      'into v_maker',
+      'into v_maker_open_reserved_amount',
+      "where\n      b.user_id = v_maker.user_id",
+      "'{mexasWalletOpenReservedAmount}'",
+      'to_jsonb(v_maker_open_reserved_amount)',
+      'where id = v_maker.user_id',
+    ])
+    expectMarkersInOrder(source, [
+      'update public.contract_bets',
+      'returning *',
+      'into v_taker',
+      'into v_taker_open_reserved_amount',
+      "where\n    b.user_id = v_taker.user_id",
+      "'{mexasWalletOpenReservedAmount}'",
+      'to_jsonb(v_taker_open_reserved_amount)',
+      'where id = v_taker.user_id',
+    ])
   })
 
   test('the SQL matcher rejects non-MEXAS markets, closed/resolved markets, and expired orders', () => {

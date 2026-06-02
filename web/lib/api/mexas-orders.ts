@@ -22,6 +22,8 @@ const EXPIRED_ORDER_PAGE_SIZE = 1000
 const OPEN_RESERVED_ORDER_PAGE_SIZE = 1000
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
+const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =
+  'mexasWalletOpenReservedAmount'
 const MEXAS_RELEASE_REASON_EXPIRED = 'expired'
 const MEXAS_RELEASE_REASON_MARKET_CLOSED = 'market-closed'
 const MEXAS_RELEASE_REASON_CANCELLED = 'cancelled'
@@ -73,9 +75,20 @@ async function syncAvailableBalanceFromBacking(params: {
       dataPatch: {
         [MEXAS_WALLET_SYNC_UNITS_KEY]: params.onChainUnits.toString(),
         [MEXAS_WALLET_SYNC_TIME_KEY]: Date.now(),
+        [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: openReservedAmount,
       },
     }
   )
+}
+
+async function getOpenReservedMexasDataPatch(
+  db: SupabaseClient,
+  userId: string
+) {
+  return {
+    [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]:
+      await getOpenReservedMexasAmount(db, { userId }),
+  }
 }
 
 async function prepareOpenMexasOrderRelease(
@@ -252,6 +265,7 @@ async function completePreparedMexasOrderRelease(
     if (refundAmount > 0) {
       await updateMexasUserBalanceCas(db, bet.userId, refundAmount, {
         creditKey,
+        dataPatch: await getOpenReservedMexasDataPatch(db, bet.userId),
       })
     }
 

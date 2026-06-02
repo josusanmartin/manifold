@@ -49,6 +49,8 @@ type ErrorResponse = { message: string; details?: unknown }
 
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
+const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =
+  'mexasWalletOpenReservedAmount'
 const BALANCE_UPDATE_ATTEMPTS = 5
 const ORDER_PAGE_SIZE = 1000
 const ORDER_LOCK_ATTEMPTS = 20
@@ -239,6 +241,7 @@ async function syncMexasWalletBalance(
       ...latestData,
       [MEXAS_WALLET_SYNC_UNITS_KEY]: currentUnits.toString(),
       [MEXAS_WALLET_SYNC_TIME_KEY]: Date.now(),
+      [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: openReservedAmount,
     }
 
     const { data: updatedUserRow, error } = await db
