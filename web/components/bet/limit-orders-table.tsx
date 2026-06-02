@@ -6,6 +6,8 @@ import { BiCaretDown, BiCaretUp } from 'react-icons/bi'
 import { contractPath, MarketContract } from 'common/contract'
 import { LimitBet } from 'common/bet'
 import { formatPercent } from 'common/util/format'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+import { getMexasOpenOrderAmount } from 'common/mexas-order-book'
 import Link from 'next/link'
 import { Col } from '../layout/col'
 import { Button, IconButton } from '../buttons/button'
@@ -161,12 +163,10 @@ export function LimitOrdersTable(props: {
         const contract = contractsById[bet.contractId]
         if (!contract) return null
 
-        // Calculate remaining amount
-        const filledAmount = bet.fills.reduce(
-          (sum, fill) => sum + fill.amount,
-          0
-        )
-        const remainingAmount = bet.orderAmount - filledAmount
+        const remainingAmount = isMexasOrderBookOnlyContract(contract)
+          ? getMexasOpenOrderAmount(bet)
+          : bet.orderAmount -
+            bet.fills.reduce((sum, fill) => sum + fill.amount, 0)
 
         const prob = currentProb({ ...bet, contract })
         const priceDiff = prob - bet.limitProb

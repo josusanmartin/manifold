@@ -632,6 +632,9 @@ describe('MEXAS flow safety guardrails', () => {
       'web/components/contract/order-book-panel.tsx'
     )
     const checkoutSource = readRepoFile('web/pages/checkout.tsx')
+    const limitOrdersTableSource = readRepoFile(
+      'web/components/bet/limit-orders-table.tsx'
+    )
 
     expect(panelSource).toContain('getMexasOpenOrderAmount')
     expect(panelSource).not.toContain('sumBy(bet.fills')
@@ -641,6 +644,12 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(checkoutSource).not.toContain('fills?:')
     expect(checkoutSource).not.toContain('order.fills')
+    expectMarkersInOrder(limitOrdersTableSource, [
+      'isMexasOrderBookOnlyContract(contract)',
+      'getMexasOpenOrderAmount(bet)',
+      'bet.orderAmount -',
+      'bet.fills.reduce',
+    ])
   })
 
   test('serves public order book rows only for MEXAS orderbook markets', () => {
