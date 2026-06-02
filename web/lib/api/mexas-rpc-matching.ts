@@ -41,3 +41,16 @@ export async function matchMexasOrderbookLimitOrderRpc(
 
   return convertBet(getTakerRow(data)) as LimitBet
 }
+
+export async function assertMexasOrderbookMatchingEngineReady(
+  db: SupabaseClient
+) {
+  const { data, error } = await db.rpc('mexas_orderbook_matching_engine_ready')
+
+  if (error || data !== true) {
+    throw new APIError(
+      503,
+      'MEXAS matching engine is configured but the Supabase RPC is not ready.'
+    )
+  }
+}

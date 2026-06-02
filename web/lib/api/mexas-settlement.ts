@@ -5,6 +5,8 @@ import {
   type MexasSettlementAudit,
   type MexasSettlementSettings,
 } from 'common/mexas-settlement'
+import type { SupabaseClient } from 'common/supabase/utils'
+import { assertMexasOrderbookMatchingEngineReady } from './mexas-rpc-matching'
 
 function getMexasSettlementSettings(): MexasSettlementSettings {
   return {
@@ -15,9 +17,15 @@ function getMexasSettlementSettings(): MexasSettlementSettings {
   }
 }
 
-export function assertMexasCanMatchCrossingOrders(hasCrossingOrders: boolean) {
+export async function assertMexasCanMatchCrossingOrders(
+  db: SupabaseClient,
+  hasCrossingOrders: boolean
+) {
   if (!hasCrossingOrders) return
-  if (canMexasMatchCrossingOrders(getMexasSettlementSettings())) return
+  if (canMexasMatchCrossingOrders(getMexasSettlementSettings())) {
+    await assertMexasOrderbookMatchingEngineReady(db)
+    return
+  }
 
   throw new APIError(
     503,

@@ -111,6 +111,14 @@ describe('MEXAS flow safety guardrails', () => {
   test('uses the Supabase RPC matcher instead of the in-process simulator on live orders', () => {
     const source = readRepoFile('web/pages/api/v0/bet.ts')
 
+    expectMarkersInOrder(source, [
+      'const hasCrossingOrders = crossingOrderRows.length > 0',
+      'await assertMexasCanMatchCrossingOrders(db, hasCrossingOrders)',
+      'reservedAmount = getMexasRemainingReservedAmount(bet)',
+      'await updateUserBalanceCas(db, userId, -reservedAmount',
+      '.insert(betToRow(bet))',
+      'await matchMexasOrderbookLimitOrderRpc(db, bet.id)',
+    ])
     expect(source).toContain('matchMexasOrderbookLimitOrderRpc')
     expect(source).not.toContain('async function matchMexasOrder(')
     expect(source).not.toContain('async function updateLimitBetCas(')
@@ -130,5 +138,26 @@ describe('MEXAS flow safety guardrails', () => {
       'grant execute on function public.mexas_match_orderbook_limit_order(text, bigint, integer) to service_role',
     ])
     expect(source).not.toContain('skip locked')
+  })
+
+  test('preflights the MEXAS matching RPC before a crossing order can debit funds', () => {
+    const source = readRepoFile('web/lib/api/mexas-settlement.ts')
+    const helper = readRepoFile('web/lib/api/mexas-rpc-matching.ts')
+    const migration = readRepoFile(
+      'backend/supabase/migrations/2026060203_add_mexas_matching_health.sql'
+    )
+
+    expectMarkersInOrder(source, [
+      'export async function assertMexasCanMatchCrossingOrders',
+      'canMexasMatchCrossingOrders(getMexasSettlementSettings())',
+      'await assertMexasOrderbookMatchingEngineReady(db)',
+    ])
+    expect(helper).toContain("db.rpc('mexas_orderbook_matching_engine_ready')")
+    expectMarkersInOrder(migration, [
+      'create or replace function public.mexas_orderbook_matching_engine_ready',
+      "to_regprocedure('public.mexas_match_orderbook_limit_order(text,bigint,integer)') is not null",
+      'revoke execute on function public.mexas_orderbook_matching_engine_ready() from public, anon, authenticated',
+      'grant execute on function public.mexas_orderbook_matching_engine_ready() to service_role',
+    ])
   })
 })

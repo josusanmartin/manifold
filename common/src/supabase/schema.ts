@@ -4082,6 +4082,10 @@ export type Database = {
         }
         Returns: Json
       }
+      mexas_orderbook_matching_engine_ready: {
+        Args: never
+        Returns: boolean
+      }
       get_non_empty_private_message_channel_ids:
         | {
             Args: {
