@@ -173,6 +173,27 @@ describe('MEXAS flow safety guardrails', () => {
       ".eq('updated_time', row.updated_time)",
       'return updatedRow ? 1 : 0',
     ])
+    expectMarkersInOrder(source, [
+      'async function loadPendingMexasReleaseRows',
+      ".eq('is_cancelled', true)",
+      ".eq('data->>mexasFundsReserved', 'true')",
+      'return data.mexasFundsReleased !== true',
+    ])
+  })
+
+  test('generic backend limit-order expiry does not cancel reserved MEXAS orders', () => {
+    const source = readRepoFile('backend/shared/src/expire-limit-orders.ts')
+
+    expectMarkersInOrder(source, [
+      'update contract_bets',
+      'and expires_at < now()',
+      'and not (',
+      "coalesce(data, '{}'::jsonb)->>'mexasFundsReserved' = 'true'",
+      'returning *',
+    ])
+    expect(source).not.toContain('mexasRefunds')
+    expect(source).not.toContain('getMexasRemainingReservedAmount')
+    expect(source).not.toContain('mexasReleaseCreditKey')
   })
 
   test('treats market close time as an inclusive trading cutoff', () => {

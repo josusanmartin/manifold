@@ -334,10 +334,7 @@ async function loadPendingMexasReleaseRows(
     rows.push(
       ...((data ?? []) as Row<'contract_bets'>[]).filter((row) => {
         const data = getBetData(row)
-        return (
-          data.mexasFundsReleased !== true &&
-          typeof data.mexasReleaseCreditKey === 'string'
-        )
+        return data.mexasFundsReleased !== true
       })
     )
     if ((data ?? []).length < PENDING_RELEASE_PAGE_SIZE) break
