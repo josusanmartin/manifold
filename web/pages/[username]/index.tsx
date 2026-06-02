@@ -1,6 +1,5 @@
 import {
   CashIcon,
-  ChatAlt2Icon,
   ChevronDownIcon,
   PresentationChartLineIcon,
   ScaleIcon,
@@ -28,7 +27,6 @@ import { UserBetsTable } from 'web/components/bet/user-bets-table'
 import { FollowButton } from 'web/components/buttons/follow-button'
 import { TextButton } from 'web/components/buttons/text-button'
 import { UserSettingButton } from 'web/components/buttons/user-settings-button'
-import { UserCommentsList } from 'web/components/comments/profile-comments'
 import { BackButton } from 'web/components/contract/back-button'
 import { FollowList } from 'web/components/follow-list'
 import { JsonLd } from 'web/components/JsonLd'
@@ -401,11 +399,12 @@ function UserProfile(props: {
             labelsParentClassName={'gap-0 sm:gap-4'}
             labelClassName={'pb-2 pt-2'}
             saveTabInLocalStorageKey={
-              isCurrentUser ? `profile-tabs-${user.id}` : undefined
+              isCurrentUser ? `profile-tabs-v2-${user.id}` : undefined
             }
             tabs={buildArray(
-              isCurrentUser && {
+              {
                 title: 'Summary',
+                queryString: 'summary',
                 prerender: true,
                 stackedTabIcon: <PresentationChartLineIcon className="h-5" />,
                 content: <PortfolioSummary className="mt-4" user={user} />,
@@ -454,30 +453,10 @@ function UserProfile(props: {
                 ),
               },
               {
-                title: 'Achievements',
-                prerender: true,
-                stackedTabIcon: <TrophyIcon className="h-5" />,
-                content: (
-                  <>
-                    <Spacer h={4} />
-                    <AchievementsSection userId={user.id} />
-                  </>
-                ),
-              },
-              {
                 title: 'Balance log',
                 stackedTabIcon: <ViewListIcon className="h-5" />,
                 content: <BalanceChangeTable user={user} />,
                 queryString: balanceChangesKey,
-              },
-              {
-                title: 'Comments',
-                stackedTabIcon: <ChatAlt2Icon className="h-5" />,
-                content: (
-                  <Col>
-                    <UserCommentsList user={user} />
-                  </Col>
-                ),
               },
               {
                 title: 'Wallet',
