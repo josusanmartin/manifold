@@ -466,6 +466,7 @@ describe('MEXAS flow safety guardrails', () => {
     const dangerSource = readRepoFile(
       'web/components/contract/danger-zone.tsx'
     )
+    const proxySource = readRepoFile('web/proxy.ts')
     const confirmSource = readRepoFile(
       'web/components/buttons/confirmation-button.tsx'
     )
@@ -494,6 +495,9 @@ describe('MEXAS flow safety guardrails', () => {
       'órdenes abiertas se cancelan y el MEX reservado se devuelve',
     ])
     expect(selectorSource).toContain('includeMkt?: boolean')
+    expect(proxySource).toContain(
+      '^v0\\/market\\/[^/]+\\/mexas-resolution-readiness$'
+    )
     expect(dangerSource).toContain('Resolver')
     expect(confirmSource).toContain('Resolver a ${label}')
     expect(panelSource).not.toContain('comments section')

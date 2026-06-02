@@ -103,6 +103,7 @@ describe('MEXAS public API surface', () => {
   test.each([
     'v0/bet',
     'v0/bets',
+    'v0/market/mexwcwin26a/mexas-resolution-readiness',
     'v0/market/mexwcwin26a/resolve',
     'v0/revalidate',
   ])('does not classify local MEXAS endpoint %s as legacy', (path) => {
