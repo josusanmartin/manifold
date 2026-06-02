@@ -941,21 +941,31 @@ async function checkMexasSettlementExposure(
       if ((data ?? []).length < OPEN_ORDER_PAGE_SIZE) break
     }
 
-    const audit = getMexasSettlementAudit(rows.map((row) => convertBet(row)))
     const rowsByContractId = rows.reduce((map, row) => {
       const contractRows = map.get(row.contract_id) ?? []
       contractRows.push(row)
       map.set(row.contract_id, contractRows)
       return map
     }, new Map<string, Row<'contract_bets'>[]>())
-    const contractExposureDetails = [...rowsByContractId.entries()]
-      .map(([contractId, contractRows]) => ({
-        audit: getMexasSettlementAudit(
+    const audit = getMexasSettlementAudit(rows.map((row) => convertBet(row)))
+    const filledContractExposures = [...rowsByContractId.entries()]
+      .map(([contractId, contractRows]) => {
+        const contractAudit = getMexasSettlementAudit(
           contractRows.map((row) => convertBet(row))
-        ),
-        contractId,
-      }))
+        )
+        return {
+          audit: contractAudit,
+          contractId,
+          rows: contractRows,
+        }
+      })
       .filter(({ audit }) => audit.filledBetCount > 0)
+    const filledContractAudit = getMexasSettlementAudit(
+      filledContractExposures.flatMap(({ rows }) =>
+        rows.map((row) => convertBet(row))
+      )
+    )
+    const contractExposureDetails = filledContractExposures
       .map(
         ({ audit, contractId }) =>
           `${contractId}: ${audit.filledBetCount} filled, open refunds ${audit.openReservationRefund}, total YES ${audit.yesCredit}, total NO ${audit.noCredit}, total CANCEL ${audit.cancelCredit}`
@@ -970,7 +980,7 @@ async function checkMexasSettlementExposure(
     if (!options.hasOperationalEscrow) {
       return fail(
         'settlement exposure',
-        `${audit.filledBetCount} filled MEXAS positions require escrow before resolution payouts. Total credit exposure including open reservation refunds: YES ${audit.yesCredit} MEX, NO ${audit.noCredit} MEX, CANCEL ${audit.cancelCredit} MEX. Open reservation refunds: ${audit.openReservationRefund} MEX. Markets: ${contractExposureDetails
+        `${audit.filledBetCount} filled MEXAS positions require escrow before resolution payouts. Filled-market credit exposure: YES ${filledContractAudit.yesCredit} MEX, NO ${filledContractAudit.noCredit} MEX, CANCEL ${filledContractAudit.cancelCredit} MEX. Open reservation refunds across all unresolved MEXAS markets: ${audit.openReservationRefund} MEX. Markets: ${contractExposureDetails
           .slice(0, 5)
           .join('; ')}${
           contractExposureDetails.length > 5
@@ -982,7 +992,7 @@ async function checkMexasSettlementExposure(
 
     return pass(
       'settlement exposure',
-      `${audit.filledBetCount} filled MEXAS positions have operational escrow for resolution payouts. Total credit exposure: YES ${audit.yesCredit} MEX, NO ${audit.noCredit} MEX, CANCEL ${audit.cancelCredit} MEX.`
+      `${audit.filledBetCount} filled MEXAS positions have operational escrow for resolution payouts. Filled-market credit exposure: YES ${filledContractAudit.yesCredit} MEX, NO ${filledContractAudit.noCredit} MEX, CANCEL ${filledContractAudit.cancelCredit} MEX.`
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

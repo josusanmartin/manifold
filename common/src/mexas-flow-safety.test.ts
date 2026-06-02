@@ -1269,20 +1269,24 @@ describe('MEXAS flow safety guardrails', () => {
       'const contractIds = await loadMexasOrderbookContractIds(db)',
       ".is('resolution_time', null)",
       'async function checkMexasSettlementExposure',
-      'getMexasSettlementAudit(rows.map((row) => convertBet(row)))',
       'const rowsByContractId = rows.reduce',
+      'const audit = getMexasSettlementAudit(rows.map((row) => convertBet(row)))',
+      'filledContractAudit',
       'contractExposureDetails',
       'if (audit.filledBetCount === 0)',
       'if (!options.hasOperationalEscrow)',
       'filled MEXAS positions require escrow before resolution payouts',
-      'Total credit exposure including open reservation refunds',
+      'Filled-market credit exposure',
+      'Open reservation refunds across all unresolved MEXAS markets',
       'Markets:',
       'await checkMexasSettlementExposure(supabaseDb, { hasOperationalEscrow })',
     ])
-    expect(source).toContain('YES ${audit.yesCredit} MEX')
-    expect(source).toContain('NO ${audit.noCredit} MEX')
-    expect(source).toContain('CANCEL ${audit.cancelCredit} MEX')
-    expect(source).toContain('Open reservation refunds: ${audit.openReservationRefund} MEX')
+    expect(source).toContain('YES ${filledContractAudit.yesCredit} MEX')
+    expect(source).toContain('NO ${filledContractAudit.noCredit} MEX')
+    expect(source).toContain('CANCEL ${filledContractAudit.cancelCredit} MEX')
+    expect(source).toContain(
+      'Open reservation refunds across all unresolved MEXAS markets: ${audit.openReservationRefund} MEX'
+    )
   })
 
   test('provides a read-only MEXAS settlement exposure audit script', () => {
