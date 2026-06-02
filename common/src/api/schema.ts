@@ -381,12 +381,24 @@ export const API = (_apiTypeCheck = {
     props: z
       .object({
         contractId: z.string(),
-        amount: z.number().gte(SWEEPS_MIN_BET),
+        amount: z.number().gte(SWEEPS_MIN_BET).finite().safe(),
         replyToCommentId: z.string().optional(),
-        limitProb: z.number().gte(0.01).lte(0.99).optional(),
-        expiresMillisAfter: z.number().lt(MAX_EXPIRES_AT).optional(),
+        limitProb: z.number().gte(0.01).lte(0.99).finite().optional(),
+        expiresMillisAfter: z
+          .number()
+          .gt(0)
+          .lt(MAX_EXPIRES_AT)
+          .finite()
+          .safe()
+          .optional(),
         silent: z.boolean().optional(),
-        expiresAt: z.number().lt(MAX_EXPIRES_AT).optional(),
+        expiresAt: z
+          .number()
+          .gt(0)
+          .lt(MAX_EXPIRES_AT)
+          .finite()
+          .safe()
+          .optional(),
         // Used for binary and new multiple choice contracts (cpmm-multi-1).
         outcome: z.enum(['YES', 'NO']).default('YES'),
         //Multi

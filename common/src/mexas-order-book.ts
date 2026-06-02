@@ -51,6 +51,27 @@ export function getMexasOpenOrderAmount(order: LimitBet) {
   return Math.max(0, (order.orderAmount ?? 0) - (order.amount ?? 0))
 }
 
+export function getMexasLimitOrderExpiresAt(
+  now: number,
+  params: {
+    expiresAt?: number
+    expiresMillisAfter?: number
+  }
+) {
+  if (params.expiresAt !== undefined) return params.expiresAt
+  if (params.expiresMillisAfter !== undefined) {
+    return now + params.expiresMillisAfter
+  }
+  return undefined
+}
+
+export function hasValidMexasLimitOrderExpiration(
+  now: number,
+  expiresAt?: number
+) {
+  return expiresAt === undefined || expiresAt > now
+}
+
 export function isMexasCrossingOrder(
   takerOutcome: MexasOutcome,
   takerLimitProb: number,

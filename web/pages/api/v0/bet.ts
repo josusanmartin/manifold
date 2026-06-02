@@ -10,6 +10,8 @@ import {
 } from 'common/mexas-market'
 import {
   getMexasOpenOrderAmount,
+  getMexasLimitOrderExpiresAt,
+  hasValidMexasLimitOrderExpiration,
   isMexasCrossingOrder,
   matchMexasLimitOrder,
   sortMexasMakersForTaker,
@@ -228,15 +230,6 @@ function betToRow(bet: Bet): Tables['contract_bets']['Insert'] {
   })
 }
 
-function getLimitOrderExpiresAt(params: {
-  expiresAt?: number
-  expiresMillisAfter?: number
-}) {
-  if (params.expiresAt) return params.expiresAt
-  if (params.expiresMillisAfter) return Date.now() + params.expiresMillisAfter
-  return undefined
-}
-
 function createMexasOpenLimitBet(
   contract: MarketContract & { prob: number },
   params: {
@@ -255,6 +248,14 @@ function createMexasOpenLimitBet(
   }
 
   const now = Date.now()
+  const expiresAt = getMexasLimitOrderExpiresAt(now, params)
+  if (!hasValidMexasLimitOrderExpiration(now, expiresAt)) {
+    throw new APIError(
+      400,
+      'La expiración de la orden debe estar en el futuro.'
+    )
+  }
+
   return removeUndefinedProps({
     id: getNewBetId(),
     userId,
@@ -281,7 +282,7 @@ function createMexasOpenLimitBet(
     mexasFundsReserved: true,
     mexasFundsReleased: false,
     mexasReservedAmount: params.amount,
-    expiresAt: getLimitOrderExpiresAt(params),
+    expiresAt,
     silent: params.silent,
   }) as LimitBet
 }

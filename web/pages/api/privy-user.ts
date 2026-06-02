@@ -1,9 +1,7 @@
-import {
-  PrivyClient,
-  type LinkedAccount,
-  type User as PrivyUser,
-} from '@privy-io/node'
+import { PrivyClient, type User as PrivyUser } from '@privy-io/node'
+import { APIError } from 'common/api/utils'
 import { RESERVED_PATHS } from 'common/envs/constants'
+import { getVerifiedPrivyEmbeddedEthereumWallet } from 'common/privy-wallet'
 import { type UserAndPrivateUser, type PrivateUser } from 'common/user'
 import { getDefaultNotificationPreferences } from 'common/user-notification-preferences'
 import { cleanDisplayName, cleanUsername } from 'common/util/clean-username'
@@ -91,18 +89,22 @@ function getLinkedEmail(privyUser: PrivyUser) {
 }
 
 function getLinkedWallet(privyUser: PrivyUser, walletAddress?: string | null) {
-  if (walletAddress) return walletAddress
+  if (walletAddress && !isAddress(walletAddress)) {
+    throw new APIError(400, 'Invalid wallet address.')
+  }
 
-  const wallets = privyUser.linked_accounts.filter(
-    (account): account is Extract<LinkedAccount, { type: 'wallet' }> =>
-      account.type === 'wallet' &&
-      'chain_type' in account &&
-      account.chain_type === 'ethereum'
+  const linkedWallet = getVerifiedPrivyEmbeddedEthereumWallet(
+    privyUser.linked_accounts,
+    walletAddress
   )
-  return (
-    wallets.find((wallet) => wallet.wallet_client_type === 'privy')?.address ??
-    wallets[0]?.address
-  )
+  if (walletAddress && !linkedWallet) {
+    throw new APIError(
+      403,
+      'Wallet address is not linked to this Privy account.'
+    )
+  }
+
+  return linkedWallet
 }
 
 function getFallbackName(
@@ -460,6 +462,14 @@ export default async function handler(
     return res.status(200).json(result)
   } catch (e) {
     console.error('Privy signup failed', e)
+    if (e instanceof APIError) {
+      return res.status(e.code).json({ message: e.message })
+    }
+    if (e instanceof z.ZodError) {
+      return res.status(400).json({
+        message: 'Invalid Privy signup request.',
+      })
+    }
     return res.status(500).json({
       message: e instanceof Error ? e.message : 'Privy signup failed.',
     })

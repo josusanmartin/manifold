@@ -1,6 +1,8 @@
 import { LimitBet } from './bet'
 import {
+  getMexasLimitOrderExpiresAt,
   getMexasOpenOrderAmount,
+  hasValidMexasLimitOrderExpiration,
   matchMexasLimitOrder,
   sortMexasMakersForTaker,
 } from './mexas-order-book'
@@ -137,5 +139,19 @@ describe('MEXAS order book matching', () => {
     expect(result.matches).toHaveLength(0)
     expect(result.takerAmount).toBe(0)
     expect(result.remainingAmount).toBe(5)
+  })
+
+  test('derives and validates order expiration times', () => {
+    const now = 1_000
+
+    expect(getMexasLimitOrderExpiresAt(now, {})).toBeUndefined()
+    expect(getMexasLimitOrderExpiresAt(now, { expiresAt: 2_000 })).toBe(2_000)
+    expect(getMexasLimitOrderExpiresAt(now, { expiresMillisAfter: 500 })).toBe(
+      1_500
+    )
+    expect(hasValidMexasLimitOrderExpiration(now, undefined)).toBe(true)
+    expect(hasValidMexasLimitOrderExpiration(now, 1_001)).toBe(true)
+    expect(hasValidMexasLimitOrderExpiration(now, 1_000)).toBe(false)
+    expect(hasValidMexasLimitOrderExpiration(now, 999)).toBe(false)
   })
 })
