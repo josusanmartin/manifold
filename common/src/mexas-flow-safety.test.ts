@@ -332,6 +332,7 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('syncs Privy wallet balances under the user balance lock', () => {
     const source = readRepoFile('web/pages/api/privy-user.ts')
+    const userSource = readRepoFile('common/src/user.ts')
 
     expectMarkersInOrder(source, [
       'const balanceLockOwner = await acquireMexasUserBalanceLock(db, userRow.id)',
@@ -348,7 +349,12 @@ describe('MEXAS flow safety guardrails', () => {
       'await releaseExpiredMexasOrders(db',
       'await releaseUnbackedMexasOrders(db',
       'const openReservedAmount = await getOpenReservedMexasAmount',
+      '[MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: openReservedAmount',
     ])
+    expect(source).toContain(
+      "const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =\n  'mexasWalletOpenReservedAmount'"
+    )
+    expect(userSource).toContain('mexasWalletOpenReservedAmount?: number')
   })
 
   test('keeps logged-in balance UI on Privy/MEX instead of Firebase/MANA', () => {
@@ -533,7 +539,10 @@ describe('MEXAS flow safety guardrails', () => {
       '.then(refreshWalletState)',
     ])
     expect(source).toContain('Disponible para retirar')
-    expect(source).toContain('órdenes abiertas y los trades ejecutados')
+    expect(source).toContain('Reservado en órdenes abiertas')
+    expect(source).toContain('setOpenReservedAmount')
+    expect(source).toContain('órdenes abiertas descuentan MEX disponible')
+    expect(source).toContain('los trades ejecutados')
     expect(source).toContain(
       'Cancela órdenes abiertas o espera la resolución de trades'
     )

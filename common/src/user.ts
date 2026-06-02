@@ -116,6 +116,7 @@ export type User = {
   isBot?: boolean
   isAdvancedTrader?: boolean
   purchasedMana?: boolean
+  mexasWalletOpenReservedAmount?: number
   verifiedPhone?: boolean
 
   // Bonus eligibility for receiving site bonuses and participating in cash raffles

@@ -205,6 +205,9 @@ function MexasWalletPanelInner() {
   const [internalAvailableAmount, setInternalAvailableAmount] = useState<
     number | undefined
   >(user?.balance)
+  const [openReservedAmount, setOpenReservedAmount] = useState<
+    number | undefined
+  >(user?.mexasWalletOpenReservedAmount)
 
   const wallet = wallets.find(
     (wallet) => wallet.walletClientType === 'privy'
@@ -213,7 +216,8 @@ function MexasWalletPanelInner() {
 
   useEffect(() => {
     setInternalAvailableAmount(user?.balance)
-  }, [user?.balance])
+    setOpenReservedAmount(user?.mexasWalletOpenReservedAmount)
+  }, [user?.balance, user?.mexasWalletOpenReservedAmount])
 
   const refreshBalance = useCallback(async () => {
     if (!walletAddress) return
@@ -249,6 +253,7 @@ function MexasWalletPanelInner() {
 
       const syncedUser = (await response.json()) as UserAndPrivateUser
       setInternalAvailableAmount(syncedUser.user.balance)
+      setOpenReservedAmount(syncedUser.user.mexasWalletOpenReservedAmount)
     } catch (error) {
       console.error('Failed to sync internal MEX balance', error)
     }
@@ -441,6 +446,10 @@ function MexasWalletPanelInner() {
             {MEXAS_TOKEN.symbol}
           </div>
           <div className="text-ink-500 text-sm">
+            Reservado en órdenes abiertas: {getDisplayAmount(openReservedAmount)}{' '}
+            {MEXAS_TOKEN.symbol}
+          </div>
+          <div className="text-ink-500 text-sm">
             Disponible para retirar: {getDisplayBalance(withdrawableUnits)}{' '}
             {MEXAS_TOKEN.symbol}
           </div>
@@ -579,8 +588,8 @@ function MexasWalletPanelInner() {
       <div className="text-ink-600 border-ink-200 rounded-md border bg-teal-50/70 p-3 text-sm dark:bg-teal-950/20">
         Deposita {MEXAS_TOKEN.symbol} directamente en esta Wallet en{' '}
         {MEXAS_TOKEN.chainName}. No hay compra de fondos ni conversión; las
-        órdenes abiertas y los trades ejecutados comprometen MEX hasta que se
-        cancelan, expiran o se resuelve el mercado.
+        órdenes abiertas descuentan MEX disponible y los trades ejecutados
+        comprometen MEX hasta que se cancela, expira o se resuelve el mercado.
       </div>
 
       {balanceError && (

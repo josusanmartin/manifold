@@ -33,6 +33,8 @@ type JsonObject = Record<string, unknown>
 
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
+const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =
+  'mexasWalletOpenReservedAmount'
 const USER_UPDATE_ATTEMPTS = 5
 
 const bodySchema = z
@@ -199,6 +201,7 @@ async function getMexasWalletSync(
         ...data,
         [MEXAS_WALLET_SYNC_UNITS_KEY]: currentUnits.toString(),
         [MEXAS_WALLET_SYNC_TIME_KEY]: Date.now(),
+        [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: openReservedAmount,
       },
       balance,
       totalDeposits,
@@ -410,6 +413,7 @@ async function createPrivyManifoldUser(params: {
     signupBonusPaid: 0,
     privyUserId: id,
     privyWalletAddress: walletAddress,
+    [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: 0,
     ...(walletBalance
       ? {
           [MEXAS_WALLET_SYNC_UNITS_KEY]: walletBalance.units.toString(),
