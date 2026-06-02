@@ -11,6 +11,7 @@ import { MEXAS_PUBLIC_RPC_URL, MEXAS_TOKEN } from 'common/crypto/mexas'
 import {
   getMexasRemainingReservedAmount,
   isMexasOrderBookOnlyContract,
+  type MexasReservedOrderData,
 } from 'common/mexas-market'
 import { getMexasOpenOrderAmount } from 'common/mexas-order-book'
 import { convertBet } from 'common/supabase/bets'
@@ -78,6 +79,10 @@ type OpenMexasLimitOrder = {
   limitProb: number
   openAmount: number
   outcome: 'YES' | 'NO'
+}
+
+type UnsafeOpenMexasLimitOrder = OpenMexasLimitOrder & {
+  reasons: string[]
 }
 
 type SettlementExposureCheckOptions = {
@@ -498,6 +503,7 @@ async function loadOpenReservedMexasOrders(
       .eq('is_filled', false)
       .eq('is_cancelled', false)
       .eq('data->>mexasFundsReserved', 'true')
+      .eq('data->>mexasFundsReleased', 'false')
       .or(`expires_at.is.null,expires_at.gt.${now}`)
       .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
 
@@ -567,6 +573,8 @@ async function loadOpenMexasLimitOrders(
       .in('contract_id', contractIds)
       .eq('is_filled', false)
       .eq('is_cancelled', false)
+      .eq('data->>mexasFundsReserved', 'true')
+      .eq('data->>mexasFundsReleased', 'false')
       .or(`expires_at.is.null,expires_at.gt.${now}`)
       .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
 
@@ -595,8 +603,110 @@ async function loadOpenMexasLimitOrders(
   return orders
 }
 
+function getUnsafeOpenMexasOrderReasons(bet: MexasReservedOrderData) {
+  const reasons: string[] = []
+  if (bet.mexasFundsReserved !== true) reasons.push('funds not reserved')
+  if (bet.mexasFundsReleased !== false) {
+    reasons.push(
+      bet.mexasFundsReleased === true
+        ? 'funds already released'
+        : 'funds release flag missing'
+    )
+  }
+  if (getMexasRemainingReservedAmount(bet) <= EPSILON) {
+    reasons.push('no remaining reserved amount')
+  }
+  return reasons
+}
+
+async function loadUnsafeOpenMexasLimitOrders(
+  db: SupabaseClient,
+  contractIds: string[]
+) {
+  if (!contractIds.length) return []
+
+  const now = new Date().toISOString()
+  const unsafeOrders: UnsafeOpenMexasLimitOrder[] = []
+
+  for (let from = 0; ; from += OPEN_ORDER_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('contract_bets')
+      .select('*')
+      .in('contract_id', contractIds)
+      .eq('is_filled', false)
+      .eq('is_cancelled', false)
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
+
+    if (error) throw error
+
+    for (const row of (data ?? []) as Row<'contract_bets'>[]) {
+      const bet = convertBet(row)
+      if (bet.answerId) continue
+      if (bet.outcome !== 'YES' && bet.outcome !== 'NO') continue
+      if (typeof bet.limitProb !== 'number') continue
+
+      const openAmount = getMexasOpenOrderAmount(bet as any)
+      if (openAmount <= EPSILON) continue
+
+      const reasons = getUnsafeOpenMexasOrderReasons(
+        bet as MexasReservedOrderData
+      )
+      if (!reasons.length) continue
+
+      unsafeOrders.push({
+        betId: bet.id,
+        contractId: bet.contractId,
+        limitProb: bet.limitProb,
+        openAmount,
+        outcome: bet.outcome,
+        reasons,
+      })
+    }
+    if ((data ?? []).length < OPEN_ORDER_PAGE_SIZE) break
+  }
+
+  return unsafeOrders
+}
+
 function formatProbability(prob: number) {
   return `${(prob * 100).toFixed(2)}%`
+}
+
+async function checkNoUnsafeOpenMexasOrders(
+  db: SupabaseClient
+): Promise<CheckResult> {
+  try {
+    const contractIds = await loadOpenMexasOrderbookContractIds(db)
+    const unsafeOrders = await loadUnsafeOpenMexasLimitOrders(db, contractIds)
+
+    if (unsafeOrders.length) {
+      return fail(
+        'open order reservation flags',
+        `${unsafeOrders
+          .slice(0, 5)
+          .map(
+            (order) =>
+              `${order.contractId}/${order.betId} ${order.outcome} ${formatProbability(
+                order.limitProb
+              )} ${order.openAmount} MEX: ${order.reasons.join(', ')}`
+          )
+          .join('; ')}${
+          unsafeOrders.length > 5
+            ? `; ${unsafeOrders.length - 5} more`
+            : ''
+        }`
+      )
+    }
+
+    return pass(
+      'open order reservation flags',
+      `All ${contractIds.length} unresolved MEXAS markets have only actively reserved visible orders.`
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return fail('open order reservation flags', message)
+  }
 }
 
 async function checkNoCrossedMexasOrderBooks(
@@ -1032,6 +1142,7 @@ async function runChecks() {
         : fail('matching RPC health', 'Matching health RPC returned false.')
     )
 
+    checks.push(await checkNoUnsafeOpenMexasOrders(db))
     checks.push(await checkOpenMexasOrderBacking(db))
     checks.push(await checkInternalMexasBalanceBacking(db))
     checks.push(await checkNoCrossedMexasOrderBooks(db))

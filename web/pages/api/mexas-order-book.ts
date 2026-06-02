@@ -80,6 +80,8 @@ export default async function handler(
       .eq('contract_id', contractId)
       .eq('is_filled', false)
       .eq('is_cancelled', false)
+      .eq('data->>mexasFundsReserved', 'true')
+      .eq('data->>mexasFundsReleased', 'false')
       .or(`expires_at.is.null,expires_at.gt.${now}`)
       .order('created_time', { ascending: false })
       .limit(limit)

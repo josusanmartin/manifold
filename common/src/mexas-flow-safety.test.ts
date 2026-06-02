@@ -673,6 +673,8 @@ describe('MEXAS flow safety guardrails', () => {
       'if (!isMexasOrderBookOnlyContract(convertContract(contractRow)))',
       'return res.status(404)',
       ".from('contract_bets')",
+      ".eq('data->>mexasFundsReserved', 'true')",
+      ".eq('data->>mexasFundsReleased', 'false')",
     ])
   })
 
@@ -1008,6 +1010,7 @@ describe('MEXAS flow safety guardrails', () => {
       'isMexasOrderBookOnlyContract(contract)',
       'async function loadOpenReservedMexasOrders',
       ".eq('data->>mexasFundsReserved', 'true')",
+      ".eq('data->>mexasFundsReleased', 'false')",
       'getMexasRemainingReservedAmount',
       'walletUnits < backing.requiredUnits',
       "checks.push(await checkOpenMexasOrderBacking(db))",
@@ -1022,6 +1025,32 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('privyWalletAddress')
     expect(source).toContain('open order backing')
     expect(source).not.toContain('PRIVATE_KEY')
+  })
+
+  test('launch readiness fails visible MEXAS orders without active reserved funds', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('async function checkNoUnsafeOpenMexasOrders')
+    expectMarkersInOrder(source, [
+      'function getUnsafeOpenMexasOrderReasons',
+      'bet.mexasFundsReserved !== true',
+      'bet.mexasFundsReleased !== false',
+      'no remaining reserved amount',
+      'async function loadUnsafeOpenMexasLimitOrders',
+      ".eq('is_filled', false)",
+      ".eq('is_cancelled', false)",
+      'const openAmount = getMexasOpenOrderAmount',
+      'const reasons = getUnsafeOpenMexasOrderReasons',
+      'async function checkNoUnsafeOpenMexasOrders',
+      "fail(\n        'open order reservation flags'",
+      "checks.push(await checkNoUnsafeOpenMexasOrders(db))",
+      "checks.push(await checkOpenMexasOrderBacking(db))",
+    ])
+    expect(source).toContain('funds not reserved')
+    expect(source).toContain('funds already released')
+    expect(source).toContain('funds release flag missing')
   })
 
   test('launch readiness checks internal MEX balances against on-chain backing', () => {
@@ -1060,6 +1089,8 @@ describe('MEXAS flow safety guardrails', () => {
       'async function loadOpenMexasLimitOrders',
       ".eq('is_filled', false)",
       ".eq('is_cancelled', false)",
+      ".eq('data->>mexasFundsReserved', 'true')",
+      ".eq('data->>mexasFundsReleased', 'false')",
       '.or(`expires_at.is.null,expires_at.gt.${now}`)',
       'if (bet.answerId) continue',
       "bet.outcome !== 'YES' && bet.outcome !== 'NO'",
