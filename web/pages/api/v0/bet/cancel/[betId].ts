@@ -195,6 +195,9 @@ export default async function handler(
 
       const typedContractRow = contractRow as Row<'contracts'>
       const contract = convertContract(typedContractRow) as MarketContract
+      if (!isMexasOrderBookOnlyContract(contract)) {
+        throw new APIError(404, 'Order is not available on MEXAS.')
+      }
       if (contract.isResolved) {
         throw new APIError(403, 'Market is resolved.')
       }

@@ -8,8 +8,6 @@ type MexasOrderBookCandidate = {
 export function isMexasOrderBookOnlyContract(
   contract: MexasOrderBookCandidate
 ) {
-  if (contract.takerAPIOrdersDisabled) return true
-
   return (
     contract.token === 'MEX' &&
     contract.mechanism === 'cpmm-1' &&

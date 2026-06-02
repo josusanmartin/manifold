@@ -18,7 +18,7 @@ function order(
 }
 
 describe('MEXAS reserved order backing', () => {
-  test('identifies only MEX binary CPMM or explicitly flagged contracts', () => {
+  test('identifies only MEX binary CPMM contracts', () => {
     expect(
       isMexasOrderBookOnlyContract({
         token: 'MEX',
@@ -36,6 +36,14 @@ describe('MEXAS reserved order backing', () => {
     expect(
       isMexasOrderBookOnlyContract({
         token: 'MANA',
+        mechanism: 'cpmm-1',
+        outcomeType: 'BINARY',
+        takerAPIOrdersDisabled: true,
+      })
+    ).toBe(false)
+    expect(
+      isMexasOrderBookOnlyContract({
+        token: 'MEX',
         mechanism: 'cpmm-1',
         outcomeType: 'BINARY',
         takerAPIOrdersDisabled: true,

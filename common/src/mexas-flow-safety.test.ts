@@ -31,6 +31,12 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('releaseMexasUserBalanceLock')
     expect(source).toContain('skipUserBalanceLock: true')
     expectMarkersInOrder(source, [
+      'const contract = convertContract(contractRow) as MarketContract',
+      'if (!isMexasOrderBookOnlyContract(contract))',
+      "throw new APIError(404, 'Market is not available on MEXAS.')",
+      'if (contract.closeTime && Date.now() >= contract.closeTime)',
+    ])
+    expectMarkersInOrder(source, [
       'const balanceLockOwner = await acquireMexasUserBalanceLock(db, userId)',
       'const lock = await acquireMexasOrderLock(db, params.contractId)',
       'await updateUserBalanceCas(db, userId, -reservedAmount',
@@ -51,6 +57,12 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('web/pages/api/v0/bet/cancel/[betId].ts')
 
     expectMarkersInOrder(source, [
+      'const contract = convertContract(typedContractRow) as MarketContract',
+      'if (!isMexasOrderBookOnlyContract(contract))',
+      "throw new APIError(404, 'Order is not available on MEXAS.')",
+      'if (contract.isResolved)',
+    ])
+    expectMarkersInOrder(source, [
       'const balanceLockOwner = await acquireMexasUserBalanceLock(db, userId)',
       'await releaseUnbackedMexasOrders(db',
       'const releasedBetRow = shouldReleaseMexasFunds',
@@ -66,6 +78,21 @@ describe('MEXAS flow safety guardrails', () => {
       "throw new APIError(503, 'Order changed. Please refresh and try again.')",
     ])
     expect(source).toContain('skipUserBalanceLock: true')
+  })
+
+  test('lists bets only after resolving MEXAS orderbook contract ids', () => {
+    const source = readRepoFile('web/pages/api/v0/bets.ts')
+
+    expectMarkersInOrder(source, [
+      'async function getMexasContractIds',
+      ".contains('data', { token: 'MEX' } as any)",
+      'isMexasOrderBookOnlyContract(convertContract(row))',
+      'const mexasContractIds = await getMexasContractIds(db, contractId)',
+      'query = query.in',
+    ])
+    expect(source).toContain("query = query.in('contract_id', mexasContractIds)")
+    expect(source).not.toContain("query.eq('contract_id', contractId)")
+    expect(source).not.toContain("query.in('contract_id', contractId)")
   })
 
   test('releases expired and unbacked orders only when the order row has not changed', () => {

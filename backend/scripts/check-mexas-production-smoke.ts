@@ -236,6 +236,15 @@ async function checkBlockedOrderBook(contractId: string) {
     : fail(`blocked orderbook ${contractId}`, `${response.status}`)
 }
 
+async function checkBlockedBets(contractId: string) {
+  const { response } = await fetchText(
+    `/api/v0/bets?contractId=${encodeURIComponent(contractId)}`
+  )
+  return response.status === 404
+    ? pass(`blocked bets ${contractId}`, '404')
+    : fail(`blocked bets ${contractId}`, `${response.status}`)
+}
+
 async function checkBlockedApi(path: string) {
   const response = await fetch(`${SITE_URL}${path}`, { redirect: 'manual' })
   return response.status === 404
@@ -261,6 +270,7 @@ async function runSmoke() {
   results.push(await checkOrderBook('mexwcwin26a'))
   results.push(await checkOrderBook('ukrwarend26a'))
   results.push(await checkBlockedOrderBook('not-a-mexas-market'))
+  results.push(await checkBlockedBets('not-a-mexas-market'))
   return results
 }
 

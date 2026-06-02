@@ -1,6 +1,9 @@
 import { API } from 'common/api/schema'
+import { APIError } from 'common/api/utils'
 import type { Bet } from 'common/bet'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { convertBet } from 'common/supabase/bets'
+import { convertContract } from 'common/supabase/contracts'
 import {
   createClient,
   millisToTs,
@@ -16,6 +19,7 @@ import {
 import { z } from 'zod'
 
 type ErrorResponse = { message: string; details?: unknown }
+const CONTRACT_PAGE_SIZE = 1000
 
 function getSupabaseAdminClient() {
   const key =
@@ -49,10 +53,43 @@ async function getContractIdFromSlug(db: SupabaseClient, slug: string) {
     .from('contracts')
     .select('id')
     .eq('slug', slug)
-    .single()
+    .maybeSingle()
 
   if (error) throw error
   return data?.id
+}
+
+async function getMexasContractIds(
+  db: SupabaseClient,
+  contractId?: string | string[]
+) {
+  const rows: Row<'contracts'>[] = []
+
+  for (let from = 0; ; from += CONTRACT_PAGE_SIZE) {
+    let query = db
+      .from('contracts')
+      .select('*')
+      .contains('data', { token: 'MEX' } as any)
+
+    if (contractId) {
+      query = Array.isArray(contractId)
+        ? query.in('id', contractId)
+        : query.eq('id', contractId)
+    }
+
+    const { data, error } = await query.range(
+      from,
+      from + CONTRACT_PAGE_SIZE - 1
+    )
+    if (error) throw error
+
+    rows.push(...((data ?? []) as Row<'contracts'>[]))
+    if ((data ?? []).length < CONTRACT_PAGE_SIZE) break
+  }
+
+  return rows
+    .filter((row) => isMexasOrderBookOnlyContract(convertContract(row)))
+    .map((row) => row.id)
 }
 
 async function getUserIdFromUsername(db: SupabaseClient, username: string) {
@@ -85,7 +122,20 @@ export default async function handler(
       ? await getUserIdFromUsername(db, params.username)
       : params.userId
 
-    const singleContractId = Array.isArray(contractId) ? undefined : contractId
+    if (params.contractSlug && !contractId) {
+      throw new APIError(404, 'Contract not found.')
+    }
+    const mexasContractIds = await getMexasContractIds(db, contractId)
+
+    if (contractId && mexasContractIds.length === 0) {
+      throw new APIError(404, 'Contract not found.')
+    }
+    if (mexasContractIds.length === 0) {
+      return res.status(200).json([])
+    }
+
+    const singleContractId =
+      mexasContractIds.length === 1 ? mexasContractIds[0] : undefined
     if (params.kinds === 'open-limit' && (singleContractId || userId)) {
       await releaseClosedMexasMarketOrders(db, {
         contractId: singleContractId,
@@ -104,11 +154,7 @@ export default async function handler(
     let query = db.from('contract_bets').select('*')
 
     if (params.id) query = query.eq('bet_id', params.id)
-    if (contractId) {
-      query = Array.isArray(contractId)
-        ? query.in('contract_id', contractId)
-        : query.eq('contract_id', contractId)
-    }
+    query = query.in('contract_id', mexasContractIds)
     if (userId) query = query.eq('user_id', userId)
     if (params.answerId) query = query.eq('answer_id', params.answerId)
     if (params.afterTime !== undefined) {
@@ -146,6 +192,9 @@ export default async function handler(
       return res
         .status(400)
         .json({ message: 'Invalid bets request.', details: error.flatten() })
+    }
+    if (error instanceof APIError) {
+      return res.status(error.code).json({ message: error.message })
     }
 
     const message =

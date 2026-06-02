@@ -2,7 +2,6 @@ import { PrivyClient } from '@privy-io/node'
 import { API } from 'common/api/schema'
 import { APIError } from 'common/api/utils'
 import { getNewBetId, LimitBet, type Bet } from 'common/bet'
-import { getCpmmProbability } from 'common/calculate-cpmm'
 import { MarketContract } from 'common/contract'
 import {
   getMexasRemainingReservedAmount,
@@ -18,7 +17,6 @@ import {
   sortMexasMakersForTaker,
   type MexasOutcome,
 } from 'common/mexas-order-book'
-import { getBinaryCpmmBetInfo } from 'common/new-bet'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import {
@@ -525,63 +523,6 @@ async function releaseMexasOrderLock(
     .eq('data->>mexasOrderLockOwner', lockOwner)
 }
 
-function getContractUpdate(
-  contract: MarketContract & { pool: { [outcome: string]: number }; p: number },
-  contractRow: Row<'contracts'>,
-  bet: Bet,
-  newPool: { [outcome: string]: number } | undefined,
-  newP: number | undefined,
-  isUniqueBettor: boolean
-) {
-  const now = bet.createdTime
-  const data =
-    contractRow.data &&
-    typeof contractRow.data === 'object' &&
-    !Array.isArray(contractRow.data)
-      ? contractRow.data
-      : {}
-  const prob =
-    newPool && newP ? getCpmmProbability(newPool, newP) : bet.probAfter
-
-  return {
-    data: {
-      ...data,
-      pool: newPool ?? contract.pool,
-      p: newP ?? contract.p,
-      prob,
-      volume: contract.volume + Math.abs(bet.amount),
-      lastBetTime: now,
-      lastUpdatedTime: now,
-      uniqueBettorCount: contract.uniqueBettorCount + (isUniqueBettor ? 1 : 0),
-    },
-    last_bet_time: millisToTs(now),
-    last_updated_time: millisToTs(now),
-    unique_bettor_count: contract.uniqueBettorCount + (isUniqueBettor ? 1 : 0),
-  }
-}
-
-async function loadUnfilledLimitBets(
-  db: SupabaseClient,
-  contractId: string,
-  outcome: 'YES' | 'NO'
-) {
-  const { data, error } = await db
-    .from('contract_bets')
-    .select('*')
-    .eq('contract_id', contractId)
-    .eq('is_filled', false)
-    .eq('is_cancelled', false)
-    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
-
-  if (error) throw error
-
-  return (data ?? [])
-    .map((row) => convertBet(row as Row<'contract_bets'>))
-    .filter((bet): bet is LimitBet => {
-      return !bet.answerId && bet.outcome !== outcome && bet.limitProb != null
-    })
-}
-
 type LimitBetRow = {
   bet: LimitBet
   row: Row<'contract_bets'>
@@ -668,34 +609,6 @@ async function updateMexasContractAfterOrder(
   }
 }
 
-async function getBalanceByUserId(db: SupabaseClient, bets: LimitBet[]) {
-  const userIds = Array.from(new Set(bets.map((bet) => bet.userId)))
-  if (!userIds.length) return {}
-
-  const { data, error } = await db
-    .from('users')
-    .select('id,balance')
-    .in('id', userIds)
-
-  if (error) throw error
-  return Object.fromEntries((data ?? []).map((row) => [row.id, row.balance]))
-}
-
-async function hasExistingBet(
-  db: SupabaseClient,
-  contractId: string,
-  userId: string
-) {
-  const { count, error } = await db
-    .from('contract_bets')
-    .select('bet_id', { count: 'exact', head: true })
-    .eq('contract_id', contractId)
-    .eq('user_id', userId)
-
-  if (error) throw error
-  return (count ?? 0) > 0
-}
-
 async function placeBinaryBet(
   req: NextApiRequest,
   res: NextApiResponse<any | ErrorResponse>
@@ -724,18 +637,18 @@ async function placeBinaryBet(
       'This MEXAS bet route supports binary CPMM markets.'
     )
   }
+  if (!isMexasOrderBookOnlyContract(contract)) {
+    throw new APIError(404, 'Market is not available on MEXAS.')
+  }
   if (contract.closeTime && Date.now() >= contract.closeTime) {
     throw new APIError(403, 'Trading is closed.')
   }
   if (contract.isResolved) throw new APIError(403, 'Market is resolved.')
-  if (
-    isMexasOrderBookOnlyContract(contract) &&
-    params.limitProb === undefined
-  ) {
+  if (params.limitProb === undefined) {
     throw new APIError(400, 'Los mercados MEXAS solo aceptan órdenes límite.')
   }
 
-  if (isMexasOrderBookOnlyContract(contract)) {
+  {
     const balanceLockOwner = await acquireMexasUserBalanceLock(db, userId)
     try {
       await releaseClosedMexasMarketOrders(db, {
@@ -869,96 +782,6 @@ async function placeBinaryBet(
       await releaseMexasUserBalanceLock(db, userId, balanceLockOwner)
     }
   }
-
-  await releaseClosedMexasMarketOrders(db, { userId })
-  await releaseExpiredMexasOrders(db, { userId })
-  await releaseUnbackedMexasOrders(db, {
-    userId,
-    requireBalanceRead: true,
-  })
-  const syncedUserRow = await syncMexasWalletBalance(db, userRow)
-  if (syncedUserRow.balance < params.amount) {
-    throw new APIError(403, 'Insufficient balance.')
-  }
-
-  const unfilledBets = await loadUnfilledLimitBets(
-    db,
-    params.contractId,
-    params.outcome
-  )
-  const balanceByUserId = await getBalanceByUserId(db, unfilledBets)
-  const betInfo = getBinaryCpmmBetInfo(
-    contract,
-    params.outcome,
-    params.amount,
-    params.limitProb,
-    unfilledBets,
-    balanceByUserId,
-    params.expiresAt,
-    params.expiresMillisAfter
-  )
-
-  if (betInfo.makers?.length) {
-    throw new APIError(
-      503,
-      'Matching existing limit orders is not available on this MEXAS route yet.'
-    )
-  }
-  if (betInfo.ordersToCancel?.length) {
-    throw new APIError(
-      503,
-      'Cancelling filled limit orders is not available on this MEXAS route yet.'
-    )
-  }
-  if (params.dryRun) {
-    return res.status(200).json({ ...betInfo.newBet, betId: 'dry-run' })
-  }
-  if (syncedUserRow.balance < betInfo.newBet.amount) {
-    throw new APIError(403, 'Insufficient balance.')
-  }
-
-  const bet = removeUndefinedProps({
-    id: getNewBetId(),
-    userId,
-    isApi: false,
-    silent: params.silent,
-    ...betInfo.newBet,
-  }) as Bet
-  const balance = syncedUserRow.balance - bet.amount
-  const isUniqueBettor = !(await hasExistingBet(db, params.contractId, userId))
-  const contractUpdate = getContractUpdate(
-    contract,
-    contractRow,
-    bet,
-    betInfo.newPool,
-    betInfo.newP,
-    isUniqueBettor
-  )
-
-  const [
-    { error: balanceError },
-    { error: betError },
-    { error: contractUpdateError },
-  ] = await Promise.all([
-    db
-      .from('users')
-      .update({
-        balance,
-        data: {
-          ...getUserData(syncedUserRow),
-          lastBetTime: bet.createdTime,
-        },
-      })
-      .eq('id', userId),
-    db.from('contract_bets').insert(betToRow(bet)),
-    db.from('contracts').update(contractUpdate).eq('id', contract.id),
-  ])
-
-  if (balanceError) throw balanceError
-  if (betError) throw betError
-  if (contractUpdateError) throw contractUpdateError
-
-  return res.status(200).json({ ...bet, betId: bet.id } as Bet)
 }
 
 export default async function handler(
