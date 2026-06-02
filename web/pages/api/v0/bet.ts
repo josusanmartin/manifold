@@ -532,7 +532,8 @@ async function loadMexasCrossingOrderRows(
   db: SupabaseClient,
   contractId: string,
   outcome: MexasOutcome,
-  limitProb: number
+  limitProb: number,
+  takerUserId: string
 ) {
   const data: Row<'contract_bets'>[] = []
   const now = new Date().toISOString()
@@ -561,6 +562,7 @@ async function loadMexasCrossingOrderRows(
       const bet = entry.bet
       return (
         !bet.answerId &&
+        bet.userId !== takerUserId &&
         bet.limitProb !== undefined &&
         bet.orderAmount !== undefined &&
         !bet.isFilled &&
@@ -707,7 +709,8 @@ async function placeBinaryBet(
           db,
           params.contractId,
           bet.outcome,
-          bet.limitProb
+          bet.limitProb,
+          userId
         )
         const hasCrossingOrders = crossingOrderRows.length > 0
         await assertMexasCanMatchCrossingOrders(db, hasCrossingOrders)
@@ -719,6 +722,7 @@ async function placeBinaryBet(
             makers: crossingOrderRows.map((entry) => entry.bet),
             outcome: bet.outcome,
             takerBetId: 'dry-run',
+            takerUserId: userId,
             timestamp: Date.now(),
           })
           return res.status(200).json({

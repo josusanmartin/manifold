@@ -286,6 +286,28 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('async function updateLimitBetCas(')
   })
 
+  test('does not treat the taker own orders as crossing liquidity', () => {
+    const apiSource = readRepoFile('web/pages/api/v0/bet.ts')
+    const bookSource = readRepoFile('common/src/mexas-order-book.ts')
+    const sqlSource = readRepoFile(
+      'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
+    )
+
+    expectMarkersInOrder(apiSource, [
+      'async function loadMexasCrossingOrderRows',
+      'takerUserId: string',
+      'bet.userId !== takerUserId',
+      'isMexasCrossingOrder(outcome, limitProb, bet as LimitBet)',
+    ])
+    expect(apiSource).toContain('takerUserId: userId')
+    expectMarkersInOrder(bookSource, [
+      'takerUserId?: string',
+      '(!takerUserId || maker.userId !== takerUserId)',
+      'takerUserId,',
+    ])
+    expect(sqlSource).toContain('and b.user_id <> v_taker.user_id')
+  })
+
   test('allows crossing MEXAS limit orders through the UI so the RPC can match them', () => {
     const source = readRepoFile('web/components/bet/limit-order-panel.tsx')
 
@@ -490,6 +512,21 @@ describe('MEXAS flow safety guardrails', () => {
       "to_regprocedure('public.mexas_match_orderbook_limit_order(text,bigint,integer)') is not null",
       'revoke execute on function public.mexas_orderbook_matching_engine_ready() from public, anon, authenticated',
       'grant execute on function public.mexas_orderbook_matching_engine_ready() to service_role',
+    ])
+  })
+
+  test('continues RPC matching in batches instead of leaving crossed liquidity after one full batch', () => {
+    const helper = readRepoFile('web/lib/api/mexas-rpc-matching.ts')
+
+    expect(helper).toContain('const MAX_MATCHES_PER_RPC = 1000')
+    expect(helper).toContain('const MAX_RPC_MATCH_PASSES = 20')
+    expectMarkersInOrder(helper, [
+      'for (let pass = 0; pass < MAX_RPC_MATCH_PASSES; pass++)',
+      "db.rpc('mexas_match_orderbook_limit_order'",
+      'p_max_matches: MAX_MATCHES_PER_RPC',
+      'const matchCount = getMatchCount(data)',
+      'if (latestTaker.isFilled || matchCount < MAX_MATCHES_PER_RPC)',
+      'return latestTaker',
     ])
   })
 

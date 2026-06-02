@@ -252,6 +252,39 @@ describe('MEXAS order book matching', () => {
     ).toEqual(['old-crossing-ask', 'new-crossing-ask'])
   })
 
+  test('does not match the taker against their own opposite orders', () => {
+    const result = matchMexasLimitOrder({
+      amount: 10,
+      limitProb: 0.8,
+      makers: [
+        order({
+          id: 'own-ask',
+          userId: 'trader-1',
+          outcome: 'NO',
+          limitProb: 0.7,
+          orderAmount: 3,
+        }),
+        order({
+          id: 'other-ask',
+          userId: 'trader-2',
+          outcome: 'NO',
+          limitProb: 0.75,
+          orderAmount: 1,
+        }),
+      ],
+      outcome: 'YES',
+      takerBetId: 'taker',
+      takerUserId: 'trader-1',
+      timestamp: 10,
+    })
+
+    expect(result.matches.map((match) => match.maker.id)).toEqual([
+      'other-ask',
+    ])
+    expect(result.takerAmount).toBe(3)
+    expect(result.remainingAmount).toBe(7)
+  })
+
   test('derives and validates order expiration times', () => {
     const now = 1_000
 

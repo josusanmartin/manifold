@@ -8,6 +8,9 @@ type MexasRpcMatchPayload = {
   matches?: unknown
 }
 
+const MAX_MATCHES_PER_RPC = 1000
+const MAX_RPC_MATCH_PASSES = 20
+
 function getTakerRow(payload: unknown) {
   const result =
     payload && typeof payload === 'object' && !Array.isArray(payload)
@@ -22,24 +25,46 @@ function getTakerRow(payload: unknown) {
   return taker as Row<'contract_bets'>
 }
 
+function getMatchCount(payload: unknown) {
+  const result =
+    payload && typeof payload === 'object' && !Array.isArray(payload)
+      ? (payload as MexasRpcMatchPayload)
+      : undefined
+
+  return Array.isArray(result?.matches) ? result.matches.length : 0
+}
+
 export async function matchMexasOrderbookLimitOrderRpc(
   db: SupabaseClient,
   takerBetId: string
 ) {
-  const { data, error } = await db.rpc('mexas_match_orderbook_limit_order', {
-    p_taker_bet_id: takerBetId,
-    p_timestamp_ms: Date.now(),
-    p_max_matches: 100,
-  })
+  let latestTaker: LimitBet | undefined
 
-  if (error) {
-    throw new APIError(
-      503,
-      `MEXAS matching engine unavailable: ${error.message}`
-    )
+  for (let pass = 0; pass < MAX_RPC_MATCH_PASSES; pass++) {
+    const { data, error } = await db.rpc('mexas_match_orderbook_limit_order', {
+      p_taker_bet_id: takerBetId,
+      p_timestamp_ms: Date.now(),
+      p_max_matches: MAX_MATCHES_PER_RPC,
+    })
+
+    if (error) {
+      throw new APIError(
+        503,
+        `MEXAS matching engine unavailable: ${error.message}`
+      )
+    }
+
+    latestTaker = convertBet(getTakerRow(data)) as LimitBet
+    const matchCount = getMatchCount(data)
+    if (latestTaker.isFilled || matchCount < MAX_MATCHES_PER_RPC) {
+      return latestTaker
+    }
   }
 
-  return convertBet(getTakerRow(data)) as LimitBet
+  throw new APIError(
+    503,
+    'MEXAS matching engine reached the maximum matching passes for one order.'
+  )
 }
 
 export async function assertMexasOrderbookMatchingEngineReady(

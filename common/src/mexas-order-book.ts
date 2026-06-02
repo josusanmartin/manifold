@@ -106,12 +106,14 @@ export function getMexasCrossingOrders(params: {
   limitProb: number
   makers: LimitBet[]
   outcome: MexasOutcome
+  takerUserId?: string
 }) {
-  const { limitProb, makers, outcome } = params
+  const { limitProb, makers, outcome, takerUserId } = params
   return sortMexasMakersForTaker(
     outcome,
     makers.filter((maker) => {
       return (
+        (!takerUserId || maker.userId !== takerUserId) &&
         !maker.isFilled &&
         !maker.isCancelled &&
         getMexasOpenOrderAmount(maker) > EPSILON &&
@@ -127,9 +129,11 @@ export function matchMexasLimitOrder(params: {
   makers: LimitBet[]
   outcome: MexasOutcome
   takerBetId: string
+  takerUserId?: string
   timestamp: number
 }) {
-  const { amount, limitProb, outcome, takerBetId, timestamp } = params
+  const { amount, limitProb, outcome, takerBetId, takerUserId, timestamp } =
+    params
   let remainingAmount = amount
   let takerAmount = 0
   let takerShares = 0
@@ -139,6 +143,7 @@ export function matchMexasLimitOrder(params: {
     limitProb,
     makers: params.makers,
     outcome,
+    takerUserId,
   })
 
   for (const maker of makers) {
