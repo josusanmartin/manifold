@@ -1,7 +1,5 @@
 const path = require('path')
 
-const API_DOCS_URL = 'https://docs.manifold.markets/api'
-
 const MEXAS_WALLET_REDIRECTS = [
   '/payments',
   '/add-funds',
@@ -16,6 +14,8 @@ const MEXAS_WALLET_REDIRECTS = [
 const MEXAS_ONLY_REDIRECTS = [
   '/',
   '/activity',
+  '/admin',
+  '/admin/:path*',
   '/home',
   '/browse',
   '/browse/:path*',
@@ -64,6 +64,8 @@ const MEXAS_ONLY_REDIRECTS = [
   '/redeem',
   '/referrals',
   '/register-on-discord',
+  '/reports',
+  '/reports/:path*',
   '/shop',
   '/shop/:path*',
   '/sitemap',
@@ -170,12 +172,12 @@ module.exports = {
 
       {
         source: '/api',
-        destination: API_DOCS_URL,
+        destination: '/about',
         permanent: false,
       },
       {
         source: '/api/v0',
-        destination: API_DOCS_URL,
+        destination: '/about',
         permanent: false,
       },
       {
@@ -196,23 +198,23 @@ module.exports = {
       },
       {
         source: '/privacy',
-        destination: 'https://docs.manifold.markets/privacy-policy',
-        permanent: true,
+        destination: '/about',
+        permanent: false,
       },
       {
         source: '/terms',
-        destination: 'https://docs.manifold.markets/terms',
-        permanent: true,
+        destination: '/about',
+        permanent: false,
       },
       {
         source: '/mana-only-terms',
-        destination: 'https://docs.manifold.markets/terms',
-        permanent: true,
+        destination: '/about',
+        permanent: false,
       },
       {
         source: '/sweepstakes-rules',
-        destination: 'https://docs.manifold.markets/sweepstakes-rules',
-        permanent: true,
+        destination: '/about',
+        permanent: false,
       },
       {
         source: '/umami',
