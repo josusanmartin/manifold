@@ -62,6 +62,7 @@ describe('MEXAS flow safety guardrails', () => {
   test('releases expired and unbacked orders only when the order row has not changed', () => {
     const source = readRepoFile('web/lib/api/mexas-orders.ts')
 
+    expect(source).toContain(".lte('expires_at', now)")
     expectMarkersInOrder(source, [
       'const { data: updatedRow, error } = await db',
       ".eq('is_filled', false)",
@@ -74,6 +75,16 @@ describe('MEXAS flow safety guardrails', () => {
       ".eq('is_filled', false)",
       ".eq('updated_time', row.updated_time)",
     ])
+  })
+
+  test('treats market close time as an inclusive trading cutoff', () => {
+    const betSource = readRepoFile('web/pages/api/v0/bet.ts')
+    const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')
+
+    expect(
+      countOccurrences(betSource, 'Date.now() >= contract.closeTime')
+    ).toBeGreaterThanOrEqual(2)
+    expect(ordersSource).toContain(".lte('close_time', now)")
   })
 
   test('resolves markets by locking each participant while crediting and releasing orders', () => {
@@ -98,6 +109,26 @@ describe('MEXAS flow safety guardrails', () => {
       'const walletSync = await getMexasWalletSync',
       ".eq('balance', latestUserRow.balance)",
       'await releaseMexasUserBalanceLock(db, userRow.id, balanceLockOwner)',
+    ])
+  })
+
+  test('limits wallet withdrawals to synced MEX and refreshes after the chain receipt', () => {
+    const source = readRepoFile('web/components/crypto/mexas-wallet-panel.tsx')
+
+    expectMarkersInOrder(source, [
+      'const withdrawableUnits =',
+      'balanceUnits !== null && internalAvailableUnits !== null',
+      '? minUnits(balanceUnits, internalAvailableUnits)',
+    ])
+    expectMarkersInOrder(source, [
+      'eth_sendTransaction',
+      'setWithdrawHash(hash)',
+      'setBalanceUnits((units) =>',
+      'units - parsedWithdrawAmount',
+      'setInternalAvailableAmount((amount) =>',
+      'mexasUnitsToAmount(parsedWithdrawAmount)',
+      'waitForTransactionReceipt({ hash })',
+      '.then(refreshWalletState)',
     ])
   })
 
@@ -201,6 +232,20 @@ describe('MEXAS flow safety guardrails', () => {
       'where bet_id = v_taker.bet_id',
     ])
     expect(source).not.toContain('skip locked')
+  })
+
+  test('persists SQL matcher fills in canonical columns and JSON data', () => {
+    const source = readRepoFile(
+      'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
+    )
+    const sql = compactWhitespace(source)
+
+    expect(sql).toMatch(
+      /update public\.contract_bets set amount = v_maker_amount, shares = v_maker_shares, is_filled = v_maker_remaining_amount <= v_epsilon, data = v_maker_data where bet_id = v_maker\.bet_id/
+    )
+    expect(sql).toMatch(
+      /update public\.contract_bets set amount = v_taker_amount, shares = v_taker_shares, is_filled = v_remaining_amount <= v_epsilon, data = v_taker_data where bet_id = v_taker\.bet_id/
+    )
   })
 
   test('the SQL matcher rejects closed/resolved markets and expired orders', () => {

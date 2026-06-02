@@ -156,7 +156,7 @@ export async function releaseExpiredMexasOrders(
       .select('*')
       .eq('is_filled', false)
       .eq('is_cancelled', false)
-      .lt('expires_at', now)
+      .lte('expires_at', now)
       .eq('data->>mexasFundsReserved', 'true')
       .range(0, EXPIRED_ORDER_PAGE_SIZE - 1)
 
@@ -199,7 +199,7 @@ export async function releaseClosedMexasMarketOrders(
     .from('contracts')
     .select('id')
     .in('id', contractIds)
-    .lt('close_time', now)
+    .lte('close_time', now)
 
   if (error) throw error
 

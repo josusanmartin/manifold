@@ -438,7 +438,7 @@ async function acquireMexasOrderLock(db: SupabaseClient, contractId: string) {
     const contract = convertContract(typedContractRow) as MarketContract
     const contractData = getContractData(typedContractRow)
 
-    if (contract.closeTime && Date.now() > contract.closeTime) {
+    if (contract.closeTime && Date.now() >= contract.closeTime) {
       throw new APIError(403, 'Trading is closed.')
     }
     if (contract.isResolved) throw new APIError(403, 'Market is resolved.')
@@ -722,7 +722,7 @@ async function placeBinaryBet(
       'This MEXAS bet route supports binary CPMM markets.'
     )
   }
-  if (contract.closeTime && Date.now() > contract.closeTime) {
+  if (contract.closeTime && Date.now() >= contract.closeTime) {
     throw new APIError(403, 'Trading is closed.')
   }
   if (contract.isResolved) throw new APIError(403, 'Market is resolved.')

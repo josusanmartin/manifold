@@ -4,7 +4,6 @@
 -- Supabase exposes public-schema functions through the Data API unless execute
 -- privileges are revoked, so keep anon/authenticated clients out of the
 -- matching engine.
-
 create or replace function public.mexas_match_orderbook_limit_order (
   p_taker_bet_id text,
   p_timestamp_ms bigint,
@@ -227,7 +226,11 @@ begin
     );
 
     update public.contract_bets
-    set data = v_maker_data
+    set
+      amount = v_maker_amount,
+      shares = v_maker_shares,
+      is_filled = v_maker_remaining_amount <= v_epsilon,
+      data = v_maker_data
     where bet_id = v_maker.bet_id
     returning *
     into v_maker;
@@ -269,7 +272,11 @@ begin
   );
 
   update public.contract_bets
-  set data = v_taker_data
+  set
+    amount = v_taker_amount,
+    shares = v_taker_shares,
+    is_filled = v_remaining_amount <= v_epsilon,
+    data = v_taker_data
   where bet_id = v_taker.bet_id
   returning *
   into v_taker;

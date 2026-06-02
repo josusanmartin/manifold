@@ -40,6 +40,7 @@ import {
   getArbiscanTxUrl,
   getMexasBalanceUnits,
   mexasErc20Abi,
+  mexasPublicClient,
 } from 'web/lib/crypto/mexas'
 
 function MissingPrivyConfig(props: { missingEnv: string[] }) {
@@ -74,6 +75,10 @@ function mexasAmountToUnits(amount: number) {
     Math.max(0, amount).toFixed(MEXAS_TOKEN.decimals),
     MEXAS_TOKEN.decimals
   )
+}
+
+function mexasUnitsToAmount(units: bigint) {
+  return Number(formatMexasUnits(units))
 }
 
 function minUnits(a: bigint, b: bigint) {
@@ -337,9 +342,24 @@ function MexasWalletPanelInner() {
       })) as Hex
 
       setWithdrawHash(hash)
+      setBalanceUnits((units) =>
+        units === null
+          ? units
+          : units > parsedWithdrawAmount
+          ? units - parsedWithdrawAmount
+          : 0n
+      )
+      setInternalAvailableAmount((amount) =>
+        amount === undefined
+          ? amount
+          : Math.max(0, amount - mexasUnitsToAmount(parsedWithdrawAmount))
+      )
       setWithdrawAmount('')
       setWithdrawAddress('')
-      setTimeout(refreshWalletState, 4000)
+      mexasPublicClient
+        .waitForTransactionReceipt({ hash })
+        .then(refreshWalletState)
+        .catch(() => setTimeout(refreshWalletState, 4000))
     } catch (error) {
       console.error('Failed to withdraw MEX', error)
       setWithdrawError(
