@@ -753,6 +753,29 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('launch readiness validates the MEXAS treasury wallet env pair', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('function checkTreasuryWalletEnv')
+    expect(source).toContain('ZERO_EVM_ADDRESS')
+    expect(source).toContain('MEXAS_TOKEN.address')
+    expectMarkersInOrder(source, [
+      'function checkTreasuryWalletEnv',
+      "'MEXAS_TREASURY_WALLET_ADDRESS'",
+      "'NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS'",
+      'EVM_ADDRESS_PATTERN.test(address)',
+      'normalizedAddress === ZERO_EVM_ADDRESS',
+      'normalizedAddress === normalizeEvmAddress(MEXAS_TOKEN.address)',
+      'server treasury',
+      'does not match public treasury',
+      "fail('treasury wallet env'",
+      "pass(\n        'treasury wallet env'",
+      'checks.push(checkTreasuryWalletEnv(vercelEnvValues))',
+    ])
+  })
+
   test('launch readiness checks open MEXAS order backing against Privy wallet balances', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'

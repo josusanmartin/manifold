@@ -61,6 +61,7 @@ const REQUIRED_MEXAS_CONTRACTS = [
 const CONTRACT_PAGE_SIZE = 1000
 const OPEN_ORDER_PAGE_SIZE = 1000
 const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
+const ZERO_EVM_ADDRESS = '0x0000000000000000000000000000000000000000'
 const ERC20_BALANCE_OF_SELECTOR = '0x70a08231'
 
 type OpenMexasOrder = {
@@ -270,6 +271,74 @@ function getEnvOrVercelValue(
   vercelEnvValues: Map<string, string>
 ) {
   return process.env[name]?.trim() || vercelEnvValues.get(name)?.trim()
+}
+
+function normalizeEvmAddress(address: string) {
+  return address.toLowerCase()
+}
+
+function formatAddressForDiagnostics(address: string | undefined) {
+  if (!address) return 'missing'
+  if (address.length <= 12) return address
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
+
+function checkTreasuryWalletEnv(
+  vercelEnvValues: Map<string, string>
+): CheckResult {
+  const serverTreasury = getEnvOrVercelValue(
+    'MEXAS_TREASURY_WALLET_ADDRESS',
+    vercelEnvValues
+  )
+  const publicTreasury = getEnvOrVercelValue(
+    'NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS',
+    vercelEnvValues
+  )
+  const failures: string[] = []
+
+  for (const [name, address] of [
+    ['MEXAS_TREASURY_WALLET_ADDRESS', serverTreasury],
+    ['NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS', publicTreasury],
+  ] as const) {
+    if (!address) {
+      failures.push(`${name} is missing or empty`)
+      continue
+    }
+    if (!EVM_ADDRESS_PATTERN.test(address)) {
+      failures.push(`${name} is not a valid EVM address`)
+      continue
+    }
+    const normalizedAddress = normalizeEvmAddress(address)
+    if (normalizedAddress === ZERO_EVM_ADDRESS) {
+      failures.push(`${name} cannot be the zero address`)
+    }
+    if (normalizedAddress === normalizeEvmAddress(MEXAS_TOKEN.address)) {
+      failures.push(`${name} cannot be the MEXAS token contract address`)
+    }
+  }
+
+  if (
+    serverTreasury &&
+    publicTreasury &&
+    EVM_ADDRESS_PATTERN.test(serverTreasury) &&
+    EVM_ADDRESS_PATTERN.test(publicTreasury) &&
+    normalizeEvmAddress(serverTreasury) !== normalizeEvmAddress(publicTreasury)
+  ) {
+    failures.push(
+      `server treasury ${formatAddressForDiagnostics(
+        serverTreasury
+      )} does not match public treasury ${formatAddressForDiagnostics(
+        publicTreasury
+      )}`
+    )
+  }
+
+  return failures.length
+    ? fail('treasury wallet env', failures.join('; '))
+    : pass(
+        'treasury wallet env',
+        'Server and public treasury wallet addresses are valid and match.'
+      )
 }
 
 function getSupabaseUrlOrInstanceId() {
@@ -630,6 +699,7 @@ async function runChecks() {
           'Required public env vars are non-empty in Vercel production.'
         )
   )
+  checks.push(checkTreasuryWalletEnv(vercelEnvValues))
 
   const supabaseUrlOrInstanceId = getSupabaseUrlOrInstanceId()
   const supabaseAdminKey = getSupabaseAdminKey()
