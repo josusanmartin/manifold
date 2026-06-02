@@ -25,6 +25,17 @@ const REQUIRED_PUBLIC_ENVS = [
   'NEXT_PUBLIC_SUPABASE_URL',
 ]
 
+const REQUIRED_MEXAS_CONTRACTS = [
+  {
+    id: 'mexwcwin26a',
+    slug: 'ganara-mexico-la-copa-mundial-2026',
+  },
+  {
+    id: 'ukrwarend26a',
+    slug: 'will-the-russia-ukraine-war-end-by-december-31-2026',
+  },
+]
+
 function parseEnvLine(line: string) {
   const trimmed = line.trim()
   if (!trimmed || trimmed.startsWith('#')) return
@@ -170,6 +181,59 @@ async function runChecks() {
             `Supabase is reachable; ${count ?? 0} MEX contracts found.`
           )
     )
+
+    const { data: requiredContracts, error: requiredContractsError } = await db
+      .from('contracts')
+      .select('id,token,slug,data')
+      .in(
+        'id',
+        REQUIRED_MEXAS_CONTRACTS.map((contract) => contract.id)
+      )
+
+    if (requiredContractsError) {
+      checks.push(
+        fail(
+          'required MEXAS contracts',
+          `Could not read required contracts: ${requiredContractsError.message}`
+        )
+      )
+    } else {
+      const rowsById = new Map(
+        (requiredContracts ?? []).map((row) => [row.id, row])
+      )
+      const contractFailures = REQUIRED_MEXAS_CONTRACTS.flatMap((contract) => {
+        const row = rowsById.get(contract.id)
+        if (!row) return [`${contract.id} is missing`]
+
+        const data =
+          row.data && typeof row.data === 'object' && !Array.isArray(row.data)
+            ? (row.data as Record<string, unknown>)
+            : {}
+        const failures: string[] = []
+        if (row.slug !== contract.slug) {
+          failures.push(`${contract.id} slug=${row.slug}`)
+        }
+        if (row.token !== 'MEX') {
+          failures.push(`${contract.id} sql token=${row.token}`)
+        }
+        if (data.token !== 'MEX') {
+          failures.push(`${contract.id} data token=${String(data.token)}`)
+        }
+        return failures
+      })
+
+      checks.push(
+        contractFailures.length
+          ? fail(
+              'required MEXAS contracts',
+              `Invalid rows: ${contractFailures.join('; ')}`
+            )
+          : pass(
+              'required MEXAS contracts',
+              'Required MEXAS market rows are present and tokenized as MEX.'
+            )
+      )
+    }
 
     const { data: matchingReady, error: matchingReadyError } = await db.rpc(
       'mexas_orderbook_matching_engine_ready'

@@ -151,6 +151,7 @@ async function runSmoke() {
   }
 
   results.push(await checkOrderBook('mexwcwin26a'))
+  results.push(await checkOrderBook('ukrwarend26a'))
   return results
 }
 
