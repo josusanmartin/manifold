@@ -804,6 +804,31 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('PRIVATE_KEY')
   })
 
+  test('launch readiness checks internal MEX balances against on-chain backing', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('async function checkInternalMexasBalanceBacking')
+    expectMarkersInOrder(source, [
+      'async function loadMexasWalletUsersWithPositiveBalance',
+      ".from('users')",
+      ".select('id,balance,data')",
+      ".gt('balance', 0)",
+      ".not('data->>privyWalletAddress', 'is', null)",
+      'async function checkInternalMexasBalanceBacking',
+      'const orders = await loadOpenReservedMexasOrders',
+      'const reservedUnitsByUserId = new Map',
+      'const internalUnits = mexasAmountToUnits(user.balance)',
+      'const reservedUnits = reservedUnitsByUserId.get(user.id) ?? 0n',
+      'const walletUnits = await readMexasWalletBalanceUnits(user.walletAddress)',
+      'const availableWalletUnits = subtractUnitsFloorZero',
+      'internalUnits <= availableWalletUnits',
+      "fail('internal balance backing'",
+      'checks.push(await checkInternalMexasBalanceBacking(db))',
+    ])
+  })
+
   test('launch readiness fails persistent crossed MEXAS order books', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'

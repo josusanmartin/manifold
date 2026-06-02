@@ -89,6 +89,12 @@ type UserBacking = {
   requiredUnits: bigint
 }
 
+type MexasWalletUser = {
+  balance: number
+  id: string
+  walletAddress: string
+}
+
 function parseEnvAssignment(line: string) {
   const trimmed = line.trim()
   if (!trimmed || trimmed.startsWith('#')) return
@@ -389,6 +395,10 @@ function formatMexasUnits(units: bigint) {
   return `${whole}.${padded.replace(/0+$/, '')}`
 }
 
+function subtractUnitsFloorZero(units: bigint, amount: bigint) {
+  return units > amount ? units - amount : 0n
+}
+
 function encodeBalanceOfCall(address: string) {
   return `${ERC20_BALANCE_OF_SELECTOR}${address
     .toLowerCase()
@@ -511,6 +521,34 @@ async function loadOpenReservedMexasOrders(
   }
 
   return orders
+}
+
+async function loadMexasWalletUsersWithPositiveBalance(db: SupabaseClient) {
+  const users: MexasWalletUser[] = []
+
+  for (let from = 0; ; from += OPEN_ORDER_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('users')
+      .select('id,balance,data')
+      .gt('balance', 0)
+      .not('data->>privyWalletAddress', 'is', null)
+      .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
+
+    if (error) throw error
+
+    for (const row of (data ?? []) as Row<'users'>[]) {
+      const walletAddress = getRowData(row).privyWalletAddress
+      if (typeof walletAddress !== 'string') continue
+      users.push({
+        balance: row.balance,
+        id: row.id,
+        walletAddress,
+      })
+    }
+    if ((data ?? []).length < OPEN_ORDER_PAGE_SIZE) break
+  }
+
+  return users
 }
 
 async function loadOpenMexasLimitOrders(
@@ -695,6 +733,73 @@ async function checkOpenMexasOrderBacking(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return fail('open order backing', message)
+  }
+}
+
+async function checkInternalMexasBalanceBacking(
+  db: SupabaseClient
+): Promise<CheckResult> {
+  try {
+    const contractIds = await loadMexasOrderbookContractIds(db)
+    const orders = await loadOpenReservedMexasOrders(db, contractIds)
+    const reservedUnitsByUserId = new Map<string, bigint>()
+    for (const order of orders) {
+      reservedUnitsByUserId.set(
+        order.userId,
+        (reservedUnitsByUserId.get(order.userId) ?? 0n) +
+          order.remainingReservedUnits
+      )
+    }
+
+    const users = await loadMexasWalletUsersWithPositiveBalance(db)
+    if (!users.length) {
+      return pass(
+        'internal balance backing',
+        'No positive internal MEX balances require on-chain backing.'
+      )
+    }
+
+    const failures: string[] = []
+    for (const user of users) {
+      if (!EVM_ADDRESS_PATTERN.test(user.walletAddress)) {
+        failures.push(`${user.id} has invalid Privy wallet`)
+        continue
+      }
+
+      const internalUnits = mexasAmountToUnits(user.balance)
+      const reservedUnits = reservedUnitsByUserId.get(user.id) ?? 0n
+      const walletUnits = await readMexasWalletBalanceUnits(user.walletAddress)
+      const availableWalletUnits = subtractUnitsFloorZero(
+        walletUnits,
+        reservedUnits
+      )
+      if (internalUnits <= availableWalletUnits) continue
+
+      failures.push(
+        `${user.id} internal ${formatMexasUnits(
+          internalUnits
+        )} MEX exceeds backed available ${formatMexasUnits(
+          availableWalletUnits
+        )} MEX after ${formatMexasUnits(reservedUnits)} MEX reserved`
+      )
+    }
+
+    if (failures.length) {
+      return fail(
+        'internal balance backing',
+        `${failures.slice(0, 5).join('; ')}${
+          failures.length > 5 ? `; ${failures.length - 5} more` : ''
+        }`
+      )
+    }
+
+    return pass(
+      'internal balance backing',
+      `${users.length} positive internal MEX balances are covered by on-chain wallet balances after open reservations.`
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return fail('internal balance backing', message)
   }
 }
 
@@ -915,6 +1020,7 @@ async function runChecks() {
     )
 
     checks.push(await checkOpenMexasOrderBacking(db))
+    checks.push(await checkInternalMexasBalanceBacking(db))
     checks.push(await checkNoCrossedMexasOrderBooks(db))
   }
 
