@@ -354,6 +354,23 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('prints self-verifying launch SQL for manual Supabase SQL Editor runs', () => {
+    const source = readRepoFile('backend/scripts/apply-mexas-launch-sql.ts')
+    const compact = compactWhitespace(source)
+
+    expect(source).toContain('-- Verification block for manual Supabase SQL Editor runs')
+    expect(source).toContain("raise exception 'MEXAS launch SQL verification failed: %'")
+    expect(source).toContain("raise notice 'PASS MEXAS launch SQL applied and verified.'")
+    expect(source).toContain(
+      "public.mexas_orderbook_matching_engine_ready() is distinct from true"
+    )
+    expect(compact).toContain(
+      "has_function_privilege( 'service_role', 'public.mexas_match_orderbook_limit_order(text,bigint,integer)', 'execute' )"
+    )
+    expect(source).toContain("'public clients can execute matching RPC'")
+    expect(source).toContain("'public clients can execute matching health RPC'")
+  })
+
   test('fails closed before proxying unknown Manifold API endpoints', () => {
     const source = readRepoFile('web/proxy.ts')
 

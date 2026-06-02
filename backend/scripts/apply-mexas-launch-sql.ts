@@ -83,6 +83,94 @@ function readSql() {
   }).join('\n\n')
 
   const contractIds = REQUIRED_CONTRACT_IDS.map((id) => `'${id}'`).join(', ')
+  const verificationSql = `
+do $$
+declare
+  v_failures text[] := array[]::text[];
+  v_row record;
+begin
+  for v_row in
+    select id, token, data ->> 'token' as data_token
+    from public.contracts
+    where id in (${contractIds})
+  loop
+    if v_row.id is null then
+      v_failures := array_append(v_failures, 'contract row with null id');
+    elsif v_row.token is distinct from 'MEX' or v_row.data_token is distinct from 'MEX' then
+      v_failures := array_append(
+        v_failures,
+        v_row.id || ' token=' || coalesce(v_row.token, 'null') || ' dataToken=' || coalesce(v_row.data_token, 'null')
+      );
+    end if;
+  end loop;
+
+  if (
+    select count(*)
+    from public.contracts
+    where id in (${contractIds})
+  ) <> ${REQUIRED_CONTRACT_IDS.length} then
+    v_failures := array_append(v_failures, 'required MEXAS contract row missing');
+  end if;
+
+  if to_regprocedure('public.mexas_match_orderbook_limit_order(text,bigint,integer)') is null then
+    v_failures := array_append(v_failures, 'matching RPC missing');
+  end if;
+
+  if to_regprocedure('public.mexas_orderbook_matching_engine_ready()') is null then
+    v_failures := array_append(v_failures, 'matching health RPC missing');
+  elsif public.mexas_orderbook_matching_engine_ready() is distinct from true then
+    v_failures := array_append(v_failures, 'matching health RPC returned false');
+  end if;
+
+  if not has_function_privilege(
+    'service_role',
+    'public.mexas_match_orderbook_limit_order(text,bigint,integer)',
+    'execute'
+  ) then
+    v_failures := array_append(v_failures, 'service_role cannot execute matching RPC');
+  end if;
+
+  if not has_function_privilege(
+    'service_role',
+    'public.mexas_orderbook_matching_engine_ready()',
+    'execute'
+  ) then
+    v_failures := array_append(v_failures, 'service_role cannot execute matching health RPC');
+  end if;
+
+  if has_function_privilege(
+    'anon',
+    'public.mexas_match_orderbook_limit_order(text,bigint,integer)',
+    'execute'
+  ) or has_function_privilege(
+    'authenticated',
+    'public.mexas_match_orderbook_limit_order(text,bigint,integer)',
+    'execute'
+  ) then
+    v_failures := array_append(v_failures, 'public clients can execute matching RPC');
+  end if;
+
+  if has_function_privilege(
+    'anon',
+    'public.mexas_orderbook_matching_engine_ready()',
+    'execute'
+  ) or has_function_privilege(
+    'authenticated',
+    'public.mexas_orderbook_matching_engine_ready()',
+    'execute'
+  ) then
+    v_failures := array_append(v_failures, 'public clients can execute matching health RPC');
+  end if;
+
+  if array_length(v_failures, 1) is not null then
+    raise exception 'MEXAS launch SQL verification failed: %', array_to_string(v_failures, '; ');
+  end if;
+
+  raise notice 'PASS MEXAS launch SQL applied and verified.';
+end
+$$;
+`
+
   return `${migrationSql}
 
 -- Existing seed markets were created before the SQL token constraint allowed
@@ -96,6 +184,11 @@ where id in (${contractIds})
 -- Make the new RPCs visible to Supabase/PostgREST as soon as the transaction
 -- commits.
 notify pgrst, 'reload schema';
+
+-- Verification block for manual Supabase SQL Editor runs. This raises if the
+-- migration, market token normalization, schema reload target, or RPC grants are
+-- incomplete.
+${verificationSql}
 `
 }
 
