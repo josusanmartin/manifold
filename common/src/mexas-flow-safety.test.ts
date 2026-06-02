@@ -249,6 +249,9 @@ describe('MEXAS flow safety guardrails', () => {
 
     expectMarkersInOrder(source, [
       'const balanceLockOwner = await acquireMexasUserBalanceLock(db, userRow.id)',
+      'const { data: lockedUserRow, error: lockedUserError } = await db',
+      ".eq('id', userRow.id)",
+      'let latestUserRow = lockedUserRow as Row',
       'const walletSync = await getMexasWalletSync',
       ".eq('balance', latestUserRow.balance)",
       'await releaseMexasUserBalanceLock(db, userRow.id, balanceLockOwner)',

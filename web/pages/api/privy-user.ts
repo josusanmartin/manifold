@@ -324,7 +324,16 @@ async function updateExistingUser(params: {
 
   const balanceLockOwner = await acquireMexasUserBalanceLock(db, userRow.id)
   try {
-    let latestUserRow = userRow
+    const { data: lockedUserRow, error: lockedUserError } = await db
+      .from('users')
+      .select()
+      .eq('id', userRow.id)
+      .single()
+
+    if (lockedUserError) throw lockedUserError
+    if (!lockedUserRow) throw new Error('Could not load locked Privy user.')
+
+    let latestUserRow = lockedUserRow as Row<'users'>
     for (let attempt = 0; attempt < USER_UPDATE_ATTEMPTS; attempt++) {
       const walletSync = await getMexasWalletSync(
         db,
