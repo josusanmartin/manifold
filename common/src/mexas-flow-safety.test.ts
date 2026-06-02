@@ -100,16 +100,38 @@ describe('MEXAS flow safety guardrails', () => {
 
     expect(source).toContain(".lte('expires_at', now)")
     expectMarkersInOrder(source, [
-      'const { data: updatedRow, error } = await db',
+      'async function releaseOpenMexasOrder',
+      'const { data: preparedRow, error } = await db',
+      'mexasFundsReleased:',
+      'refundAmount > 0',
+      ".eq('is_cancelled', false)",
       ".eq('is_filled', false)",
       ".eq('updated_time', row.updated_time)",
-      'if (!updatedRow) return 0',
+      'if (!preparedRow) return 0',
+      'await completePreparedMexasOrderRelease(',
+    ])
+    expectMarkersInOrder(source, [
+      'async function completePreparedMexasOrderRelease',
       'await updateMexasUserBalanceCas(db, bet.userId, refundAmount',
+      'mexasFundsReleased: true',
+      ".eq('updated_time', row.updated_time)",
+    ])
+    expectMarkersInOrder(source, [
+      'export async function releasePendingMexasOrderReleases',
+      'const rows = await loadPendingMexasReleaseRows(db, options)',
+      'completePreparedMexasOrderRelease(db, row',
+    ])
+    expectMarkersInOrder(source, [
+      'export async function releaseUnbackedMexasOrders',
+      'let released = await releasePendingMexasOrderReleases(db, options)',
+      'const rows = await loadOpenReservedMexasOrderRows(db, options)',
     ])
     expectMarkersInOrder(source, [
       'async function cancelUnbackedMexasOrder',
+      'const { data: updatedRow, error } = await db',
       ".eq('is_filled', false)",
       ".eq('updated_time', row.updated_time)",
+      'return updatedRow ? 1 : 0',
     ])
   })
 
@@ -154,6 +176,11 @@ describe('MEXAS flow safety guardrails', () => {
       'const walletSync = await getMexasWalletSync',
       ".eq('balance', latestUserRow.balance)",
       'await releaseMexasUserBalanceLock(db, userRow.id, balanceLockOwner)',
+    ])
+    expectMarkersInOrder(source, [
+      'async function getMexasWalletSync',
+      'await releasePendingMexasOrderReleases(db',
+      'const openReservedAmount = await getOpenReservedMexasAmount',
     ])
   })
 
@@ -203,6 +230,25 @@ describe('MEXAS flow safety guardrails', () => {
     expect(betPanelSource).not.toContain(
       "token={isCashContract ? 'CASH' : 'M$'}"
     )
+  })
+
+  test('does not offer immediate expiration for MEXAS orderbook markets', () => {
+    const source = readRepoFile('web/components/bet/limit-order-panel.tsx')
+
+    expect(source).toContain("{ label: 'Expira inmediatamente', value: 1 }")
+    expectMarkersInOrder(source, [
+      'if (orderBookOnly && selectedExpiration === 1)',
+      'setSelectedExpiration(0)',
+      'const availableExpirationOptions = orderBookOnly',
+      'expirationOptions.filter((option) => option.value !== 1)',
+      'const expirationItems = availableExpirationOptions.map',
+      'const selectedExpirationLabel =',
+      'availableExpirationOptions.find',
+    ])
+    expectMarkersInOrder(source, [
+      "error === 'Insufficient balance'",
+      "error === 'Saldo insuficiente'",
+    ])
   })
 
   test('syncs wallet balances incrementally instead of restoring spent filled stake', () => {

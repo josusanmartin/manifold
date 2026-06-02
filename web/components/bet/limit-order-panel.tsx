@@ -130,6 +130,12 @@ export default function LimitOrderPanel(props: {
 
   const [lastBetDetails, setLastBetDetails] = useState<Bet | null>(null)
 
+  useEffect(() => {
+    if (orderBookOnly && selectedExpiration === 1) {
+      setSelectedExpiration(0)
+    }
+  }, [orderBookOnly, selectedExpiration, setSelectedExpiration])
+
   // State for editing payout
   const [isEditingPayout, setIsEditingPayout] = useState(false)
   const [editablePayout, setEditablePayout] = useState<number | undefined>(
@@ -232,7 +238,8 @@ export default function LimitOrderPanel(props: {
     !outcome ||
     !betAmount ||
     !hasLimitBet ||
-    error === 'Insufficient balance'
+    error === 'Insufficient balance' ||
+    error === 'Saldo insuficiente'
 
   function onBetChange(newAmount: number | undefined) {
     setBetAmount(newAmount)
@@ -378,10 +385,16 @@ export default function LimitOrderPanel(props: {
 
   const hideYesNo = isBinaryMC || !!pseudonym
 
-  const expirationItems = expirationOptions.map((option) => ({
+  const availableExpirationOptions = orderBookOnly
+    ? expirationOptions.filter((option) => option.value !== 1)
+    : expirationOptions
+  const expirationItems = availableExpirationOptions.map((option) => ({
     name: option.label,
     onClick: () => setSelectedExpiration(option.value),
   }))
+  const selectedExpirationLabel =
+    availableExpirationOptions.find((opt) => opt.value === selectedExpiration)
+      ?.label ?? availableExpirationOptions[0].label
 
   return (
     <>
@@ -477,9 +490,7 @@ export default function LimitOrderPanel(props: {
           buttonContent={
             <Row className="items-center gap-1">
               <span>
-                {expirationOptions.find(
-                  (opt) => opt.value === selectedExpiration
-                )?.label ?? expirationOptions[0].label}
+                {selectedExpirationLabel}
               </span>
               <SelectorIcon className="text-ink-400 h-4 w-4" />
             </Row>

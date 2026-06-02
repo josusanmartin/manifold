@@ -15,7 +15,10 @@ import {
 } from 'common/supabase/utils'
 import { isAddress, type Address } from 'viem'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { getOpenReservedMexasAmount } from 'web/lib/api/mexas-orders'
+import {
+  getOpenReservedMexasAmount,
+  releasePendingMexasOrderReleases,
+} from 'web/lib/api/mexas-orders'
 import {
   acquireMexasUserBalanceLock,
   releaseMexasUserBalanceLock,
@@ -164,6 +167,10 @@ async function getMexasWalletSync(
     const previousUnits = parseSyncedMexasUnits(data)
     const deltaAmount = mexasUnitsDeltaToAmount(currentUnits - previousUnits)
     const onChainAmount = mexasUnitsToAmount(currentUnits)
+    await releasePendingMexasOrderReleases(db, {
+      userId: row.id,
+      skipUserBalanceLock: true,
+    })
     const openReservedAmount = await getOpenReservedMexasAmount(db, {
       userId: row.id,
     })
