@@ -29,8 +29,9 @@ sus MEX fuera de su wallet despues de una operacion llena.
 
 Para no crear saldos internos no respaldados, el API bloquea:
 
-- nuevos cruces de ordenes si no existe `MEXAS_SETTLEMENT_MODE=escrow`, salvo que
-  se active explicitamente `MEXAS_ALLOW_UNESCROWED_MATCHING=true`;
+- nuevos cruces de ordenes siempre, hasta que exista un motor atomico de
+  settlement; los flags de entorno no deben poder activar el matcher local
+  porque actualiza filas maker/taker fuera de una unica transaccion;
 - resoluciones con posiciones llenadas si no existe `MEXAS_SETTLEMENT_MODE=escrow`,
   salvo que se active explicitamente `MEXAS_ALLOW_UNESCROWED_RESOLUTION=true`.
 
@@ -47,5 +48,5 @@ de estas dos piezas:
 - custodia treasury: al abrir una orden, la wallet transfiere MEX a una treasury;
   al resolver/retirar, un servicio backend firma pagos desde esa treasury.
 
-Sin una de esas dos piezas, el orderbook puede listar ordenes, pero no debe
-prometer settlement real.
+Sin una de esas dos piezas y un motor transaccional, el orderbook puede listar
+ordenes, pero no debe prometer settlement real ni ejecutar cruces.

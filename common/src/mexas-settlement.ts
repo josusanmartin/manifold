@@ -67,9 +67,12 @@ export function hasMexasSettlementExposure(audit: MexasSettlementAudit) {
 }
 
 export function hasTransactionalMexasMatchingEngine(
-  settings: MexasSettlementSettings
+  _settings: MexasSettlementSettings
 ) {
-  return settings.matchingEngineMode === 'transactional'
+  // The in-process matcher updates maker and taker rows separately. It is useful
+  // for deterministic simulation tests, but it is not a production settlement
+  // engine. Keep live crossing disabled until an atomic RPC/escrow engine exists.
+  return false
 }
 
 export function canMexasMatchCrossingOrders(

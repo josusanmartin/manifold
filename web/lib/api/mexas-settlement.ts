@@ -21,7 +21,7 @@ export function assertMexasCanMatchCrossingOrders(hasCrossingOrders: boolean) {
 
   throw new APIError(
     503,
-    'El matching MEXAS requiere escrow on-chain y un motor transaccional. Puedes abrir ordenes limite, pero los cruces estan desactivados hasta configurar MEXAS_SETTLEMENT_MODE=escrow y MEXAS_MATCHING_ENGINE_MODE=transactional.'
+    'El matching MEXAS requiere escrow on-chain y un motor transaccional atomico. Puedes abrir ordenes limite, pero los cruces estan desactivados hasta implementar el motor de settlement.'
   )
 }
 

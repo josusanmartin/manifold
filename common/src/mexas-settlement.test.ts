@@ -125,7 +125,7 @@ describe('MEXAS settlement audit', () => {
     expect(hasMexasSettlementExposure(audit)).toBe(false)
   })
 
-  test('requires both escrow and a transactional engine before matching', () => {
+  test('blocks live matching until an implemented transactional engine exists', () => {
     expect(canMexasMatchCrossingOrders({})).toBe(false)
     expect(
       canMexasMatchCrossingOrders({
@@ -142,18 +142,18 @@ describe('MEXAS settlement audit', () => {
         settlementMode: 'escrow',
         matchingEngineMode: 'transactional',
       })
-    ).toBe(true)
+    ).toBe(false)
     expect(
       canMexasMatchCrossingOrders({
         allowUnescrowedMatching: 'true',
         matchingEngineMode: 'transactional',
       })
-    ).toBe(true)
+    ).toBe(false)
     expect(
       hasTransactionalMexasMatchingEngine({
         matchingEngineMode: 'transactional',
       })
-    ).toBe(true)
+    ).toBe(false)
   })
 
   test('allows resolution with escrow or explicit unescrowed override', () => {

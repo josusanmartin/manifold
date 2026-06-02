@@ -795,7 +795,8 @@ async function placeBinaryBet(
         bet.outcome,
         bet.limitProb
       )
-      assertMexasCanMatchCrossingOrders(crossingOrderRows.length > 0)
+      const hasCrossingOrders = crossingOrderRows.length > 0
+      assertMexasCanMatchCrossingOrders(hasCrossingOrders)
 
       if (params.dryRun) {
         const simulated = matchMexasLimitOrder({
@@ -828,7 +829,9 @@ async function placeBinaryBet(
       if (betError) throw betError
       inserted = true
 
-      const matchedBet = await matchMexasOrder(db, bet)
+      const matchedBet = hasCrossingOrders
+        ? await matchMexasOrder(db, bet)
+        : bet
       await updateMexasContractAfterOrder(
         db,
         lock.contractRow,
