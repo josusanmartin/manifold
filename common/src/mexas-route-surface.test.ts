@@ -2,6 +2,7 @@ type Redirect = {
   source: string
   destination: string
   permanent: boolean
+  has?: { type: string; key: string; value?: string }[]
 }
 
 const nextConfig = require('../../web/next.config.js') as {
@@ -86,5 +87,21 @@ describe('MEXAS route surface', () => {
         )
       ).toBe(false)
     }
+  })
+
+  test('normalizes removed profile tabs to the MEXAS summary tab', async () => {
+    const redirectsBySource = await getRedirectsBySource()
+
+    expect(redirectsBySource.get('/:username')).toMatchObject({
+      destination: '/:username?tab=summary',
+      permanent: false,
+      has: [
+        {
+          type: 'query',
+          key: 'tab',
+          value: 'comments|achievements',
+        },
+      ],
+    })
   })
 })

@@ -453,7 +453,7 @@ const BetBalanceChangeRow = (props: {
             <>
               {token === 'CASH'
                 ? formatSweepies(balance.cash)
-                : formatMoney(balance.mana)}
+                : formatWithToken({ amount: balance.mana, token: 'MEX' })}
               {'·'}
             </>
           )}{' '}
@@ -635,7 +635,7 @@ const TxnBalanceChangeRow = (props: {
               ? formatSpice(amount).replace('-', '')
               : token === 'CASH'
               ? formatSweepies(amount).replace('-', '')
-              : formatMoney(amount).replace('-', '')}
+              : formatWithToken({ amount, token: 'MEX' }).replace('-', '')}
           </span>
         </Row>
         <div className={'text-ink-600'}>
@@ -648,7 +648,7 @@ const TxnBalanceChangeRow = (props: {
                 ? formatSpice(balance.spice)
                 : token === 'CASH'
                 ? formatSweepies(balance.cash)
-                : formatMoney(balance.mana)}
+                : formatWithToken({ amount: balance.mana, token: 'MEX' })}
               {' · '}
             </>
           )}
@@ -697,15 +697,15 @@ const txnTitle = (change: TxnBalanceChange) => {
     case 'ADMIN_REWARD':
       return 'Mod task completed'
     case 'LOAN':
-      return 'Loan'
+      return 'Crédito'
     case 'MARGIN_LOAN':
-      return 'Margin Loan'
+      return 'Crédito de margen'
     case 'LEAGUE_PRIZE':
       return 'League prize'
     case 'MANA_PURCHASE':
       return 'MEX deposit'
     case 'MARKET_BOOST_REDEEM':
-      return 'Claim boost'
+      return 'Recompensa de mercado'
     case 'SIGNUP_BONUS':
       return change.description ?? 'Signup bonus'
     case 'REFERRAL':
@@ -715,11 +715,11 @@ const txnTitle = (change: TxnBalanceChange) => {
       return `Redeem prize points for MEX`
     case 'CONVERT_CASH':
     case 'CONVERT_CASH_DONE':
-      return 'Convert sweepcash to MEX'
+      return 'Convertir saldo a MEX'
     case 'CASH_OUT':
       return 'Redemption request'
     case 'CASH_BONUS':
-      return 'Sweepcash bonus'
+      return 'Bono'
     case 'KYC_BONUS':
       return 'Account bonus'
     case 'CONTRACT_RESOLUTION_FEE':
@@ -743,7 +743,8 @@ const txnTitle = (change: TxnBalanceChange) => {
 const txnTypeToDescription = (txnCategory: string) => {
   switch (txnCategory) {
     case 'MARKET_BOOST_CREATE':
-      return 'Boost'
+    case 'CONTRACT_BOOST_PURCHASE':
+      return 'Promoción de mercado'
     case 'PUSH_NOTIFICATION_BONUS':
       return 'For enabling push notifications'
     case 'CANCEL_UNIQUE_BETTOR_BONUS':
@@ -783,7 +784,7 @@ const txnTypeToDescription = (txnCategory: string) => {
     case 'ADD_SUBSIDY':
       return 'Subsidy'
     case 'MARKET_BOOST_REDEEM':
-      return 'Leagues'
+      return 'Recompensa'
     case 'BOUNTY_POSTED':
       return 'Ante'
     case 'BOUNTY_AWARDED':

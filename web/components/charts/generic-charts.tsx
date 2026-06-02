@@ -814,6 +814,8 @@ export const SingleValueHistoryChart = <P extends HistoryPoint>(props: {
     yAxis.tickFormat(
       yKind === 'percent'
         ? (n) => formatPct(n)
+        : yKind === 'MEX'
+        ? (n) => `MEX ${formatMoneyNumber(n)}`
         : yKind === 'Ṁ' || yKind === 'spice'
         ? (n) => formatMoneyNumber(n)
         : yKind === 'sweepies'

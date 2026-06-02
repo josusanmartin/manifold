@@ -18,7 +18,11 @@ import {
   type SupabaseClient,
 } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
+import {
+  acquireMexasUserBalanceLock,
+  releaseMexasUserBalanceLock,
+  updateMexasUserBalanceCas,
+} from 'web/lib/api/mexas-balance'
 import {
   releaseClosedMexasMarketOrders,
   releaseExpiredMexasOrders,
@@ -213,6 +217,52 @@ async function releaseOpenOrder(
   if (error) throw error
 }
 
+async function applyMexasResolutionCreditsAndReleases(
+  db: SupabaseClient,
+  entries: { row: Row<'contract_bets'>; bet: Bet }[],
+  creditEvents: { userId: string; amount: number; creditKey: string }[]
+) {
+  const entriesByUserId = new Map<
+    string,
+    { row: Row<'contract_bets'>; bet: Bet }[]
+  >()
+  const eventsByUserId = new Map<
+    string,
+    { userId: string; amount: number; creditKey: string }[]
+  >()
+
+  for (const entry of entries) {
+    const userEntries = entriesByUserId.get(entry.bet.userId) ?? []
+    userEntries.push(entry)
+    entriesByUserId.set(entry.bet.userId, userEntries)
+  }
+  for (const event of creditEvents) {
+    const userEvents = eventsByUserId.get(event.userId) ?? []
+    userEvents.push(event)
+    eventsByUserId.set(event.userId, userEvents)
+  }
+
+  const userIds = Array.from(
+    new Set([...entriesByUserId.keys(), ...eventsByUserId.keys()])
+  ).sort()
+
+  for (const eventUserId of userIds) {
+    const balanceLockOwner = await acquireMexasUserBalanceLock(db, eventUserId)
+    try {
+      for (const event of eventsByUserId.get(eventUserId) ?? []) {
+        await updateMexasUserBalanceCas(db, event.userId, event.amount, {
+          creditKey: event.creditKey,
+        })
+      }
+      for (const entry of entriesByUserId.get(eventUserId) ?? []) {
+        await releaseOpenOrder(db, entry)
+      }
+    } finally {
+      await releaseMexasUserBalanceLock(db, eventUserId, balanceLockOwner)
+    }
+  }
+}
+
 async function resolveMexasMarket(
   req: NextApiRequest,
   res: NextApiResponse<{ message: string } | ErrorResponse>
@@ -289,13 +339,7 @@ async function resolveMexasMarket(
     outcome
   )
 
-  for (const event of creditEvents) {
-    await updateMexasUserBalanceCas(db, event.userId, event.amount, {
-      creditKey: event.creditKey,
-    })
-  }
-
-  await Promise.all(bets.map((entry) => releaseOpenOrder(db, entry)))
+  await applyMexasResolutionCreditsAndReleases(db, bets, creditEvents)
 
   const resolutionTime = Date.now()
   const contractData = getRowData(closedContractRow)

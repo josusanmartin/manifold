@@ -20,7 +20,7 @@ export type PortfolioMode =
   | 'all'
   | 'spice'
   | 'profit'
-export const MANA_COLOR = '#7c3aed'
+export const MEX_COLOR = '#7c3aed'
 export const CASH_COLOR = '#f59e0b'
 
 export const PortfolioTooltip = (props: { date: Date }) => {
@@ -167,7 +167,7 @@ export const PortfolioGraph = (props: {
       xScale={xScale}
       yScale={portfolioFocus == 'spice' ? spiceYScale : yScale}
       zoomParams={zoomParams}
-      yKind={prefersPlay ? 'Ṁ' : 'sweepies'}
+      yKind={prefersPlay ? 'MEX' : 'sweepies'}
       data={
         portfolioFocus === 'all'
           ? prefersPlay
@@ -185,7 +185,7 @@ export const PortfolioGraph = (props: {
           ? profitPoints
           : cashProfitPoints
       }
-      color={prefersPlay ? MANA_COLOR : CASH_COLOR}
+      color={prefersPlay ? MEX_COLOR : CASH_COLOR}
       Tooltip={(props) => <PortfolioTooltip date={xScale.invert(props.x)} />}
       onMouseOver={(p) => {
         if (portfolioFocus == 'all') {

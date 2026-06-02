@@ -7,6 +7,7 @@ export type HistoryPoint<T = unknown> = Point<number, number, T>
 export type DistributionPoint<T = unknown> = Point<number, number, T>
 export type ValueKind =
   | 'Ṁ'
+  | 'MEX'
   | 'percent'
   | 'amount'
   | 'spice'

@@ -28,7 +28,7 @@ export function TokenNumber(props: {
   const {
     hideAmount,
     amount,
-    coinType = 'MANA',
+    coinType = 'MEX',
     numberType,
     className,
     isInline,

@@ -36,7 +36,6 @@ import { Row } from '../layout/row'
 import { BinaryOutcomeLabel, PseudoNumericOutcomeLabel } from '../outcome-label'
 import { AmountInput, BuyAmountInput } from '../widgets/amount-input'
 import DropdownMenu from '../widgets/dropdown-menu'
-import { InfoTooltip } from '../widgets/info-tooltip'
 import { ProbabilitySlider } from '../widgets/probability-input'
 import { sliderColors } from '../widgets/slider'
 import { MoneyDisplay } from './money-display'
@@ -384,10 +383,7 @@ export default function LimitOrderPanel(props: {
     }
   } catch (err: any) {
     console.error('Error in calculateCpmmMultiArbitrage:', err)
-    setError(
-      err?.message ??
-        `Error al calcular la orden. Inténtalo de nuevo.`
-    )
+    setError(err?.message ?? `Error al calcular la orden. Inténtalo de nuevo.`)
   }
   const returnPercent = formatPercent(currentReturn)
 
@@ -401,9 +397,7 @@ export default function LimitOrderPanel(props: {
   return (
     <>
       <Col className=" gap-1">
-        <Row className={'text-ink-600 items-center space-x-3'}>
-          Cantidad
-        </Row>
+        <Row className={'text-ink-600 items-center space-x-3'}>Cantidad</Row>
         <BuyAmountInput
           parentClassName="max-w-full mt-1"
           amount={betAmount}
@@ -574,13 +568,6 @@ export default function LimitOrderPanel(props: {
                   <>
                     Pago máximo{' '}
                     {!hideYesNo && <BinaryOutcomeLabel outcome={outcome} />}
-                    {isCashContract && (
-                      <InfoTooltip
-                        text="Manifold takes a 10% cut of profits on sweepstakes markets."
-                        className="text-ink-600 ml-1 mt-0.5"
-                        size="sm"
-                      />
-                    )}
                   </>
                 )}
               </div>

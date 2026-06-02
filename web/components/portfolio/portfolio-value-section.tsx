@@ -13,19 +13,13 @@ import { Y_AXIS_MARGIN, useZoom } from '../charts/helpers'
 import { TimeRangePicker } from '../charts/time-range-picker'
 import { Col } from '../layout/col'
 import { Row } from '../layout/row'
-import { SweepsToggle } from '../sweeps/sweeps-toggle'
 import { ColorType } from '../widgets/choices-toggle-group'
 import { TokenNumber } from '../widgets/token-number'
 import { PortfolioGraphNumber } from './portfolio-graph-number'
 import { PortfolioGraph, PortfolioMode } from './portfolio-graph'
 import { getPortfolioValues } from '../portfolio-helpers'
-import { useSweepstakes } from '../sweepstakes-provider'
-import { SPICE_TO_MANA_CONVERSION_RATE } from 'common/envs/constants'
 import { filterDefined } from 'common/util/array'
-import { DailyLeagueStat } from '../home/daily-league-stat'
 import { AddFundsButton } from '../profile/add-funds-button'
-import { DailyLoan } from '../home/daily-loan'
-import { useUser } from 'web/hooks/use-user'
 
 export type PortfolioHoveredGraphType =
   | 'balance'
@@ -130,14 +124,12 @@ export const PortfolioValueSection = memo(
       setPortfolioFocus(mode)
       updateGraphValues(emptyGraphValues)
     }
-    const sweepsState = useSweepstakes()
-
     function noHistoryGraphElement(_width: number, height: number) {
       if (portfolioHistory) {
         return (
           <Col className={'text-ink-500 mt-2'}>
             <Row className={'gap-2'}>
-              <span>No portfolio history, yet.</span>
+              <span>Sin historial de portafolio todavía.</span>
             </Row>
           </Col>
         )
@@ -159,7 +151,6 @@ export const PortfolioValueSection = memo(
         <TwombaPortfolioValueSkeleton
           userId={user.id}
           hideSwitcher={true}
-          hideSweepsToggle={true}
           currentTimePeriod={currentTimePeriod}
           setCurrentTimePeriod={setCurrentTimePeriod}
           className={clsx(
@@ -176,47 +167,22 @@ export const PortfolioValueSection = memo(
       )
     }
 
-    const { balance, investmentValue, cashBalance, cashInvestmentValue } =
-      lastPortfolioMetrics
+    const { balance, investmentValue } = lastPortfolioMetrics
 
     const first = portfolioHistory?.[0]
 
     const { firstProfit, totalValue, calculatedProfit } = getPortfolioValues({
       first: first
         ? {
-            balance:
-              first.balance +
-              (first.spiceBalance ?? 0) * SPICE_TO_MANA_CONVERSION_RATE,
+            balance: first.balance,
             investmentValue: first.investmentValue,
             totalDeposits: first.totalDeposits,
           }
         : undefined,
       last: {
-        balance:
-          lastPortfolioMetrics.balance +
-          (lastPortfolioMetrics.spiceBalance ?? 0) *
-            SPICE_TO_MANA_CONVERSION_RATE,
+        balance: lastPortfolioMetrics.balance,
         investmentValue: lastPortfolioMetrics.investmentValue,
         totalDeposits: lastPortfolioMetrics.totalDeposits,
-      },
-    })
-
-    const {
-      firstProfit: firstCashProfit,
-      totalValue: totalCashValue,
-      calculatedProfit: calculatedCashProfit,
-    } = getPortfolioValues({
-      first: first
-        ? {
-            balance: first.cashBalance,
-            investmentValue: first.cashInvestmentValue,
-            totalDeposits: first.totalCashDeposits,
-          }
-        : undefined,
-      last: {
-        balance: lastPortfolioMetrics.cashBalance,
-        investmentValue: lastPortfolioMetrics.cashInvestmentValue,
-        totalDeposits: lastPortfolioMetrics.totalCashDeposits,
       },
     })
 
@@ -230,20 +196,16 @@ export const PortfolioValueSection = memo(
       invested: investmentValue,
       profit,
       net: totalValue,
-      cashBalance: cashBalance ?? 0,
-      cashInvested: cashInvestmentValue ?? 0,
-      cashProfit: calculatedCashProfit ?? 0,
-      netCash: totalCashValue,
+      cashBalance: 0,
+      cashInvested: 0,
+      cashProfit: 0,
+      netCash: 0,
     }
 
-    const hideSweepsToggle =
-      user.createdTime > new Date('2025-02-12').getTime() ||
-      portfolioValues.netCash <= 0
-    const prefersPlay = hideSweepsToggle ? true : sweepsState.prefersPlay
+    const prefersPlay = true
     return (
       <TwombaPortfolioValueSkeleton
         userId={user.id}
-        hideSweepsToggle={hideSweepsToggle}
         currentTimePeriod={currentTimePeriod}
         setCurrentTimePeriod={setTimePeriod}
         portfolioFocus={portfolioFocus}
@@ -258,7 +220,7 @@ export const PortfolioValueSection = memo(
             zoomParams={zoomParams}
             hideXAxis={currentTimePeriod !== 'allTime' && isMobile}
             firstProfit={firstProfit}
-            firstCashProfit={firstCashProfit}
+            firstCashProfit={0}
             updateGraphValues={updateGraphValues}
             portfolioFocus={portfolioFocus}
             setPortfolioFocus={onSetPortfolioFocus}
@@ -289,7 +251,6 @@ function TwombaPortfolioValueSkeleton(props: {
   graphValues: GraphValueType
   portfolioFocus: PortfolioMode
   setPortfolioFocus: (mode: PortfolioMode) => void
-  hideSweepsToggle?: boolean
 }) {
   const {
     currentTimePeriod,
@@ -303,28 +264,21 @@ function TwombaPortfolioValueSkeleton(props: {
     graphValues,
     portfolioFocus,
     setPortfolioFocus,
-    hideSweepsToggle,
     userId,
   } = props
 
   function togglePortfolioFocus(toggleTo: PortfolioMode) {
     setPortfolioFocus(portfolioFocus === toggleTo ? 'all' : toggleTo)
-    setPortfolioFocus(portfolioFocus === toggleTo ? 'all' : toggleTo)
   }
 
-  const sweepsState = useSweepstakes()
-  const prefersPlay = hideSweepsToggle ? true : sweepsState.prefersPlay
+  const prefersPlay = true
 
   return (
     <Col>
       <Col className={clsx('gap-2')}>
         <Row className="text-ink-800 w-full items-center justify-between text-xl font-semibold">
-          Portfolio
+          Portafolio
           <Row className="items-center gap-2">
-            {!hideSweepsToggle && (
-              <SweepsToggle sweepsEnabled={true} isPlay={prefersPlay} />
-            )}
-            <PortfolioLoanButton userId={userId} />
             <AddFundsButton userId={userId} size="md" />
           </Row>
         </Row>
@@ -351,14 +305,14 @@ function TwombaPortfolioValueSkeleton(props: {
                 )}
                 isInline
                 coinClassName="top-[0.25rem] sm:top-[0.1rem]"
-                coinType={prefersPlay ? 'mana' : 'sweepies'}
+                coinType="MEX"
               />
               <span
                 className={clsx(
                   'text-ink-600 ml-1 whitespace-nowrap text-sm transition-all sm:ml-1.5 sm:text-base'
                 )}
               >
-                net worth
+                valor total
               </span>
             </span>
             <Row className="-mr-4 mt-2 gap-2">
@@ -385,7 +339,7 @@ function TwombaPortfolioValueSkeleton(props: {
               <PortfolioGraphNumber
                 prefersPlay={prefersPlay}
                 numberType={'investment'}
-                descriptor="invested"
+                descriptor="invertido"
                 portfolioFocus={portfolioFocus}
                 displayedAmount={displayAmounts(
                   graphValues.invested,
@@ -405,7 +359,7 @@ function TwombaPortfolioValueSkeleton(props: {
               <PortfolioGraphNumber
                 prefersPlay={prefersPlay}
                 numberType={'profit'}
-                descriptor="profit"
+                descriptor="ganancia"
                 portfolioFocus={portfolioFocus}
                 displayedAmount={displayAmounts(
                   graphValues.profit,
@@ -421,13 +375,6 @@ function TwombaPortfolioValueSkeleton(props: {
                     : 'bg-canvas-50 text-ink-1000'
                 )}
                 onClick={() => togglePortfolioFocus('profit')}
-              />
-              <DailyLeagueStat
-                userId={userId}
-                className={clsx(
-                  'group cursor-pointer select-none rounded px-2 py-1 transition-colors',
-                  'bg-canvas-50 text-ink-1000 opacity-[0.75] hover:opacity-100'
-                )}
               />
             </Row>
           </Col>
@@ -466,16 +413,4 @@ function displayAmounts(
     return currentNumber ?? undefined
   }
   return graphNumber ?? undefined
-}
-
-function PortfolioLoanButton(props: { userId?: string }) {
-  const { userId } = props
-  const currentUser = useUser()
-
-  // Only show for current user viewing their own portfolio
-  if (!userId || !currentUser || currentUser.id !== userId) {
-    return null
-  }
-
-  return <DailyLoan user={currentUser} showChest={false} />
 }

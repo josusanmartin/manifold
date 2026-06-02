@@ -31,7 +31,11 @@ import {
 import { removeUndefinedProps } from 'common/util/object'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { isAddress, type Address } from 'viem'
-import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
+import {
+  acquireMexasUserBalanceLock,
+  releaseMexasUserBalanceLock,
+  updateMexasUserBalanceCas,
+} from 'web/lib/api/mexas-balance'
 import {
   releaseClosedMexasMarketOrders,
   releaseExpiredMexasOrders,
@@ -742,12 +746,6 @@ async function placeBinaryBet(
   const userId = await getPrivyUserId(req)
   const params = API.bet.props.parse(req.body)
   const db = getSupabaseAdminClient()
-  await releaseClosedMexasMarketOrders(db, { userId })
-  await releaseExpiredMexasOrders(db, { userId })
-  await releaseUnbackedMexasOrders(db, {
-    userId,
-    requireBalanceRead: true,
-  })
 
   const [
     { data: userRow, error: userError },
@@ -779,106 +777,143 @@ async function placeBinaryBet(
   ) {
     throw new APIError(400, 'Los mercados MEXAS solo aceptan órdenes límite.')
   }
+
+  if (isMexasOrderBookOnlyContract(contract)) {
+    const balanceLockOwner = await acquireMexasUserBalanceLock(db, userId)
+    try {
+      await releaseClosedMexasMarketOrders(db, {
+        userId,
+        skipUserBalanceLock: true,
+      })
+      await releaseExpiredMexasOrders(db, {
+        userId,
+        skipUserBalanceLock: true,
+      })
+      await releaseUnbackedMexasOrders(db, {
+        userId,
+        requireBalanceRead: true,
+        skipUserBalanceLock: true,
+      })
+      const syncedUserRow = await syncMexasWalletBalance(db, userRow)
+      if (syncedUserRow.balance < params.amount) {
+        throw new APIError(403, 'Insufficient balance.')
+      }
+
+      const lock = await acquireMexasOrderLock(db, params.contractId)
+      let bet: (LimitBet & { outcome: MexasOutcome }) | undefined
+      let reservedAmount = 0
+      let debited = false
+      let inserted = false
+
+      try {
+        const lockedContract = lock.contract
+        await releaseClosedMexasMarketOrders(db, {
+          userId,
+          skipUserBalanceLock: true,
+        })
+        await releaseExpiredMexasOrders(db, {
+          userId,
+          skipUserBalanceLock: true,
+        })
+        await releaseUnbackedMexasOrders(db, {
+          userId,
+          requireBalanceRead: true,
+          skipUserBalanceLock: true,
+        })
+        const latestSyncedUserRow = await syncMexasWalletBalance(
+          db,
+          syncedUserRow as Row<'users'>
+        )
+        if (latestSyncedUserRow.balance < params.amount) {
+          throw new APIError(403, 'Insufficient balance.')
+        }
+        bet = createMexasOpenLimitBet(
+          lockedContract as MarketContract & { prob: number },
+          params,
+          userId
+        ) as LimitBet & { outcome: MexasOutcome }
+
+        const crossingOrderRows = await loadMexasCrossingOrderRows(
+          db,
+          params.contractId,
+          bet.outcome,
+          bet.limitProb
+        )
+        const hasCrossingOrders = crossingOrderRows.length > 0
+        assertMexasCanMatchCrossingOrders(hasCrossingOrders)
+
+        if (params.dryRun) {
+          const simulated = matchMexasLimitOrder({
+            amount: bet.orderAmount,
+            limitProb: bet.limitProb,
+            makers: crossingOrderRows.map((entry) => entry.bet),
+            outcome: bet.outcome,
+            takerBetId: 'dry-run',
+            timestamp: Date.now(),
+          })
+          return res.status(200).json({
+            ...bet,
+            amount: simulated.takerAmount,
+            shares: simulated.takerShares,
+            fills: simulated.takerFills,
+            isFilled: simulated.remainingAmount <= EPSILON,
+            betId: 'dry-run',
+          })
+        }
+
+        reservedAmount = getMexasRemainingReservedAmount(bet)
+        await updateUserBalanceCas(db, userId, -reservedAmount, {
+          lastBetTime: bet.createdTime,
+        })
+        debited = true
+
+        const { error: betError } = await db
+          .from('contract_bets')
+          .insert(betToRow(bet))
+        if (betError) throw betError
+        inserted = true
+
+        const matchedBet = hasCrossingOrders
+          ? await matchMexasOrder(db, bet)
+          : bet
+        await updateMexasContractAfterOrder(
+          db,
+          lock.contractRow,
+          lockedContract,
+          matchedBet
+        )
+
+        return res.status(200).json({
+          ...matchedBet,
+          betId: matchedBet.id,
+        } as LimitBet)
+      } catch (error) {
+        if (debited && !inserted && bet) {
+          await refundMexasReservation(
+            db,
+            userId,
+            reservedAmount,
+            `mexas-insert-refund:${bet.id}`
+          )
+        }
+        throw error
+      } finally {
+        await releaseMexasOrderLock(db, params.contractId, lock.lockOwner)
+      }
+    } finally {
+      await releaseMexasUserBalanceLock(db, userId, balanceLockOwner)
+    }
+  }
+
+  await releaseClosedMexasMarketOrders(db, { userId })
+  await releaseExpiredMexasOrders(db, { userId })
+  await releaseUnbackedMexasOrders(db, {
+    userId,
+    requireBalanceRead: true,
+  })
   const syncedUserRow = await syncMexasWalletBalance(db, userRow)
   if (syncedUserRow.balance < params.amount) {
     throw new APIError(403, 'Insufficient balance.')
-  }
-
-  if (isMexasOrderBookOnlyContract(contract)) {
-    const lock = await acquireMexasOrderLock(db, params.contractId)
-    let bet: (LimitBet & { outcome: MexasOutcome }) | undefined
-    let reservedAmount = 0
-    let debited = false
-    let inserted = false
-
-    try {
-      const lockedContract = lock.contract
-      await releaseClosedMexasMarketOrders(db, { contractId: params.contractId })
-      await releaseExpiredMexasOrders(db, { contractId: params.contractId })
-      await releaseUnbackedMexasOrders(db, {
-        contractId: params.contractId,
-        requireBalanceRead: true,
-      })
-      const latestSyncedUserRow = await syncMexasWalletBalance(
-        db,
-        syncedUserRow as Row<'users'>
-      )
-      if (latestSyncedUserRow.balance < params.amount) {
-        throw new APIError(403, 'Insufficient balance.')
-      }
-      bet = createMexasOpenLimitBet(
-        lockedContract as MarketContract & { prob: number },
-        params,
-        userId
-      ) as LimitBet & { outcome: MexasOutcome }
-
-      const crossingOrderRows = await loadMexasCrossingOrderRows(
-        db,
-        params.contractId,
-        bet.outcome,
-        bet.limitProb
-      )
-      const hasCrossingOrders = crossingOrderRows.length > 0
-      assertMexasCanMatchCrossingOrders(hasCrossingOrders)
-
-      if (params.dryRun) {
-        const simulated = matchMexasLimitOrder({
-          amount: bet.orderAmount,
-          limitProb: bet.limitProb,
-          makers: crossingOrderRows.map((entry) => entry.bet),
-          outcome: bet.outcome,
-          takerBetId: 'dry-run',
-          timestamp: Date.now(),
-        })
-        return res.status(200).json({
-          ...bet,
-          amount: simulated.takerAmount,
-          shares: simulated.takerShares,
-          fills: simulated.takerFills,
-          isFilled: simulated.remainingAmount <= EPSILON,
-          betId: 'dry-run',
-        })
-      }
-
-      reservedAmount = getMexasRemainingReservedAmount(bet)
-      await updateUserBalanceCas(db, userId, -reservedAmount, {
-        lastBetTime: bet.createdTime,
-      })
-      debited = true
-
-      const { error: betError } = await db
-        .from('contract_bets')
-        .insert(betToRow(bet))
-      if (betError) throw betError
-      inserted = true
-
-      const matchedBet = hasCrossingOrders
-        ? await matchMexasOrder(db, bet)
-        : bet
-      await updateMexasContractAfterOrder(
-        db,
-        lock.contractRow,
-        lockedContract,
-        matchedBet
-      )
-
-      return res.status(200).json({
-        ...matchedBet,
-        betId: matchedBet.id,
-      } as LimitBet)
-    } catch (error) {
-      if (debited && !inserted && bet) {
-        await refundMexasReservation(
-          db,
-          userId,
-          reservedAmount,
-          `mexas-insert-refund:${bet.id}`
-        )
-      }
-      throw error
-    } finally {
-      await releaseMexasOrderLock(db, params.contractId, lock.lockOwner)
-    }
   }
 
   const unfilledBets = await loadUnfilledLimitBets(

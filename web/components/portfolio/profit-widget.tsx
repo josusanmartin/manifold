@@ -46,7 +46,7 @@ export function ProfitWidget(props: { user: User | null | undefined }) {
         size="xs"
         className="gap-1 !px-1 !py-1"
       >
-        See {moreChanges} changes today
+        Ver {moreChanges} cambios de hoy
       </Button>
       {open && (
         <DailyProfitModal
@@ -56,7 +56,7 @@ export function ProfitWidget(props: { user: User | null | undefined }) {
           contracts={data?.contracts}
           dailyProfit={dailyProfit}
           netWorth={netWorth}
-          token="MANA"
+          token="MEX"
         />
       )}
     </>

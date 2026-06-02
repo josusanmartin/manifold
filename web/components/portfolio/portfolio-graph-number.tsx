@@ -41,7 +41,7 @@ export const PortfolioGraphNumber = (props: {
         <TokenNumber
           amount={displayedAmount}
           className={clsx('font-bold transition-all', className)}
-          coinType={isSpice ? 'spice' : prefersPlay ? 'mana' : 'sweepies'}
+          coinType={isSpice ? 'spice' : prefersPlay ? 'MEX' : 'sweepies'}
         />
 
         <div

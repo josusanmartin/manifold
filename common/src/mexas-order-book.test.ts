@@ -145,6 +145,48 @@ describe('MEXAS order book matching', () => {
     expect(getMexasOpenOrderAmount(result.matches[0].updatedMaker)).toBe(0)
   })
 
+  test('fills multiple equal-price makers by time before moving to newer orders', () => {
+    const result = matchMexasLimitOrder({
+      amount: 40,
+      limitProb: 0.8,
+      makers: [
+        order({
+          id: 'new-ask',
+          outcome: 'NO',
+          limitProb: 0.7,
+          createdTime: 3,
+          orderAmount: 3,
+        }),
+        order({
+          id: 'old-ask',
+          outcome: 'NO',
+          limitProb: 0.7,
+          createdTime: 2,
+          orderAmount: 7,
+        }),
+        order({
+          id: 'better-ask',
+          outcome: 'NO',
+          limitProb: 0.6,
+          createdTime: 4,
+          orderAmount: 6,
+        }),
+      ],
+      outcome: 'YES',
+      takerBetId: 'taker',
+      timestamp: 10,
+    })
+
+    expect(result.matches.map((match) => match.maker.id)).toEqual([
+      'better-ask',
+      'old-ask',
+      'new-ask',
+    ])
+    expect(result.matches.map((match) => match.makerAmount)).toEqual([6, 7, 3])
+    expect(result.takerAmount).toBeCloseTo(32.33333333)
+    expect(result.remainingAmount).toBeCloseTo(7.66666667)
+  })
+
   test('does not match non-crossing orders', () => {
     const result = matchMexasLimitOrder({
       amount: 5,

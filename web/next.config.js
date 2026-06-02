@@ -162,6 +162,18 @@ module.exports = {
       ...MEXAS_WALLET_REDIRECTS,
       ...MEXAS_ONLY_REDIRECTS,
       {
+        source: '/:username',
+        has: [
+          {
+            type: 'query',
+            key: 'tab',
+            value: 'comments|achievements',
+          },
+        ],
+        destination: '/:username?tab=summary',
+        permanent: false,
+      },
+      {
         source: '/supporter',
         destination: '/checkout',
         permanent: false,

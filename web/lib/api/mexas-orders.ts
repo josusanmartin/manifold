@@ -12,6 +12,8 @@ import type { Row, SupabaseClient } from 'common/supabase/utils'
 import { isAddress, type Address } from 'viem'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import {
+  acquireMexasUserBalanceLock,
+  releaseMexasUserBalanceLock,
   setMexasUserBalanceCas,
   updateMexasUserBalanceCas,
 } from './mexas-balance'
@@ -22,6 +24,10 @@ const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
 const MEXAS_RELEASE_REASON_EXPIRED = 'expired'
 const MEXAS_RELEASE_REASON_MARKET_CLOSED = 'market-closed'
+
+type MexasOrderReleaseOptions = {
+  skipUserBalanceLock?: boolean
+}
 
 function getBetData(row: Row<'contract_bets'>) {
   const data = row.data
@@ -69,48 +75,61 @@ async function syncAvailableBalanceFromBacking(params: {
 async function releaseOpenMexasOrder(
   db: SupabaseClient,
   row: Row<'contract_bets'>,
-  releaseReason: string
+  releaseReason: string,
+  options: MexasOrderReleaseOptions = {}
 ) {
   const bet = convertBet(row) as LimitBet & MexasReservedOrderData
   if (bet.limitProb === undefined || bet.orderAmount === undefined) return
 
-  const data = getBetData(row)
-  const now = Date.now()
-  const shouldRefund =
-    bet.mexasFundsReserved === true && bet.mexasFundsReleased !== true
-  const refundAmount = shouldRefund ? getMexasRemainingReservedAmount(bet) : 0
-  const creditKey = getMexasOrderReleaseCreditKey(bet.id)
+  const release = async () => {
+    const data = getBetData(row)
+    const now = Date.now()
+    const shouldRefund =
+      bet.mexasFundsReserved === true && bet.mexasFundsReleased !== true
+    const refundAmount = shouldRefund ? getMexasRemainingReservedAmount(bet) : 0
+    const creditKey = getMexasOrderReleaseCreditKey(bet.id)
 
-  if (refundAmount > 0) {
-    await updateMexasUserBalanceCas(db, bet.userId, refundAmount, {
-      creditKey,
-    })
+    if (refundAmount > 0) {
+      await updateMexasUserBalanceCas(db, bet.userId, refundAmount, {
+        creditKey,
+      })
+    }
+
+    const { error } = await db
+      .from('contract_bets')
+      .update({
+        is_cancelled: true,
+        data: {
+          ...data,
+          isCancelled: true,
+          mexasFundsReleased: shouldRefund ? true : bet.mexasFundsReleased,
+          mexasReleaseCreditKey: refundAmount > 0 ? creditKey : undefined,
+          mexasReleaseReason: releaseReason,
+          mexasReleasedAt: now,
+        } as any,
+      })
+      .eq('bet_id', bet.id)
+      .eq('is_cancelled', false)
+
+    if (error) throw error
   }
 
-  const { error } = await db
-    .from('contract_bets')
-    .update({
-      is_cancelled: true,
-      data: {
-        ...data,
-        isCancelled: true,
-        mexasFundsReleased: shouldRefund ? true : bet.mexasFundsReleased,
-        mexasReleaseCreditKey: refundAmount > 0 ? creditKey : undefined,
-        mexasReleaseReason: releaseReason,
-        mexasReleasedAt: now,
-      } as any,
-    })
-    .eq('bet_id', bet.id)
-    .eq('is_cancelled', false)
+  if (options.skipUserBalanceLock) return await release()
 
-  if (error) throw error
+  const balanceLockOwner = await acquireMexasUserBalanceLock(db, bet.userId)
+  try {
+    return await release()
+  } finally {
+    await releaseMexasUserBalanceLock(db, bet.userId, balanceLockOwner)
+  }
 }
 
 async function releaseExpiredMexasOrder(
   db: SupabaseClient,
-  row: Row<'contract_bets'>
+  row: Row<'contract_bets'>,
+  options: MexasOrderReleaseOptions = {}
 ) {
-  return releaseOpenMexasOrder(db, row, MEXAS_RELEASE_REASON_EXPIRED)
+  return releaseOpenMexasOrder(db, row, MEXAS_RELEASE_REASON_EXPIRED, options)
 }
 
 export async function releaseExpiredMexasOrders(
@@ -118,6 +137,7 @@ export async function releaseExpiredMexasOrders(
   options: {
     contractId?: string
     userId?: string
+    skipUserBalanceLock?: boolean
   } = {}
 ) {
   const now = new Date().toISOString()
@@ -141,7 +161,9 @@ export async function releaseExpiredMexasOrders(
 
     const rows = (data ?? []) as Row<'contract_bets'>[]
     for (const row of rows) {
-      await releaseExpiredMexasOrder(db, row)
+      await releaseExpiredMexasOrder(db, row, {
+        skipUserBalanceLock: options.skipUserBalanceLock,
+      })
       released++
     }
     if (rows.length < EXPIRED_ORDER_PAGE_SIZE) break
@@ -155,6 +177,7 @@ export async function releaseClosedMexasMarketOrders(
   options: {
     contractId?: string
     userId?: string
+    skipUserBalanceLock?: boolean
   } = {}
 ) {
   const openRows = await loadOpenReservedMexasOrderRows(db, options)
@@ -180,11 +203,9 @@ export async function releaseClosedMexasMarketOrders(
   let released = 0
   for (const row of openRows) {
     if (closedContractIds.has(row.contract_id)) {
-      await releaseOpenMexasOrder(
-        db,
-        row,
-        MEXAS_RELEASE_REASON_MARKET_CLOSED
-      )
+      await releaseOpenMexasOrder(db, row, MEXAS_RELEASE_REASON_MARKET_CLOSED, {
+        skipUserBalanceLock: options.skipUserBalanceLock,
+      })
       released++
     }
   }
@@ -297,6 +318,7 @@ export async function releaseUnbackedMexasOrders(
     contractId?: string
     userId?: string
     requireBalanceRead?: boolean
+    skipUserBalanceLock?: boolean
   } = {}
 ) {
   const rows = await loadOpenReservedMexasOrderRows(db, options)
@@ -323,35 +345,48 @@ export async function releaseUnbackedMexasOrders(
   let released = 0
 
   for (const [userId, userOrderRows] of rowsByUserId) {
-    const onChainAmount = await getUserOnChainMexasAmount(
-      userRowById.get(userId),
-      options.requireBalanceRead ?? false
-    )
-    if (onChainAmount === undefined) continue
+    const releaseUserOrders = async () => {
+      const onChainAmount = await getUserOnChainMexasAmount(
+        userRowById.get(userId),
+        options.requireBalanceRead ?? false
+      )
+      if (onChainAmount === undefined) return
 
-    const bets = userOrderRows.map(
-      (row) => convertBet(row) as LimitBet & MexasReservedOrderData
-    )
-    const backedAmount =
-      typeof onChainAmount === 'number' ? onChainAmount : onChainAmount.amount
-    const unbackedIds = new Set(getUnbackedMexasOrderIds(bets, backedAmount))
-    if (!unbackedIds.size) continue
+      const bets = userOrderRows.map(
+        (row) => convertBet(row) as LimitBet & MexasReservedOrderData
+      )
+      const backedAmount =
+        typeof onChainAmount === 'number' ? onChainAmount : onChainAmount.amount
+      const unbackedIds = new Set(getUnbackedMexasOrderIds(bets, backedAmount))
+      if (!unbackedIds.size) return
 
-    let userReleased = 0
-    for (const row of userOrderRows) {
-      if (unbackedIds.has(row.bet_id)) {
-        const rowReleased = await cancelUnbackedMexasOrder(db, row)
-        userReleased += rowReleased
-        released += rowReleased
+      let userReleased = 0
+      for (const row of userOrderRows) {
+        if (unbackedIds.has(row.bet_id)) {
+          const rowReleased = await cancelUnbackedMexasOrder(db, row)
+          userReleased += rowReleased
+          released += rowReleased
+        }
+      }
+      if (userReleased && typeof onChainAmount !== 'number') {
+        await syncAvailableBalanceFromBacking({
+          db,
+          userId,
+          onChainAmount: onChainAmount.amount,
+          onChainUnits: onChainAmount.units,
+        })
       }
     }
-    if (userReleased && typeof onChainAmount !== 'number') {
-      await syncAvailableBalanceFromBacking({
-        db,
-        userId,
-        onChainAmount: onChainAmount.amount,
-        onChainUnits: onChainAmount.units,
-      })
+
+    if (options.skipUserBalanceLock) {
+      await releaseUserOrders()
+    } else {
+      const balanceLockOwner = await acquireMexasUserBalanceLock(db, userId)
+      try {
+        await releaseUserOrders()
+      } finally {
+        await releaseMexasUserBalanceLock(db, userId, balanceLockOwner)
+      }
     }
   }
 
