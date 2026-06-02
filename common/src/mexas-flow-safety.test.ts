@@ -1468,11 +1468,43 @@ describe('MEXAS flow safety guardrails', () => {
       'async function checkNoUnsafeOpenMexasOrders',
       "fail(\n        'open order reservation flags'",
       "checks.push(await checkNoUnsafeOpenMexasOrders(db))",
+      "checks.push(await checkNoMexasMarketLocks(db))",
       "checks.push(await checkOpenMexasOrderBacking(db))",
     ])
     expect(source).toContain('funds not reserved')
     expect(source).toContain('funds already released')
     expect(source).toContain('funds release flag missing')
+  })
+
+  test('launch readiness fails unresolved MEXAS markets with lock residue', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('type MexasMarketLockIssue')
+    expect(source).toContain('const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000')
+    expect(source).toContain(
+      'const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000'
+    )
+    expectMarkersInOrder(source, [
+      'async function loadOpenMexasContractRows',
+      'const contractIds = await loadOpenMexasOrderbookContractIds(db)',
+      ".from('contracts')",
+      ".select('*')",
+      "function getMexasMarketLockIssues",
+      'data.mexasOrderLock === true',
+      'data.mexasResolving === true',
+      'async function checkNoMexasMarketLocks',
+      'const issues = rows.flatMap(getMexasMarketLockIssues)',
+      "fail(\n        'market lock residue'",
+      "pass(\n      'market lock residue'",
+      "checks.push(await checkNoMexasMarketLocks(db))",
+    ])
+    expect(source).toContain('formatLockAge')
+    expect(source).toContain('fresh')
+    expect(source).toContain('stale')
+    expect(source).toContain('mexasOrderLockOwner')
+    expect(source).toContain('mexasResolvingOutcome')
   })
 
   test('launch readiness checks internal MEX balances against on-chain backing', () => {

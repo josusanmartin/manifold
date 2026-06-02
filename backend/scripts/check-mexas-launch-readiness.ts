@@ -62,6 +62,8 @@ const REQUIRED_MEXAS_CONTRACTS = [
 
 const CONTRACT_PAGE_SIZE = 1000
 const OPEN_ORDER_PAGE_SIZE = 1000
+const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000
+const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
 const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
 const ZERO_EVM_ADDRESS = '0x0000000000000000000000000000000000000000'
 const ERC20_BALANCE_OF_SELECTOR = '0x70a08231'
@@ -83,6 +85,14 @@ type OpenMexasLimitOrder = {
 
 type UnsafeOpenMexasLimitOrder = OpenMexasLimitOrder & {
   reasons: string[]
+}
+
+type MexasMarketLockIssue = {
+  ageMs?: number
+  contractId: string
+  detail: string
+  lockType: 'order' | 'resolution'
+  timeoutMs: number
 }
 
 type SettlementExposureCheckOptions = {
@@ -712,6 +722,106 @@ function formatProbability(prob: number) {
   return `${(prob * 100).toFixed(2)}%`
 }
 
+function formatLockAge(issue: MexasMarketLockIssue) {
+  if (issue.ageMs === undefined) return 'age unknown'
+  const ageSeconds = Math.max(0, Math.round(issue.ageMs / 1000))
+  const timeoutSeconds = Math.round(issue.timeoutMs / 1000)
+  const freshness = issue.ageMs < issue.timeoutMs ? 'fresh' : 'stale'
+  return `${ageSeconds}s old (${freshness}; timeout ${timeoutSeconds}s)`
+}
+
+function getLockAgeMs(data: Record<string, unknown>, key: string) {
+  const since = data[key]
+  return typeof since === 'number' ? Date.now() - since : undefined
+}
+
+async function loadOpenMexasContractRows(db: SupabaseClient) {
+  const contractIds = await loadOpenMexasOrderbookContractIds(db)
+  if (!contractIds.length) return []
+
+  const rows: Row<'contracts'>[] = []
+  for (let index = 0; index < contractIds.length; index += CONTRACT_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('contracts')
+      .select('*')
+      .in('id', contractIds.slice(index, index + CONTRACT_PAGE_SIZE))
+
+    if (error) throw error
+    rows.push(...((data ?? []) as Row<'contracts'>[]))
+  }
+
+  return rows
+}
+
+function getMexasMarketLockIssues(row: Row<'contracts'>) {
+  const data = getRowData(row)
+  const issues: MexasMarketLockIssue[] = []
+
+  if (data.mexasOrderLock === true) {
+    const owner =
+      typeof data.mexasOrderLockOwner === 'string'
+        ? data.mexasOrderLockOwner
+        : 'unknown owner'
+    issues.push({
+      ageMs: getLockAgeMs(data, 'mexasOrderLockSince'),
+      contractId: row.id,
+      detail: owner,
+      lockType: 'order',
+      timeoutMs: ORDER_LOCK_TIMEOUT_MS,
+    })
+  }
+
+  if (data.mexasResolving === true) {
+    const outcome =
+      typeof data.mexasResolvingOutcome === 'string'
+        ? data.mexasResolvingOutcome
+        : 'unknown outcome'
+    issues.push({
+      ageMs: getLockAgeMs(data, 'mexasResolvingSince'),
+      contractId: row.id,
+      detail: outcome,
+      lockType: 'resolution',
+      timeoutMs: RESOLUTION_LOCK_TIMEOUT_MS,
+    })
+  }
+
+  return issues
+}
+
+async function checkNoMexasMarketLocks(
+  db: SupabaseClient
+): Promise<CheckResult> {
+  try {
+    const rows = await loadOpenMexasContractRows(db)
+    const issues = rows.flatMap(getMexasMarketLockIssues)
+
+    if (issues.length) {
+      return fail(
+        'market lock residue',
+        `${issues
+          .slice(0, 5)
+          .map(
+            (issue) =>
+              `${issue.contractId} ${issue.lockType} lock ${formatLockAge(
+                issue
+              )}: ${issue.detail}`
+          )
+          .join('; ')}${
+          issues.length > 5 ? `; ${issues.length - 5} more` : ''
+        }`
+      )
+    }
+
+    return pass(
+      'market lock residue',
+      `No active order or resolution locks found across ${rows.length} unresolved MEXAS markets.`
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return fail('market lock residue', message)
+  }
+}
+
 async function checkNoUnsafeOpenMexasOrders(
   db: SupabaseClient
 ): Promise<CheckResult> {
@@ -1193,6 +1303,7 @@ async function runChecks() {
     )
 
     checks.push(await checkNoUnsafeOpenMexasOrders(db))
+    checks.push(await checkNoMexasMarketLocks(db))
     checks.push(await checkOpenMexasOrderBacking(db))
     checks.push(await checkInternalMexasBalanceBacking(db))
     checks.push(await checkNoCrossedMexasOrderBooks(db))
