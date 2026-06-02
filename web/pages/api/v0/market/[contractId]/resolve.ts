@@ -38,7 +38,7 @@ type ErrorResponse = { message: string; details?: unknown }
 
 const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
 const CONTRACT_BETS_PAGE_SIZE = 1000
-const ORDER_LOCK_TIMEOUT_MS = 30 * 1000
+const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000
 
 let privyClient: PrivyClient | undefined
 

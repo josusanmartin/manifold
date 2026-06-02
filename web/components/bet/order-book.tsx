@@ -14,6 +14,8 @@ import {
   PseudoNumericContract,
   StonkContract,
 } from 'common/contract'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+import { getMexasOpenOrderAmount } from 'common/mexas-order-book'
 import { getFormattedMappedValue } from 'common/pseudo-numeric'
 import { formatPercent } from 'common/util/format'
 import { groupBy, keyBy, sortBy, sumBy, uniq } from 'lodash'
@@ -160,6 +162,11 @@ export function OrderTable(props: {
   onOrderCancelled?: (bet: LimitBet) => void
 }) {
   const { limitBets, contract, isYou, showAnswers, onOrderCancelled } = props
+  const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)
+  const getOpenAmount = (bet: LimitBet) =>
+    isMexasOrderBookOnly
+      ? getMexasOpenOrderAmount(bet)
+      : bet.orderAmount - bet.amount
   const answers =
     showAnswers && contract.mechanism === 'cpmm-multi-1'
       ? contract.answers.filter((a) =>
@@ -218,7 +225,7 @@ export function OrderTable(props: {
                           {isYou &&
                             answerBets.length > 1 &&
                             answerBets.some(
-                              (b) => !b.isCancelled && b.amount < b.orderAmount
+                              (b) => !b.isCancelled && getOpenAmount(b) > 0
                             ) && (
                               <Button
                                 loading={isCancelling}
@@ -270,7 +277,7 @@ export function OrderTable(props: {
               {isYou &&
                 limitBets.length > 1 &&
                 limitBets.some(
-                  (b) => !b.isCancelled && b.amount < b.orderAmount
+                  (b) => !b.isCancelled && getOpenAmount(b) > 0
                 ) && (
                   <Button
                     loading={isCancelling}
@@ -315,6 +322,9 @@ function OrderRow(props: {
   const { orderAmount, amount, limitProb, outcome } = bet
   const isPseudoNumeric = contract.outcomeType === 'PSEUDO_NUMERIC'
   const isBinaryMC = isBinaryMulti(contract)
+  const openAmount = isMexasOrderBookOnlyContract(contract)
+    ? getMexasOpenOrderAmount(bet)
+    : orderAmount - amount
   const user = useDisplayUserById(bet.userId)
 
   const [isCancelling, setIsCancelling] = useState(false)
@@ -329,8 +339,13 @@ function OrderRow(props: {
     }
   }
   const isCashContract = contract.token === 'CASH'
+  const displayToken = isMexasOrderBookOnlyContract(contract)
+    ? 'MEX'
+    : isCashContract
+    ? 'CASH'
+    : undefined
   const expired = bet.expiresAt && bet.expiresAt < Date.now()
-  const filled = bet.amount >= bet.orderAmount
+  const filled = bet.isFilled || openAmount <= 1e-9
   const cancelled = bet.isCancelled
   const isInactive = expired || filled || cancelled
 
@@ -373,8 +388,9 @@ function OrderRow(props: {
       </td>
       <td className="text-ink-900 py-3 font-medium">
         <MoneyDisplay
-          amount={orderAmount - amount}
+          amount={openAmount}
           isCashContract={isCashContract}
+          token={displayToken}
         />
       </td>
       {isYou && (

@@ -349,6 +349,21 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('uses a consistent fresh order-lock timeout across order, cancel, and resolve flows', () => {
+    const betSource = readRepoFile('web/pages/api/v0/bet.ts')
+    const cancelSource = readRepoFile(
+      'web/pages/api/v0/bet/cancel/[betId].ts'
+    )
+    const resolveSource = readRepoFile(
+      'web/pages/api/v0/market/[contractId]/resolve.ts'
+    )
+
+    for (const source of [betSource, cancelSource, resolveSource]) {
+      expect(source).toContain('const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000')
+      expect(source).toContain('Date.now() - since < ORDER_LOCK_TIMEOUT_MS')
+    }
+  })
+
   test('syncs Privy wallet balances under the user balance lock', () => {
     const source = readRepoFile('web/pages/api/privy-user.ts')
     const userSource = readRepoFile('common/src/user.ts')
@@ -906,6 +921,7 @@ describe('MEXAS flow safety guardrails', () => {
     const limitOrdersTableSource = readRepoFile(
       'web/components/bet/limit-orders-table.tsx'
     )
+    const orderBookSource = readRepoFile('web/components/bet/order-book.tsx')
 
     expect(panelSource).toContain('getMexasOpenOrderAmount')
     expect(panelSource).not.toContain('sumBy(bet.fills')
@@ -920,6 +936,14 @@ describe('MEXAS flow safety guardrails', () => {
       'getMexasOpenOrderAmount(bet)',
       'bet.orderAmount -',
       'bet.fills.reduce',
+    ])
+    expectMarkersInOrder(orderBookSource, [
+      'isMexasOrderBookOnlyContract(contract)',
+      'getMexasOpenOrderAmount(bet)',
+      "displayToken = isMexasOrderBookOnlyContract(contract)\n    ? 'MEX'",
+      'const filled = bet.isFilled || openAmount <= 1e-9',
+      'amount={openAmount}',
+      'token={displayToken}',
     ])
   })
 
