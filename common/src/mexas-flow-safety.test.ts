@@ -261,9 +261,11 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('common/src/mexas-settlement.ts')
 
     expectMarkersInOrder(source, [
+      'export const MEXAS_ONCHAIN_ESCROW_IMPLEMENTED = false',
       'export function hasTransactionalMexasMatchingEngine',
       "return settings.matchingEngineMode === 'rpc'",
       'export function hasOperationalMexasEscrow',
+      'MEXAS_ONCHAIN_ESCROW_IMPLEMENTED',
       "settings.escrowImplementation === 'onchain-transfer'",
       'export function canMexasMatchCrossingOrders',
       'hasOperationalMexasEscrow(settings)',
@@ -572,5 +574,41 @@ describe('MEXAS flow safety guardrails', () => {
     )
     expect(source).toContain('is only set locally, not in Vercel production')
     expect(source).not.toContain('hasEnvOrVercelEnv')
+  })
+
+  test('launch readiness reports how to apply missing Supabase launch SQL', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('const LAUNCH_SQL_APPLY_ENVS = [')
+    expect(source).toContain("'MEXAS_SUPABASE_DB_URL'")
+    expect(source).toContain("'SUPABASE_DB_PASSWORD'")
+    expectMarkersInOrder(source, [
+      'let needsLaunchSql = false',
+      'if (contractFailures.length) needsLaunchSql = true',
+      'if (matchingReadyError || matchingReady !== true) needsLaunchSql = true',
+      'if (needsLaunchSql)',
+      'Launch SQL is missing and no local Postgres connection env is set.',
+      'apply:mexas-launch-sql --print-sql',
+    ])
+  })
+
+  test('launch readiness cannot be passed by setting the escrow env before escrow code exists', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain(
+      "import { hasOperationalMexasEscrow } from 'common/mexas-settlement'"
+    )
+    expectMarkersInOrder(source, [
+      'const hasOperationalEscrow = hasOperationalMexasEscrow',
+      'escrowImplementation,',
+      'settlementMode,',
+      'hasOperationalEscrow',
+      'MEXAS on-chain escrow implementation is enabled and implemented.',
+      'order escrow/release code is not implemented yet',
+    ])
   })
 })

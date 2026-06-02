@@ -7,6 +7,7 @@ import {
   hasMexasFilledExposure,
   hasMexasSettlementExposure,
   hasTransactionalMexasMatchingEngine,
+  MEXAS_ONCHAIN_ESCROW_IMPLEMENTED,
 } from './mexas-settlement'
 
 function bet(props: Partial<Bet> & Pick<Bet, 'id' | 'userId'>): Bet {
@@ -150,7 +151,7 @@ describe('MEXAS settlement audit', () => {
         settlementMode: 'escrow',
         matchingEngineMode: 'rpc',
       })
-    ).toBe(true)
+    ).toBe(false)
     expect(
       canMexasMatchCrossingOrders({
         allowUnescrowedMatching: 'true',
@@ -167,7 +168,8 @@ describe('MEXAS settlement audit', () => {
         escrowImplementation: 'onchain-transfer',
         settlementMode: 'escrow',
       })
-    ).toBe(true)
+    ).toBe(false)
+    expect(MEXAS_ONCHAIN_ESCROW_IMPLEMENTED).toBe(false)
   })
 
   test('allows resolution with operational escrow or explicit unescrowed override', () => {
@@ -180,7 +182,7 @@ describe('MEXAS settlement audit', () => {
         escrowImplementation: 'onchain-transfer',
         settlementMode: 'escrow',
       })
-    ).toBe(true)
+    ).toBe(false)
     expect(
       canMexasResolveFilledPositions({
         allowUnescrowedResolution: 'true',

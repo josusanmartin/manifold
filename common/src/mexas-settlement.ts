@@ -5,6 +5,7 @@ import {
 } from './mexas-resolution'
 
 const EPSILON = 1e-9
+export const MEXAS_ONCHAIN_ESCROW_IMPLEMENTED = false
 
 export type MexasSettlementAudit = {
   filledBetCount: number
@@ -77,6 +78,7 @@ export function hasTransactionalMexasMatchingEngine(
 
 export function hasOperationalMexasEscrow(settings: MexasSettlementSettings) {
   return (
+    MEXAS_ONCHAIN_ESCROW_IMPLEMENTED &&
     settings.settlementMode === 'escrow' &&
     settings.escrowImplementation === 'onchain-transfer'
   )

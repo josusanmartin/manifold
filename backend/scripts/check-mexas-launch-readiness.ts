@@ -2,6 +2,7 @@ import { execFileSync } from 'child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
+import { hasOperationalMexasEscrow } from 'common/mexas-settlement'
 import { createClient } from 'common/supabase/utils'
 
 type CheckStatus = 'pass' | 'warn' | 'fail'
@@ -24,6 +25,14 @@ const REQUIRED_PUBLIC_ENVS = [
   'NEXT_PUBLIC_PRIVY_APP_ID',
   'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
   'NEXT_PUBLIC_SUPABASE_URL',
+]
+
+const LAUNCH_SQL_APPLY_ENVS = [
+  'MEXAS_SUPABASE_DB_URL',
+  'SUPABASE_DB_URL',
+  'DATABASE_URL',
+  'MEXAS_SUPABASE_DB_PASSWORD',
+  'SUPABASE_DB_PASSWORD',
 ]
 
 const REQUIRED_MEXAS_CONTRACTS = [
@@ -268,6 +277,7 @@ async function runChecks() {
     vercelEnvNames,
     vercelEnvValues
   )
+  let needsLaunchSql = false
 
   checks.push(
     serverEnvFailures.length
@@ -353,6 +363,7 @@ async function runChecks() {
         }
         return failures
       })
+      if (contractFailures.length) needsLaunchSql = true
 
       checks.push(
         contractFailures.length
@@ -370,6 +381,7 @@ async function runChecks() {
     const { data: matchingReady, error: matchingReadyError } = await db.rpc(
       'mexas_orderbook_matching_engine_ready'
     )
+    if (matchingReadyError || matchingReady !== true) needsLaunchSql = true
     checks.push(
       matchingReadyError
         ? fail(
@@ -380,6 +392,25 @@ async function runChecks() {
         ? pass('matching RPC health', 'Matching health RPC reports ready.')
         : fail('matching RPC health', 'Matching health RPC returned false.')
     )
+  }
+
+  if (needsLaunchSql) {
+    const hasLaunchSqlApplyAccess = LAUNCH_SQL_APPLY_ENVS.some(hasEnv)
+    checks.push(
+      hasLaunchSqlApplyAccess
+        ? pass(
+            'launch SQL apply access',
+            'A local Postgres connection env var is present for apply:mexas-launch-sql.'
+          )
+        : fail(
+            'launch SQL apply access',
+            `Launch SQL is missing and no local Postgres connection env is set. Set one of ${LAUNCH_SQL_APPLY_ENVS.join(
+              ', '
+            )}, or run "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts apply:mexas-launch-sql --print-sql" and paste it into Supabase SQL Editor.`
+          )
+    )
+  } else {
+    checks.push(pass('launch SQL apply access', 'Launch SQL is already applied.'))
   }
 
   const matchingMode = getEnvOrVercelValue(
@@ -394,6 +425,10 @@ async function runChecks() {
     'MEXAS_ESCROW_IMPLEMENTATION',
     vercelEnvValues
   )
+  const hasOperationalEscrow = hasOperationalMexasEscrow({
+    escrowImplementation,
+    settlementMode,
+  })
   checks.push(
     matchingMode === 'rpc'
       ? pass('matching mode', 'MEXAS_MATCHING_ENGINE_MODE=rpc.')
@@ -411,14 +446,16 @@ async function runChecks() {
         )
   )
   checks.push(
-    escrowImplementation === 'onchain-transfer'
+    hasOperationalEscrow
       ? pass(
           'escrow implementation',
-          'MEXAS_ESCROW_IMPLEMENTATION=onchain-transfer.'
+          'MEXAS on-chain escrow implementation is enabled and implemented.'
         )
       : fail(
           'escrow implementation',
-          'MEXAS_ESCROW_IMPLEMENTATION must be onchain-transfer before live matching or resolving filled MEXAS positions.'
+          escrowImplementation === 'onchain-transfer'
+            ? 'MEXAS_ESCROW_IMPLEMENTATION=onchain-transfer is configured, but the order escrow/release code is not implemented yet.'
+            : 'MEXAS_ESCROW_IMPLEMENTATION must be onchain-transfer before live matching or resolving filled MEXAS positions.'
         )
   )
   checks.push(
