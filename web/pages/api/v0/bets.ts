@@ -97,10 +97,11 @@ async function getUserIdFromUsername(db: SupabaseClient, username: string) {
     .from('users')
     .select('id')
     .ilike('username', username)
-    .single()
+    .maybeSingle()
 
   if (error) throw error
-  return data?.id
+  if (!data?.id) throw new APIError(404, 'User not found.')
+  return data.id
 }
 
 export default async function handler(

@@ -28,6 +28,8 @@ declare
   v_taker_shares numeric;
   v_taker_unused_refund numeric := 0;
   v_taker_refund_credit_key text;
+  v_taker_user_data jsonb;
+  v_taker_user_credit_keys jsonb;
   v_maker_limit_prob numeric;
   v_maker_order_amount numeric;
   v_maker_reserved_amount numeric;
@@ -35,6 +37,8 @@ declare
   v_maker_shares numeric;
   v_maker_unused_refund numeric := 0;
   v_maker_refund_credit_key text;
+  v_maker_user_data jsonb;
+  v_maker_user_credit_keys jsonb;
   v_remaining_amount numeric;
   v_maker_remaining_amount numeric;
   v_price numeric;
@@ -236,27 +240,33 @@ begin
     if v_maker_unused_refund > v_epsilon then
       v_maker_refund_credit_key := 'mexas-order-price-improvement:' || v_maker.bet_id;
 
-      update public.users
-      set
-        balance = case
-          when coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) ? v_maker_refund_credit_key
-            then balance
-          else round(balance + v_maker_unused_refund, 8)
-        end,
-        data = case
-          when coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) ? v_maker_refund_credit_key
-            then data
-          else jsonb_set(
-            coalesce(data, '{}'::jsonb),
-            '{mexasBalanceCreditKeys}',
-            coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) || to_jsonb(v_maker_refund_credit_key),
-            true
-          )
+      select
+        coalesce(data, '{}'::jsonb),
+        case
+          when jsonb_typeof(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys') = 'array'
+            then coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys'
+          else '[]'::jsonb
         end
-      where id = v_maker.user_id;
+      into v_maker_user_data, v_maker_user_credit_keys
+      from public.users
+      where id = v_maker.user_id
+      for update;
 
       if not found then
         raise exception 'Maker user not found' using errcode = 'P0002';
+      end if;
+
+      if not (v_maker_user_credit_keys ? v_maker_refund_credit_key) then
+        update public.users
+        set
+          balance = round(balance + v_maker_unused_refund, 8),
+          data = jsonb_set(
+            v_maker_user_data,
+            '{mexasBalanceCreditKeys}',
+            v_maker_user_credit_keys || to_jsonb(v_maker_refund_credit_key),
+            true
+          )
+        where id = v_maker.user_id;
       end if;
     end if;
 
@@ -340,27 +350,33 @@ begin
   if v_taker_unused_refund > v_epsilon then
     v_taker_refund_credit_key := 'mexas-order-price-improvement:' || v_taker.bet_id;
 
-    update public.users
-    set
-      balance = case
-        when coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) ? v_taker_refund_credit_key
-          then balance
-        else round(balance + v_taker_unused_refund, 8)
-      end,
-      data = case
-        when coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) ? v_taker_refund_credit_key
-          then data
-        else jsonb_set(
-          coalesce(data, '{}'::jsonb),
-          '{mexasBalanceCreditKeys}',
-          coalesce(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys', '[]'::jsonb) || to_jsonb(v_taker_refund_credit_key),
-          true
-        )
+    select
+      coalesce(data, '{}'::jsonb),
+      case
+        when jsonb_typeof(coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys') = 'array'
+          then coalesce(data, '{}'::jsonb) -> 'mexasBalanceCreditKeys'
+        else '[]'::jsonb
       end
-    where id = v_taker.user_id;
+    into v_taker_user_data, v_taker_user_credit_keys
+    from public.users
+    where id = v_taker.user_id
+    for update;
 
     if not found then
       raise exception 'Taker user not found' using errcode = 'P0002';
+    end if;
+
+    if not (v_taker_user_credit_keys ? v_taker_refund_credit_key) then
+      update public.users
+      set
+        balance = round(balance + v_taker_unused_refund, 8),
+        data = jsonb_set(
+          v_taker_user_data,
+          '{mexasBalanceCreditKeys}',
+          v_taker_user_credit_keys || to_jsonb(v_taker_refund_credit_key),
+          true
+        )
+      where id = v_taker.user_id;
     end if;
   end if;
 
