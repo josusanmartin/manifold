@@ -33,6 +33,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { isAddress, type Address } from 'viem'
 import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
 import {
+  releaseClosedMexasMarketOrders,
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
   getOpenReservedMexasAmount,
@@ -741,6 +742,7 @@ async function placeBinaryBet(
   const userId = await getPrivyUserId(req)
   const params = API.bet.props.parse(req.body)
   const db = getSupabaseAdminClient()
+  await releaseClosedMexasMarketOrders(db, { userId })
   await releaseExpiredMexasOrders(db, { userId })
   await releaseUnbackedMexasOrders(db, {
     userId,
@@ -791,6 +793,7 @@ async function placeBinaryBet(
 
     try {
       const lockedContract = lock.contract
+      await releaseClosedMexasMarketOrders(db, { contractId: params.contractId })
       await releaseExpiredMexasOrders(db, { contractId: params.contractId })
       await releaseUnbackedMexasOrders(db, {
         contractId: params.contractId,

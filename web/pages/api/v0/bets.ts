@@ -9,6 +9,7 @@ import {
 } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import {
+  releaseClosedMexasMarketOrders,
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
 } from 'web/lib/api/mexas-orders'
@@ -86,6 +87,10 @@ export default async function handler(
 
     const singleContractId = Array.isArray(contractId) ? undefined : contractId
     if (params.kinds === 'open-limit' && (singleContractId || userId)) {
+      await releaseClosedMexasMarketOrders(db, {
+        contractId: singleContractId,
+        userId,
+      })
       await releaseExpiredMexasOrders(db, {
         contractId: singleContractId,
         userId,

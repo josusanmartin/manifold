@@ -3,6 +3,7 @@ import { convertBet } from 'common/supabase/bets'
 import { createClient, type Row } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import {
+  releaseClosedMexasMarketOrders,
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
 } from 'web/lib/api/mexas-orders'
@@ -53,6 +54,7 @@ export default async function handler(
   try {
     const db = getSupabaseAdminClient()
     const now = new Date().toISOString()
+    await releaseClosedMexasMarketOrders(db, { contractId })
     await releaseExpiredMexasOrders(db, { contractId })
     await releaseUnbackedMexasOrders(db, { contractId })
 

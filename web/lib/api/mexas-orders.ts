@@ -20,6 +20,8 @@ const EXPIRED_ORDER_PAGE_SIZE = 1000
 const OPEN_RESERVED_ORDER_PAGE_SIZE = 1000
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
+const MEXAS_RELEASE_REASON_EXPIRED = 'expired'
+const MEXAS_RELEASE_REASON_MARKET_CLOSED = 'market-closed'
 
 function getBetData(row: Row<'contract_bets'>) {
   const data = row.data
@@ -64,14 +66,16 @@ async function syncAvailableBalanceFromBacking(params: {
   )
 }
 
-async function releaseExpiredMexasOrder(
+async function releaseOpenMexasOrder(
   db: SupabaseClient,
-  row: Row<'contract_bets'>
+  row: Row<'contract_bets'>,
+  releaseReason: string
 ) {
   const bet = convertBet(row) as LimitBet & MexasReservedOrderData
   if (bet.limitProb === undefined || bet.orderAmount === undefined) return
 
   const data = getBetData(row)
+  const now = Date.now()
   const shouldRefund =
     bet.mexasFundsReserved === true && bet.mexasFundsReleased !== true
   const refundAmount = shouldRefund ? getMexasRemainingReservedAmount(bet) : 0
@@ -92,12 +96,21 @@ async function releaseExpiredMexasOrder(
         isCancelled: true,
         mexasFundsReleased: shouldRefund ? true : bet.mexasFundsReleased,
         mexasReleaseCreditKey: refundAmount > 0 ? creditKey : undefined,
+        mexasReleaseReason: releaseReason,
+        mexasReleasedAt: now,
       } as any,
     })
     .eq('bet_id', bet.id)
     .eq('is_cancelled', false)
 
   if (error) throw error
+}
+
+async function releaseExpiredMexasOrder(
+  db: SupabaseClient,
+  row: Row<'contract_bets'>
+) {
+  return releaseOpenMexasOrder(db, row, MEXAS_RELEASE_REASON_EXPIRED)
 }
 
 export async function releaseExpiredMexasOrders(
@@ -132,6 +145,48 @@ export async function releaseExpiredMexasOrders(
       released++
     }
     if (rows.length < EXPIRED_ORDER_PAGE_SIZE) break
+  }
+
+  return released
+}
+
+export async function releaseClosedMexasMarketOrders(
+  db: SupabaseClient,
+  options: {
+    contractId?: string
+    userId?: string
+  } = {}
+) {
+  const openRows = await loadOpenReservedMexasOrderRows(db, options)
+  if (!openRows.length) return 0
+
+  const contractIds = Array.from(
+    new Set(openRows.map((row) => row.contract_id).filter(Boolean))
+  )
+  if (!contractIds.length) return 0
+
+  const now = new Date().toISOString()
+  const { data, error } = await db
+    .from('contracts')
+    .select('id')
+    .in('id', contractIds)
+    .lt('close_time', now)
+
+  if (error) throw error
+
+  const closedContractIds = new Set((data ?? []).map((row) => row.id))
+  if (!closedContractIds.size) return 0
+
+  let released = 0
+  for (const row of openRows) {
+    if (closedContractIds.has(row.contract_id)) {
+      await releaseOpenMexasOrder(
+        db,
+        row,
+        MEXAS_RELEASE_REASON_MARKET_CLOSED
+      )
+      released++
+    }
   }
 
   return released

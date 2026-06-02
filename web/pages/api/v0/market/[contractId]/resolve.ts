@@ -20,6 +20,7 @@ import {
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { updateMexasUserBalanceCas } from 'web/lib/api/mexas-balance'
 import {
+  releaseClosedMexasMarketOrders,
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
 } from 'web/lib/api/mexas-orders'
@@ -260,6 +261,7 @@ async function resolveMexasMarket(
     throw new APIError(503, 'Resolution already in progress. Please retry.')
   }
 
+  await releaseClosedMexasMarketOrders(db, { contractId })
   await releaseExpiredMexasOrders(db, { contractId })
   await releaseUnbackedMexasOrders(db, {
     contractId,
@@ -275,6 +277,7 @@ async function resolveMexasMarket(
     initialContractRow,
     outcome
   )
+  await releaseClosedMexasMarketOrders(db, { contractId })
   await releaseExpiredMexasOrders(db, { contractId })
   await releaseUnbackedMexasOrders(db, {
     contractId,
