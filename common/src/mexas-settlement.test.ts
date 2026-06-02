@@ -125,7 +125,7 @@ describe('MEXAS settlement audit', () => {
     expect(hasMexasSettlementExposure(audit)).toBe(false)
   })
 
-  test('blocks live matching until an implemented transactional engine exists', () => {
+  test('enables live matching only for RPC matching plus escrow or explicit override', () => {
     expect(canMexasMatchCrossingOrders({})).toBe(false)
     expect(
       canMexasMatchCrossingOrders({
@@ -134,33 +134,33 @@ describe('MEXAS settlement audit', () => {
     ).toBe(false)
     expect(
       canMexasMatchCrossingOrders({
-        matchingEngineMode: 'transactional',
+        matchingEngineMode: 'rpc',
       })
     ).toBe(false)
     expect(
       canMexasMatchCrossingOrders({
         settlementMode: 'escrow',
-        matchingEngineMode: 'transactional',
+        matchingEngineMode: 'rpc',
       })
-    ).toBe(false)
+    ).toBe(true)
     expect(
       canMexasMatchCrossingOrders({
         allowUnescrowedMatching: 'true',
-        matchingEngineMode: 'transactional',
+        matchingEngineMode: 'rpc',
       })
-    ).toBe(false)
+    ).toBe(true)
     expect(
       hasTransactionalMexasMatchingEngine({
-        matchingEngineMode: 'transactional',
+        matchingEngineMode: 'rpc',
       })
-    ).toBe(false)
+    ).toBe(true)
   })
 
   test('allows resolution with escrow or explicit unescrowed override', () => {
     expect(canMexasResolveFilledPositions({})).toBe(false)
-    expect(
-      canMexasResolveFilledPositions({ settlementMode: 'escrow' })
-    ).toBe(true)
+    expect(canMexasResolveFilledPositions({ settlementMode: 'escrow' })).toBe(
+      true
+    )
     expect(
       canMexasResolveFilledPositions({
         allowUnescrowedResolution: 'true',

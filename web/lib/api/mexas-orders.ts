@@ -79,7 +79,7 @@ async function releaseOpenMexasOrder(
   options: MexasOrderReleaseOptions = {}
 ) {
   const bet = convertBet(row) as LimitBet & MexasReservedOrderData
-  if (bet.limitProb === undefined || bet.orderAmount === undefined) return
+  if (bet.limitProb === undefined || bet.orderAmount === undefined) return 0
 
   const release = async () => {
     const data = getBetData(row)
@@ -89,13 +89,7 @@ async function releaseOpenMexasOrder(
     const refundAmount = shouldRefund ? getMexasRemainingReservedAmount(bet) : 0
     const creditKey = getMexasOrderReleaseCreditKey(bet.id)
 
-    if (refundAmount > 0) {
-      await updateMexasUserBalanceCas(db, bet.userId, refundAmount, {
-        creditKey,
-      })
-    }
-
-    const { error } = await db
+    const { data: updatedRow, error } = await db
       .from('contract_bets')
       .update({
         is_cancelled: true,
@@ -110,8 +104,21 @@ async function releaseOpenMexasOrder(
       })
       .eq('bet_id', bet.id)
       .eq('is_cancelled', false)
+      .eq('is_filled', false)
+      .eq('updated_time', row.updated_time)
+      .select()
+      .maybeSingle()
 
     if (error) throw error
+    if (!updatedRow) return 0
+
+    if (refundAmount > 0) {
+      await updateMexasUserBalanceCas(db, bet.userId, refundAmount, {
+        creditKey,
+      })
+    }
+
+    return 1
   }
 
   if (options.skipUserBalanceLock) return await release()
@@ -161,10 +168,9 @@ export async function releaseExpiredMexasOrders(
 
     const rows = (data ?? []) as Row<'contract_bets'>[]
     for (const row of rows) {
-      await releaseExpiredMexasOrder(db, row, {
+      released += await releaseExpiredMexasOrder(db, row, {
         skipUserBalanceLock: options.skipUserBalanceLock,
       })
-      released++
     }
     if (rows.length < EXPIRED_ORDER_PAGE_SIZE) break
   }
@@ -203,10 +209,14 @@ export async function releaseClosedMexasMarketOrders(
   let released = 0
   for (const row of openRows) {
     if (closedContractIds.has(row.contract_id)) {
-      await releaseOpenMexasOrder(db, row, MEXAS_RELEASE_REASON_MARKET_CLOSED, {
-        skipUserBalanceLock: options.skipUserBalanceLock,
-      })
-      released++
+      released += await releaseOpenMexasOrder(
+        db,
+        row,
+        MEXAS_RELEASE_REASON_MARKET_CLOSED,
+        {
+          skipUserBalanceLock: options.skipUserBalanceLock,
+        }
+      )
     }
   }
 
@@ -305,6 +315,7 @@ async function cancelUnbackedMexasOrder(
     .eq('bet_id', bet.id)
     .eq('is_cancelled', false)
     .eq('is_filled', false)
+    .eq('updated_time', row.updated_time)
     .select()
     .maybeSingle()
 

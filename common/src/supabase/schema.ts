@@ -4074,6 +4074,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      mexas_match_orderbook_limit_order: {
+        Args: {
+          p_taker_bet_id: string
+          p_timestamp_ms: number
+          p_max_matches?: number
+        }
+        Returns: Json
+      }
       get_non_empty_private_message_channel_ids:
         | {
             Args: {

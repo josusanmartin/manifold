@@ -67,17 +67,14 @@ export function hasMexasSettlementExposure(audit: MexasSettlementAudit) {
 }
 
 export function hasTransactionalMexasMatchingEngine(
-  _settings: MexasSettlementSettings
-) {
-  // The in-process matcher updates maker and taker rows separately. It is useful
-  // for deterministic simulation tests, but it is not a production settlement
-  // engine. Keep live crossing disabled until an atomic RPC/escrow engine exists.
-  return false
-}
-
-export function canMexasMatchCrossingOrders(
   settings: MexasSettlementSettings
 ) {
+  // Only the Supabase RPC path updates maker and taker rows inside one
+  // transaction. The TypeScript matcher remains a deterministic simulator.
+  return settings.matchingEngineMode === 'rpc'
+}
+
+export function canMexasMatchCrossingOrders(settings: MexasSettlementSettings) {
   return (
     hasTransactionalMexasMatchingEngine(settings) &&
     (settings.settlementMode === 'escrow' ||

@@ -43,6 +43,7 @@ import {
   getOpenReservedMexasAmount,
 } from 'web/lib/api/mexas-orders'
 import { assertMexasCanMatchCrossingOrders } from 'web/lib/api/mexas-settlement'
+import { matchMexasOrderbookLimitOrderRpc } from 'web/lib/api/mexas-rpc-matching'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
 
@@ -51,7 +52,6 @@ type ErrorResponse = { message: string; details?: unknown }
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
 const BALANCE_UPDATE_ATTEMPTS = 5
-const MATCH_ATTEMPTS = 50
 const ORDER_PAGE_SIZE = 1000
 const ORDER_LOCK_ATTEMPTS = 20
 const ORDER_LOCK_RETRY_MS = 100
@@ -576,112 +576,6 @@ async function loadMexasCrossingOrderRows(
     .filter((entry): entry is LimitBetRow => entry !== undefined)
 }
 
-async function updateLimitBetCas(
-  db: SupabaseClient,
-  currentRow: Row<'contract_bets'>,
-  updatedBet: LimitBet
-) {
-  const { data, error } = await db
-    .from('contract_bets')
-    .update(betToRow(updatedBet))
-    .eq('bet_id', currentRow.bet_id)
-    .eq('updated_time', currentRow.updated_time)
-    .eq('is_cancelled', false)
-    .eq('is_filled', false)
-    .select()
-    .maybeSingle()
-
-  if (error) throw error
-  return data ? (convertBet(data as Row<'contract_bets'>) as LimitBet) : null
-}
-
-async function updateTakerBet(db: SupabaseClient, bet: LimitBet) {
-  const { data, error } = await db
-    .from('contract_bets')
-    .update(betToRow(bet))
-    .eq('bet_id', bet.id)
-    .select()
-    .single()
-
-  if (error) throw error
-  return convertBet(data as Row<'contract_bets'>) as LimitBet
-}
-
-async function matchMexasOrder(
-  db: SupabaseClient,
-  taker: LimitBet & { outcome: MexasOutcome }
-) {
-  let updatedTaker = taker
-
-  for (let attempt = 0; attempt < MATCH_ATTEMPTS; attempt++) {
-    const remainingAmount = getMexasOpenOrderAmount(updatedTaker)
-    if (remainingAmount <= EPSILON) break
-
-    await releaseUnbackedMexasOrders(db, {
-      contractId: updatedTaker.contractId,
-      requireBalanceRead: true,
-    })
-    const makerRows = await loadMexasCrossingOrderRows(
-      db,
-      updatedTaker.contractId,
-      updatedTaker.outcome,
-      updatedTaker.limitProb
-    )
-    if (!makerRows.length) break
-
-    const [candidate] = matchMexasLimitOrder({
-      amount: remainingAmount,
-      limitProb: updatedTaker.limitProb,
-      makers: makerRows.map((entry) => entry.bet),
-      outcome: updatedTaker.outcome,
-      takerBetId: updatedTaker.id,
-      timestamp: Date.now(),
-    }).matches
-    if (!candidate) break
-
-    const makerRow = makerRows.find(
-      (entry) => entry.bet.id === candidate.maker.id
-    )
-    if (!makerRow) continue
-
-    await releaseUnbackedMexasOrders(db, {
-      userId: candidate.maker.userId,
-      requireBalanceRead: true,
-    })
-    const committedMaker = await updateLimitBetCas(
-      db,
-      makerRow.row,
-      candidate.updatedMaker
-    )
-    if (!committedMaker) continue
-
-    const nextAmount = updatedTaker.amount + candidate.takerAmount
-    const nextShares = updatedTaker.shares + candidate.shares
-    updatedTaker = {
-      ...updatedTaker,
-      amount: Math.round(nextAmount * 1e8) / 1e8,
-      shares: Math.round(nextShares * 1e8) / 1e8,
-      fills: [...(updatedTaker.fills ?? []), candidate.takerFill],
-    }
-    const takerOpenAmount = getMexasOpenOrderAmount(updatedTaker)
-    updatedTaker = {
-      ...updatedTaker,
-      isFilled: takerOpenAmount <= EPSILON,
-      mexasFundsReleased:
-        takerOpenAmount <= EPSILON
-          ? true
-          : (updatedTaker as LimitBet & { mexasFundsReleased?: boolean })
-              .mexasFundsReleased,
-    } as LimitBet & { outcome: MexasOutcome }
-  }
-
-  if (updatedTaker.amount !== taker.amount || updatedTaker.isFilled) {
-    return await updateTakerBet(db, updatedTaker)
-  }
-
-  return updatedTaker
-}
-
 async function updateMexasContractAfterOrder(
   db: SupabaseClient,
   contractRow: Row<'contracts'>,
@@ -874,7 +768,7 @@ async function placeBinaryBet(
         inserted = true
 
         const matchedBet = hasCrossingOrders
-          ? await matchMexasOrder(db, bet)
+          ? await matchMexasOrderbookLimitOrderRpc(db, bet.id)
           : bet
         await updateMexasContractAfterOrder(
           db,
