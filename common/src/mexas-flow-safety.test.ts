@@ -388,6 +388,8 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('limits wallet withdrawals to synced MEX and refreshes after the chain receipt', () => {
     const source = readRepoFile('web/components/crypto/mexas-wallet-panel.tsx')
+    const walletPageSource = readRepoFile('web/pages/wallet.tsx')
+    const checkoutSource = readRepoFile('web/pages/checkout.tsx')
 
     expectMarkersInOrder(source, [
       'const withdrawableUnits =',
@@ -411,6 +413,15 @@ describe('MEXAS flow safety guardrails', () => {
       'waitForTransactionReceipt({ hash })',
       '.then(refreshWalletState)',
     ])
+    expect(source).toContain('Disponible para retirar')
+    expect(source).toContain('órdenes abiertas y los trades ejecutados')
+    expect(source).toContain(
+      'Cancela órdenes abiertas o espera la resolución de trades'
+    )
+    for (const pageSource of [source, walletPageSource, checkoutSource]) {
+      expect(pageSource).not.toContain('permanecen en cadena y disponibles')
+      expect(pageSource).not.toContain('permanece disponible')
+    }
   })
 
   test('requires the RPC matching engine before live crossing matches can run', () => {

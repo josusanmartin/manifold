@@ -14,9 +14,9 @@ function WalletHeader() {
         Wallet MEX
       </h1>
       <p className="text-ink-600 max-w-2xl text-sm">
-        Deposita, conserva y retira {MEXAS_TOKEN.symbol} directamente desde tu
-        Wallet Privy. Los tokens depositados permanecen en cadena y disponibles
-        en esta Wallet.
+        Deposita y retira {MEXAS_TOKEN.symbol} desde tu Wallet Privy. El saldo
+        disponible excluye MEX comprometido en órdenes abiertas o trades
+        ejecutados.
       </p>
     </Col>
   )

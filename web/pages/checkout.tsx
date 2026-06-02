@@ -234,8 +234,8 @@ function MexasRail() {
         <Col className="gap-1">
           <h2 className="text-ink-1000 text-lg font-semibold">Wallet MEX</h2>
           <p className="text-ink-500 text-sm">
-            El MEX depositado en tu Wallet permanece disponible en{' '}
-            {MEXAS_TOKEN.chainName}.
+            Tu saldo disponible descuenta MEX comprometido en órdenes y trades
+            en {MEXAS_TOKEN.chainName}.
           </p>
         </Col>
 
