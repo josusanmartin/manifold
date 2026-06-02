@@ -3,7 +3,6 @@ import {
   CurrencyDollarIcon,
   ShieldCheckIcon,
 } from '@heroicons/react/outline'
-import { MEXAS_TOKEN } from 'common/crypto/mexas'
 import type { ReactNode } from 'react'
 import { Col } from 'web/components/layout/col'
 import { Page } from 'web/components/layout/page'
@@ -14,18 +13,18 @@ import { SEO } from 'web/components/SEO'
 const MARKET_POINTS = [
   {
     icon: <ChartBarIcon className="h-5 w-5" />,
-    label: 'Markets',
-    value: 'Event outcomes priced in MEX',
+    label: 'Mercados',
+    value: 'Resultados de eventos con precios en MEX',
   },
   {
     icon: <CurrencyDollarIcon className="h-5 w-5" />,
     label: 'Token',
-    value: `${MEXAS_TOKEN.symbol} on ${MEXAS_TOKEN.chainName}`,
+    value: 'MEX en Arbitrum',
   },
   {
     icon: <ShieldCheckIcon className="h-5 w-5" />,
-    label: 'Wallet',
-    value: 'Privy embedded wallet',
+    label: 'Cartera',
+    value: 'Cartera integrada de Privy',
   },
 ]
 
@@ -33,8 +32,8 @@ export default function AboutPage() {
   return (
     <Page trackPageView={'about page'} className="lg:col-span-10" hideFooter>
       <SEO
-        title="About MEXAS Markets"
-        description="MEXAS Markets is a prediction market venue using MEX on Arbitrum."
+        title="Acerca de MEXAS Markets"
+        description="MEXAS Markets es un mercado de predicción que usa MEX en Arbitrum."
         url="/about"
       />
 
@@ -45,14 +44,14 @@ export default function AboutPage() {
           <section className="border-ink-200 bg-canvas-0 rounded-md border p-5 sm:p-8">
             <Col className="max-w-2xl gap-3">
               <div className="text-ink-500 text-xs font-semibold uppercase">
-                About
+                Acerca de
               </div>
               <h1 className="text-ink-1000 text-3xl font-semibold tracking-normal">
                 MEXAS Markets
               </h1>
               <p className="text-ink-600 text-base">
-                MEXAS Markets is a prediction market fork focused on MEX, the
-                Arbitrum stablecoin at {MEXAS_TOKEN.address}.
+                MEXAS Markets es una plataforma de mercados de predicción
+                centrada en MEX sobre Arbitrum.
               </p>
             </Col>
           </section>

@@ -18,7 +18,7 @@ export const SidebarSignUpButton = (props: { className?: string }) => {
         disabled={!privy.configured || !privy.ready}
         className="disabled:bg-ink-300 w-full bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
       >
-        Sign up with Privy
+        Registrarse con Privy
       </Button>
     </Col>
   )
@@ -39,7 +39,7 @@ export const SignUpButton = (props: { className?: string }) => {
         className
       )}
     >
-      Sign up
+      Registrarse
     </Button>
   )
 }
@@ -60,7 +60,7 @@ export const GoogleSignInButton = (props: { onClick: () => any }) => {
           height={24}
           className="rounded-full bg-white"
         />
-        <span>Sign in with Google</span>
+        <span>Iniciar sesión con Google</span>
       </Row>
     </Button>
   )

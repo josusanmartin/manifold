@@ -63,7 +63,7 @@ export function YourOrders(props: {
     bets,
     deemphasizedHeader,
     className,
-    title = 'Your orders',
+    title = 'Tus órdenes',
     showEmptyState,
     onOrderCancelled,
   } = props
@@ -92,7 +92,7 @@ export function YourOrders(props: {
           <span className="text-ink-900 text-base font-semibold">{title}</span>
         </div>
         <div className="text-ink-500 px-4 pb-4 text-sm">
-          No open orders on this market.
+          No tienes órdenes abiertas en este mercado.
         </div>
       </Col>
     )
@@ -105,13 +105,9 @@ export function YourOrders(props: {
       {/* Header */}
       <div className="px-4 pb-1 pt-3">
         {deemphasizedHeader ? (
-          <span className="text-ink-700 text-base font-medium">
-            {title}
-          </span>
+          <span className="text-ink-700 text-base font-medium">{title}</span>
         ) : (
-          <span className="text-ink-900 text-base font-semibold">
-            {title}
-          </span>
+          <span className="text-ink-900 text-base font-semibold">{title}</span>
         )}
       </div>
 
@@ -141,8 +137,10 @@ export function YourOrders(props: {
               <ChevronDownIcon className="h-4 w-4" />
             )}
             {isExpanded
-              ? 'Show fewer orders'
-              : `Show ${moreOrders} more order${moreOrders === 1 ? '' : 's'}`}
+              ? 'Mostrar menos órdenes'
+              : `Mostrar ${moreOrders} orden${
+                  moreOrders === 1 ? '' : 'es'
+                } más`}
           </Row>
         </button>
       )}
@@ -209,14 +207,14 @@ export function OrderTable(props: {
                   <thead>
                     <tr className="text-ink-500 text-xs uppercase tracking-wide">
                       {!isYou && <th className="pb-2 font-medium"></th>}
-                      <th className="pb-2 font-medium">Outcome</th>
+                      <th className="pb-2 font-medium">Resultado</th>
                       <th className="pb-2 font-medium">
-                        {isPseudoNumeric ? 'Value' : 'Prob'}
+                        {isPseudoNumeric ? 'Valor' : 'Prob.'}
                       </th>
-                      <th className="pb-2 font-medium">Amount</th>
+                      <th className="pb-2 font-medium">Cantidad</th>
                       <th className="pb-2 font-medium">
                         <Row className="items-center justify-between gap-2">
-                          <span>Expires</span>
+                          <span>Expira</span>
                           {isYou &&
                             answerBets.length > 1 &&
                             answerBets.some(
@@ -228,7 +226,7 @@ export function OrderTable(props: {
                                 color="gray-outline"
                                 onClick={onCancel}
                               >
-                                Cancel all
+                                Cancelar todas
                               </Button>
                             )}
                         </Row>
@@ -261,14 +259,14 @@ export function OrderTable(props: {
       <thead>
         <tr className="text-ink-500 text-xs uppercase tracking-wide">
           {!isYou && <th className="pb-2 font-medium"></th>}
-          <th className="pb-2 font-medium">Outcome</th>
+          <th className="pb-2 font-medium">Resultado</th>
           <th className="pb-2 font-medium">
-            {isPseudoNumeric ? 'Value' : 'Prob'}
+            {isPseudoNumeric ? 'Valor' : 'Prob.'}
           </th>
-          <th className="pb-2 font-medium">Amount</th>
+          <th className="pb-2 font-medium">Cantidad</th>
           <th className="pb-2 font-medium">
             <Row className="items-center justify-between gap-2">
-              <span>Expires</span>
+              <span>Expira</span>
               {isYou &&
                 limitBets.length > 1 &&
                 limitBets.some(
@@ -280,7 +278,7 @@ export function OrderTable(props: {
                     color="gray-outline"
                     onClick={onCancel}
                   >
-                    Cancel all
+                    Cancelar todas
                   </Button>
                 )}
             </Row>
@@ -384,11 +382,11 @@ function OrderRow(props: {
           <Row className="items-center justify-between gap-2">
             <span className="text-ink-500">
               {expired ? (
-                'Expired'
+                'Expirada'
               ) : filled ? (
-                'Filled'
+                'Ejecutada'
               ) : cancelled ? (
-                'Cancelled'
+                'Cancelada'
               ) : bet.expiresAt ? (
                 <Tooltip
                   text={`${new Date(
@@ -400,7 +398,7 @@ function OrderRow(props: {
                   {getCountdownString(new Date(bet.expiresAt))}
                 </Tooltip>
               ) : (
-                'Never'
+                'Nunca'
               )}
             </span>
             {!filled && !cancelled && (
@@ -410,7 +408,7 @@ function OrderRow(props: {
                 color="gray-outline"
                 onClick={onCancel}
               >
-                Cancel
+                Cancelar
               </Button>
             )}
           </Row>
@@ -423,7 +421,7 @@ function OrderRow(props: {
 export type OrderClickData = {
   outcome: 'YES' | 'NO'
   limitProb: number
-  amount: number // unfilled amount in mana
+  amount: number // unfilled amount in MEX
 }
 
 export function calculateOrderFillParams(clickedOrder: OrderClickData) {
@@ -480,7 +478,7 @@ export function CollatedOrderTable(props: {
   return (
     <div>
       <Row>
-        <span className="mr-2">Buy</span>
+        <span className="mr-2">Comprar</span>
         {isBinaryMC || !!pseudonym ? (
           <OutcomeLabel
             contract={contract}
@@ -658,9 +656,9 @@ export function OrderBookButton(props: {
 }
 
 export function getOrderBookButtonLabel(limitBets: LimitBet[]) {
-  return `${limitBets.length === 0 ? 'Currently' : 'View'} ${
+  return `${limitBets.length === 0 ? 'Actualmente' : 'Ver'} ${
     limitBets.length
-  } order${limitBets.length === 1 ? '' : 's'}`
+  } orden${limitBets.length === 1 ? '' : 'es'}`
 }
 
 export function OrderBookPanel(props: {
@@ -711,9 +709,9 @@ export function OrderBookPanel(props: {
       {/* Header */}
       <div className="border-ink-200 border-b px-5 py-4">
         <Row className="items-center gap-2">
-          <h2 className="text-lg font-semibold">Order Book</h2>
+          <h2 className="text-lg font-semibold">Libro de órdenes</h2>
           <InfoTooltip
-            text="Active limit orders from traders waiting to buy at specific prices"
+            text="Órdenes límite activas de operadores que esperan comprar a precios específicos"
             className="text-ink-400"
           />
         </Row>
@@ -748,7 +746,7 @@ export function OrderBookPanel(props: {
       {!isPseudoNumeric && yesBets.length >= 2 && noBets.length >= 2 && (
         <div className="border-ink-200 border-t px-5 py-4">
           <h3 className="text-ink-600 mb-3 text-center text-xs font-medium uppercase tracking-wide">
-            Market Depth
+            Profundidad de mercado
           </h3>
           <SizedContainer className="h-[140px] w-full sm:h-[180px]">
             {(w, h) => (
@@ -798,7 +796,7 @@ function OrderBookSide(props: {
   return (
     <div>
       <Row className="mb-3 items-center gap-1.5">
-        <span className="text-ink-500 text-sm font-medium">Buy</span>
+        <span className="text-ink-500 text-sm font-medium">Comprar</span>
         {isBinaryMC || !!pseudonym ? (
           <OutcomeLabel
             contract={contract}
@@ -808,13 +806,13 @@ function OrderBookSide(props: {
           />
         ) : (
           <span className={clsx('text-sm font-semibold', sideColor)}>
-            {side}
+            {side === 'YES' ? 'SÍ' : 'NO'}
           </span>
         )}
       </Row>
 
       {limitBets.length === 0 ? (
-        <div className="text-ink-400 py-4 text-center text-sm">No orders</div>
+        <div className="text-ink-400 py-4 text-center text-sm">Sin órdenes</div>
       ) : (
         <div className="space-y-1">
           {Object.entries(groupedBets).map(([prob, bets]) => (

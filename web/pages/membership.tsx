@@ -35,7 +35,7 @@ import {
   PurchaseConfirmation,
   TIER_ITEMS,
 } from 'web/components/shop/supporter'
-import { SPEND_MANA_ENABLED } from 'web/components/nav/sidebar'
+import { SPEND_MEX_ENABLED } from 'web/components/nav/sidebar'
 import Custom404 from 'web/pages/404'
 
 export default function SupporterPage() {
@@ -43,7 +43,7 @@ export default function SupporterPage() {
   const isAdminOrMod = useAdminOrMod()
 
   // Allow admins to access supporter page for testing even when feature flag is off
-  if (!SPEND_MANA_ENABLED && !isAdminOrMod) {
+  if (!SPEND_MEX_ENABLED && !isAdminOrMod) {
     return <Custom404 />
   }
   const [purchasing, setPurchasing] = useState<string | null>(null)

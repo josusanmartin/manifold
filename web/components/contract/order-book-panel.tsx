@@ -53,7 +53,7 @@ function getMarkets(contract: OrderBookContract): MarketRow[] {
     ).slice(0, 8)
   }
 
-  return [{ name: 'YES', prob: contract.prob }]
+  return [{ name: 'SÍ', prob: contract.prob }]
 }
 
 function getLevels(orders: LimitBet[], outcome: 'YES' | 'NO') {
@@ -110,13 +110,15 @@ export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
     <Col className="border-ink-200 bg-canvas-0 mt-4 overflow-hidden rounded-md border">
       <Row className="border-ink-200 items-center justify-between border-b px-4 py-3">
         <Col className="gap-0">
-          <h2 className="text-ink-1000 text-base font-semibold">Order Book</h2>
+          <h2 className="text-ink-1000 text-base font-semibold">
+            Libro de órdenes
+          </h2>
           <span className="text-ink-500 text-xs">
-            Open limit orders priced in MEX
+            Órdenes límite abiertas en MEX
           </span>
         </Col>
         <span className="text-ink-500 text-xs">
-          {loading ? 'Loading' : `${openOrders.length} open`}
+          {loading ? 'Cargando' : `${openOrders.length} abiertas`}
         </span>
       </Row>
 
@@ -132,8 +134,8 @@ export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
 
       {!hasOpenOrders && !loading && (
         <div className="border-ink-200 text-ink-500 border-t px-4 py-3 text-sm">
-          No open limit orders yet. The current market price is shown above; new
-          limit orders will appear here.
+          Aún no hay órdenes límite abiertas. El precio actual del mercado se
+          muestra arriba; las órdenes nuevas aparecerán aquí.
         </div>
       )}
 
@@ -142,7 +144,7 @@ export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
           <YourOrders
             contract={contract as any}
             bets={openOrders}
-            title="Your open orders"
+            title="Tus órdenes abiertas"
             showEmptyState
             deemphasizedHeader
             onOrderCancelled={(bet) => removeOrder(bet.id)}
@@ -210,8 +212,8 @@ function BinaryMarketBook(props: {
   return (
     <Col>
       <Row className="text-ink-500 bg-canvas-50 border-ink-200 border-b px-4 py-2 text-xs font-medium uppercase">
-        <span className="flex-1">Price</span>
-        <span className="w-24 text-right">Size</span>
+        <span className="flex-1">Precio</span>
+        <span className="w-24 text-right">Tamaño</span>
       </Row>
       <Col className="divide-ink-100 divide-y">
         {visibleAsks.map((level) => (
@@ -273,11 +275,11 @@ function MultiMarketBook(props: {
       <table className="w-full text-sm">
         <thead className="bg-canvas-50 text-ink-500 border-ink-200 border-b text-xs uppercase">
           <tr>
-            <th className="px-4 py-2 text-left font-medium">Outcome</th>
-            <th className="px-4 py-2 text-right font-medium">Last</th>
-            <th className="px-4 py-2 text-right font-medium">Bid</th>
-            <th className="px-4 py-2 text-right font-medium">Ask</th>
-            <th className="px-4 py-2 text-right font-medium">Open size</th>
+            <th className="px-4 py-2 text-left font-medium">Resultado</th>
+            <th className="px-4 py-2 text-right font-medium">Último</th>
+            <th className="px-4 py-2 text-right font-medium">Compra</th>
+            <th className="px-4 py-2 text-right font-medium">Venta</th>
+            <th className="px-4 py-2 text-right font-medium">Tamaño abierto</th>
           </tr>
         </thead>
         <tbody className="divide-ink-100 divide-y">

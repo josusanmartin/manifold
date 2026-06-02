@@ -31,22 +31,22 @@ export default function LoginPage() {
             <Col className="gap-6 p-5 sm:p-8">
               <Col className="gap-2">
                 <div className="text-ink-500 text-xs font-semibold uppercase">
-                  MEXAS Markets
+                  Mercados MEXAS
                 </div>
                 <h1 className="text-ink-1000 text-3xl font-semibold tracking-normal">
-                  Trade with {MEXAS_TOKEN.symbol} on Arbitrum
+                  Opera con {MEXAS_TOKEN.symbol} en Arbitrum
                 </h1>
               </Col>
 
               <div className="divide-ink-200 border-ink-200 overflow-hidden rounded-md border">
                 <LoginRow
                   icon={<ShieldCheckIcon className="h-5 w-5" />}
-                  label="Privy account"
-                  value="Email or wallet"
+                  label="Cuenta Privy"
+                  value="Email o cartera"
                 />
                 <LoginRow
                   icon={<SwitchHorizontalIcon className="h-5 w-5" />}
-                  label="Settlement"
+                  label="Liquidación"
                   value={MEXAS_TOKEN.chainName}
                 />
               </div>
@@ -54,9 +54,11 @@ export default function LoginPage() {
 
             <Col className="border-ink-200 gap-4 border-t p-5 sm:p-8 lg:border-l lg:border-t-0">
               <Col className="gap-1">
-                <h2 className="text-ink-1000 text-lg font-semibold">Sign in</h2>
+                <h2 className="text-ink-1000 text-lg font-semibold">
+                  Iniciar sesión
+                </h2>
                 <p className="text-ink-500 text-sm">
-                  Privy creates the account and embedded wallet.
+                  Privy crea la cuenta y la cartera integrada.
                 </p>
               </Col>
               <Button
@@ -66,7 +68,7 @@ export default function LoginPage() {
                 disabled={!privy.configured || !privy.ready}
                 className="disabled:bg-ink-300 w-full bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
               >
-                Continue with Privy
+                Continuar con Privy
               </Button>
             </Col>
           </div>

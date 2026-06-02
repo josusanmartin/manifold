@@ -2,7 +2,6 @@ import { StarIcon, XIcon } from '@heroicons/react/solid'
 import { useContractBets } from 'client-common/hooks/use-bets'
 import { getMultiBetPointsFromBets } from 'client-common/lib/choice'
 import clsx from 'clsx'
-import { Answer } from 'common/answer'
 import { Bet } from 'common/bet'
 import {
   HistoryPoint,
@@ -23,7 +22,7 @@ import { DAY_MS } from 'common/util/time'
 import { mergeWith, uniqBy } from 'lodash'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { UserBetsSummary } from 'web/components/bet/user-bet-summary'
 import { ScrollToTopButton } from 'web/components/buttons/scroll-to-top-button'
 import {
@@ -37,16 +36,10 @@ import { AuthorInfo } from 'web/components/contract/contract-details'
 import { ContractLeaderboard } from 'web/components/contract/contract-leaderboard'
 import { ContractOverview } from 'web/components/contract/contract-overview'
 import { ContractSummaryStats } from 'web/components/contract/contract-summary-stats'
-import { ContractTabs } from 'web/components/contract/contract-tabs'
 import { VisibilityIcon } from 'web/components/contract/contracts-table'
 import { DangerZone } from 'web/components/contract/danger-zone'
 import { EditableQuestionTitle } from 'web/components/contract/editable-question-title'
-import { HeaderActions } from 'web/components/contract/header-actions'
 import { MarketTopics } from 'web/components/contract/market-topics'
-import {
-  RelatedContractsGrid,
-  SidebarRelatedContractsList,
-} from 'web/components/contract/related-contracts-widget'
 import { ExplainerPanel } from 'web/components/explainer-panel'
 import { Col } from 'web/components/layout/col'
 import { Row } from 'web/components/layout/row'
@@ -62,35 +55,27 @@ import { useLiveContract } from 'web/hooks/use-contract'
 import { useGraphUserFromUrl } from 'web/hooks/use-graph-user'
 import { useHeaderIsStuck } from 'web/hooks/use-header-is-stuck'
 import { useIsPageVisible } from 'web/hooks/use-page-visible'
-import { useRelatedMarkets } from 'web/hooks/use-related-contracts'
 import { useReview } from 'web/hooks/use-review'
 import { useSaveCampaign } from 'web/hooks/use-save-campaign'
 import { useSaveReferral } from 'web/hooks/use-save-referral'
 import { useSaveContractVisitsLocally } from 'web/hooks/use-save-visits'
 import { useSavedContractMetrics } from 'web/hooks/use-saved-contract-metrics'
 import { useTracking } from 'web/hooks/use-tracking'
-import { usePrivateUser, useUser } from 'web/hooks/use-user'
+import { useUser } from 'web/hooks/use-user'
 import { useDisplayUserById } from 'web/hooks/use-user-supabase'
 import { api } from 'web/lib/api/api'
 import { track } from 'web/lib/service/analytics'
-import { scrollIntoViewCentered } from 'web/lib/util/scroll'
 import { SpiceCoin } from 'web/public/custom-components/spiceCoin'
-import { FollowMarketButton } from '../buttons/follow-market-button'
-import { CreatorSharePanel, NonCreatorSharePanel } from './creator-share-panel'
 import { MarketContext } from './market-context'
 import { YourTrades } from './your-trades'
 
 export function ContractPageContent(props: ContractParams) {
   const {
-    comments,
-    relatedContracts,
     pointsString,
     multiPointsString,
     chartAnnotations,
     topics,
     dashboards,
-    pinnedComments,
-    totalComments,
   } = props
 
   // Just use the contract that was navigated to directly
@@ -105,9 +90,6 @@ export function ContractPageContent(props: ContractParams) {
 
   const myContractMetrics = useSavedContractMetrics(liveContract)
   const topContractMetrics = props.topContractMetrics
-
-  const privateUser = usePrivateUser()
-  const blockedUserIds = privateUser?.blockedUserIds ?? []
 
   useSaveCampaign()
   useTracking(
@@ -129,7 +111,7 @@ export function ContractPageContent(props: ContractParams) {
     }
   }, [])
 
-  const { bets, totalBets, yourNewBets, betPoints } = useBetData({
+  const { yourNewBets, betPoints } = useBetData({
     contractId: liveContract.id,
     outcomeType: liveContract.outcomeType,
     userId: user?.id,
@@ -154,11 +136,6 @@ export function ContractPageContent(props: ContractParams) {
   const [imageError, setImageError] = useState(false)
   const [showReview, setShowReview] = useState(false)
 
-  const [replyTo, setReplyTo] = useState<Answer | Bet>()
-
-  const tabsContainerRef = useRef<null | HTMLDivElement>(null)
-  const [activeTabIndex, setActiveTabIndex] = useState<number>(0)
-
   const initialHideGraph = shouldHideGraph(liveContract)
   const [hideGraph, setHideGraph] = useState(initialHideGraph)
 
@@ -167,22 +144,6 @@ export function ContractPageContent(props: ContractParams) {
     setGraphUser,
     ready: graphUserReady,
   } = useGraphUserFromUrl()
-
-  useEffect(() => {
-    if (replyTo) {
-      setActiveTabIndex(0)
-      if (tabsContainerRef.current) {
-        scrollIntoViewCentered(tabsContainerRef.current)
-      } else {
-        console.error('no ref to scroll to')
-      }
-    }
-  }, [replyTo])
-
-  const { contracts: relatedMarkets, loadMore } = useRelatedMarkets(
-    props.contract,
-    relatedContracts
-  )
 
   // detect whether header is stuck by observing if title is visible
   const { ref: titleRef, headerStuck } = useHeaderIsStuck()
@@ -287,14 +248,6 @@ export function ContractPageContent(props: ContractParams) {
                   </span>
                 )}
               </Row>
-              {(headerStuck || !coverImageUrl) && (
-                <HeaderActions
-                  contract={liveContract}
-                  initialHideGraph={initialHideGraph}
-                  hideGraph={hideGraph}
-                  setHideGraph={setHideGraph}
-                />
-              )}
             </Row>
           </div>
           {coverImageUrl && (
@@ -309,12 +262,6 @@ export function ContractPageContent(props: ContractParams) {
               <div>
                 <BackButton className="pr-8" />
               </div>
-              <HeaderActions
-                contract={liveContract}
-                initialHideGraph={initialHideGraph}
-                hideGraph={hideGraph}
-                setHideGraph={setHideGraph}
-              />
             </Row>
           )}
 
@@ -366,7 +313,7 @@ export function ContractPageContent(props: ContractParams) {
                   resolutionRating={
                     userHasReviewed ? (
                       <Row className="text-ink-500 items-center gap-0.5 text-sm italic">
-                        You rated this resolution{' '}
+                        Calificaste esta resolución con{' '}
                         {justNowReview ?? userReview?.rating}{' '}
                         <StarIcon className="h-4 w-4" />
                       </Row>
@@ -374,7 +321,7 @@ export function ContractPageContent(props: ContractParams) {
                   }
                   setShowResolver={setShowResolver}
                   setShowUnresolver={setShowUnresolver}
-                  onAnswerCommentClick={setReplyTo}
+                  onAnswerCommentClick={() => undefined}
                   chartAnnotations={chartAnnotations}
                   hideGraph={hideGraph}
                   setHideGraph={setHideGraph}
@@ -464,14 +411,11 @@ export function ContractPageContent(props: ContractParams) {
               hasReviewed={!!userHasReviewed}
             />
             {!isResolved && !isClosed && isCreator && (
-              <>
-                {showResolver && <Spacer h={4} />}
-                <CreatorSharePanel contract={liveContract} />
-              </>
+              <>{showResolver && <Spacer h={4} />}</>
             )}
             {liveContract.token === 'CASH' ? (
               <span className="bg-canvas-50 rounded-md p-4">
-                See parent question for description and comments:{' '}
+                Ver la pregunta principal para la descripción:{' '}
                 <Link
                   href={`/${
                     liveContract.creatorUsername
@@ -501,16 +445,6 @@ export function ContractPageContent(props: ContractParams) {
               />
             </Row>
 
-            <Row className="flex-wrap">
-              {!isResolved && !isClosed && !isCreator && !!user ? (
-                <NonCreatorSharePanel contract={liveContract}>
-                  <FollowMarketButton contract={liveContract} user={user} />
-                </NonCreatorSharePanel>
-              ) : !isResolved && !isCreator ? (
-                <FollowMarketButton contract={liveContract} user={user} />
-              ) : null}
-            </Row>
-
             <Row className="my-2 flex-wrap items-center justify-between gap-y-2"></Row>
             {!user && <SidebarSignUpButton className="mb-4 flex md:hidden" />}
 
@@ -528,44 +462,11 @@ export function ContractPageContent(props: ContractParams) {
                 <Spacer h={12} />
               </>
             )}
-            {comments.length > 3 && (
-              <RelatedContractsGrid
-                contracts={relatedMarkets}
-                loadMore={loadMore}
-                showAll={false}
-                className=" !pt-0 pb-4"
-              />
-            )}
-
-            <div ref={tabsContainerRef} className="mb-4">
-              <ContractTabs
-                staticContract={props.contract}
-                liveContract={liveContract}
-                bets={bets}
-                totalBets={totalBets}
-                comments={comments}
-                totalPositions={props.totalPositions}
-                replyTo={replyTo}
-                setReplyTo={setReplyTo}
-                blockedUserIds={blockedUserIds}
-                activeIndex={activeTabIndex}
-                setActiveIndex={setActiveTabIndex}
-                pinnedComments={pinnedComments}
-                totalComments={totalComments}
-                setGraphUser={setGraphUser}
-                setHideGraph={setHideGraph}
-              />
-            </div>
             {showExplainerPanel && (
               <div className="bg-canvas-50 -mx-4 p-4 pb-0 md:-mx-8 xl:hidden">
                 <ExplainerPanel showAccuracy={false} />
               </div>
             )}
-            <RelatedContractsGrid
-              contracts={relatedMarkets}
-              loadMore={loadMore}
-              showAll={true}
-            />
           </Col>
         </Col>
         <Col className="hidden min-h-full max-w-[375px] xl:flex">
@@ -574,12 +475,6 @@ export function ContractPageContent(props: ContractParams) {
               <ExplainerPanel showAccuracy={false} />
             </div>
           )}
-
-          <SidebarRelatedContractsList
-            contracts={relatedMarkets}
-            loadMore={loadMore}
-            topics={topics}
-          />
         </Col>
       </Row>
 

@@ -5,7 +5,6 @@ import toast from 'react-hot-toast'
 import { Answer } from 'common/answer'
 import { APIError } from 'common/api/utils'
 import { CPMMContract, MultiContract } from 'common/contract'
-import { TRADE_TERM } from 'common/envs/constants'
 import { formatPercent, formatWithToken } from 'common/util/format'
 import { removeUndefinedProps } from 'common/util/object'
 import { DAY_MS } from 'common/util/time'
@@ -44,7 +43,7 @@ export const QuickLimitOrderButtons = (props: {
   async function submitBet(outcome: 'YES' | 'NO') {
     if (!user) return
     if (user.balance < amount) {
-      setError('Insufficient balance')
+      setError('Saldo insuficiente')
       setShowBuyMore(true)
       return
     }
@@ -68,13 +67,13 @@ export const QuickLimitOrderButtons = (props: {
       })
     )
       .then((r) => {
-        console.log(`placed ${TRADE_TERM}. Result:`, r)
+        console.log('placed order. Result:', r)
         setIsSubmitting(false)
         toast.success(
-          `Placed order for ${formatWithToken({
+          `Orden enviada por ${formatWithToken({
             amount: amount,
             token: isCashContract ? 'CASH' : 'M$',
-          })} ${outcome} at ${formatPercent(prob)}`
+          })} ${outcome === 'YES' ? 'SÍ' : 'NO'} a ${formatPercent(prob)}`
         )
       })
       .catch((e) => {
@@ -82,7 +81,7 @@ export const QuickLimitOrderButtons = (props: {
           setError(e.message.toString())
         } else {
           console.error(e)
-          setError(`Error placing ${TRADE_TERM}`)
+          setError('Error al enviar la orden')
         }
         setIsSubmitting(false)
       })
@@ -110,14 +109,14 @@ export const QuickLimitOrderButtons = (props: {
     >
       <Row className="items-center gap-2">
         <div className="text-ink-600">
-          Quick limit order{' '}
+          Orden límite rápida{' '}
           <InfoTooltip
-            text={`Offer to buy ${formatWithToken({
+            text={`Oferta para comprar ${formatWithToken({
               amount: amount,
               token: isCashContract ? 'CASH' : 'M$',
-            })} YES or NO at the current market price of ${formatPercent(
+            })} SÍ o NO al precio actual de mercado de ${formatPercent(
               prob
-            )}. If no one takes your ${TRADE_TERM}, your offer will expire in 24 hours.`}
+            )}. Si nadie toma tu orden, expirará en 24 horas.`}
           />
         </div>
         <Button
@@ -127,7 +126,7 @@ export const QuickLimitOrderButtons = (props: {
           className="w-24 whitespace-nowrap font-semibold"
           onClick={() => submitBet('YES')}
         >
-          <MoneyDisplay amount={amount} isCashContract={isCashContract} /> YES
+          <MoneyDisplay amount={amount} isCashContract={isCashContract} /> SÍ
         </Button>
         <Button
           size="xs"
@@ -144,7 +143,7 @@ export const QuickLimitOrderButtons = (props: {
           {error}
           {showBuyMore && (
             <Link href="/wallet" className="text-primary-500 hover:underline">
-              Open wallet
+              Abrir cartera
             </Link>
           )}
         </Row>

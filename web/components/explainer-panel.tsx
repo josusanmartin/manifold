@@ -1,9 +1,8 @@
 import { ChevronDoubleDownIcon } from '@heroicons/react/solid'
 import clsx from 'clsx'
-import { ENV_CONFIG } from 'common/envs/constants'
 import Link from 'next/link'
 import React from 'react'
-import { FaGift } from 'react-icons/fa6'
+import { FaCoins, FaGift } from 'react-icons/fa6'
 import { GoGraph } from 'react-icons/go'
 import { TbTargetArrow } from 'react-icons/tb'
 import { track } from 'web/lib/service/analytics'
@@ -11,8 +10,6 @@ import { AboutManifold } from './about-manifold'
 import { Col } from './layout/col'
 import { Row } from './layout/row'
 import { Card } from './widgets/card'
-
-import { ManaCoin } from 'web/public/custom-components/manaCoin'
 
 export const ExplainerPanel = (props: {
   className?: string
@@ -67,10 +64,10 @@ const WhatIsManifold = ({
   <ExpandSection
     title={
       <>
-        <GoGraph className="mr-2  " /> What is MEXAS?
+        <GoGraph className="mr-2  " /> ¿Qué es MEXAS?
       </>
     }
-    onClick={() => onClick('What is MEXAS?')}
+    onClick={() => onClick('Qué es MEXAS')}
   >
     <AboutManifold />
   </ExpandSection>
@@ -80,24 +77,21 @@ const Accuracy = ({ onClick }: { onClick: (sectionTitle: string) => void }) => (
   <ExpandSection
     title={
       <>
-        <TbTargetArrow className="mr-2" /> Are our predictions accurate?
+        <TbTargetArrow className="mr-2" /> ¿Son precisas las probabilidades?
       </>
     }
-    onClick={() => onClick('Are our forecasts accurate?')}
+    onClick={() => onClick('Son precisas las probabilidades')}
   >
     <div className="pb-2">
-      Yes! MEXAS markets are designed to stay calibrated through open trading.
-      <a
-        className="text-primary-700 ml-1 hover:underline"
-        href="/checkout"
-      >
-        Explore live markets
+      Sí. Los mercados MEXAS se calibran mediante operaciones abiertas.
+      <a className="text-primary-700 ml-1 hover:underline" href="/checkout">
+        Ver mercados activos
       </a>
       .
     </div>
     <div className="pb-2">
-      Prices move as traders buy and sell outcomes, so the market price becomes
-      the current crowd estimate.
+      Los precios cambian cuando los usuarios compran y venden resultados, así
+      que el precio del mercado refleja la estimación colectiva actual.
     </div>
     <div></div>
   </ExpandSection>
@@ -111,19 +105,18 @@ const PlayMoney = ({
   <ExpandSection
     title={
       <>
-        <ManaCoin className="!mr-2 h-4 w-4 grayscale" />
-        Why use MEX?
+        <FaCoins className="mr-2 h-4 w-4" />
+        ¿Por qué usar MEX?
       </>
     }
-    onClick={() => onClick('Why use MEX?')}
+    onClick={() => onClick('Por qué usar MEX')}
   >
     <div className="pb-2">
-      MEX ({ENV_CONFIG.moneyMoniker}) is the Arbitrum token used to trade on
-      MEXAS markets.
+      MEX es el token de Arbitrum que se usa para operar en MEXAS Markets.
     </div>
     <div className="pb-2">
-      Deposits stay in your Privy wallet, and withdrawals send tokens directly
-      on-chain.
+      Los depósitos permanecen en tu cartera Privy y los retiros se envían
+      directamente on-chain.
     </div>
   </ExpandSection>
 )
@@ -137,20 +130,20 @@ const CashPrizes = ({
     title={
       <>
         <FaGift className="mr-2 h-4 w-4" />
-        How do I win cash prizes?
+        ¿Cómo retiro mis fondos?
       </>
     }
-    onClick={() => onClick('How do I win cash prizes?')}
+    onClick={() => onClick('Cómo retiro fondos')}
   >
     <div className="pb-2">
-      MEXAS can settle rewards and withdrawals through your connected wallet.
+      MEXAS liquida retiros a través de tu cartera conectada.
     </div>
     <div className="pb-2">
-      Keep enough Arbitrum ETH in the wallet to pay gas for token transfers.
+      Mantén suficiente ETH en Arbitrum para pagar el gas de las transferencias.
     </div>
     <div className="pb-2">
       <Link href="/wallet" className="text-primary-700 hover:underline">
-        Open MEX wallet →
+        Abrir cartera MEX
       </Link>
     </div>
   </ExpandSection>

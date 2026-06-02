@@ -176,15 +176,15 @@ export function MultiOutcomeLabel(props: {
 }
 
 export function YesLabel() {
-  return <span className="text-teal-600">YES</span>
+  return <span className="text-teal-600">SÍ</span>
 }
 
 export function HigherLabel() {
-  return <span className="text-teal-600">HIGHER</span>
+  return <span className="text-teal-600">MÁS ALTO</span>
 }
 
 export function LowerLabel() {
-  return <span className="text-scarlet-600">LOWER</span>
+  return <span className="text-scarlet-600">MÁS BAJO</span>
 }
 
 export function BuyLabel() {
@@ -204,11 +204,11 @@ export function CancelLabel() {
 }
 
 export function ProbLabel() {
-  return <span className="text-sky-600">PROB</span>
+  return <span className="text-sky-600">PROB.</span>
 }
 
 export function MultiLabel() {
-  return <span className="text-sky-600">MANY</span>
+  return <span className="text-sky-600">VARIOS</span>
 }
 
 export function ProbPercentLabel(props: { prob: number }) {

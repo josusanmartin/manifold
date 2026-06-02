@@ -58,17 +58,17 @@ const NotificationsIconSolid = (props: { className?: string }) => (
 function getNavigation(user: User) {
   return [
     {
-      name: 'Markets',
+      name: 'Mercados',
       href: '/checkout',
       icon: CreditCardIcon,
       solidIcon: CreditCardIconSolid,
     },
     {
-      name: 'Profile',
+      name: 'Perfil',
       href: `/${user.username}`,
     },
     {
-      name: 'Inbox',
+      name: 'Buzón',
       href: `/notifications`,
       icon: NotificationsIconOutline,
       solidIcon: NotificationsIconSolid,
@@ -78,20 +78,20 @@ function getNavigation(user: User) {
 
 const signedOutNavigation = (privyLogin: () => void) => [
   {
-    name: 'Markets',
+    name: 'Mercados',
     href: '/checkout',
     icon: CreditCardIcon,
     solidIcon: CreditCardIconSolid,
     alwaysShowName: true,
   },
   {
-    name: 'About',
+    name: 'Acerca',
     href: '/about',
     icon: QuestionMarkCircleIcon,
     solidIcon: QuestionMarkCircleIconSolid,
   },
   {
-    name: 'Sign in',
+    name: 'Entrar',
     onClick: privyLogin,
     icon: UserCircleIcon,
     solidIcon: UserCircleIconSolid,
@@ -118,7 +118,7 @@ export function BottomNavBar() {
 
   return (
     <nav
-      aria-label="Bottom navigation"
+      aria-label="Navegación inferior"
       className="border-ink-100/30 dark:border-ink-300 text-ink-700 bg-canvas-0 fixed inset-x-0 bottom-0 z-50 flex select-none items-center justify-between border-t text-xs lg:hidden"
     >
       <ul
@@ -131,7 +131,7 @@ export function BottomNavBar() {
               item={item}
               currentPage={currentPage}
               user={user}
-              className={item.name === 'Politics' ? '-mt-1' : ''}
+              className=""
             />
           </li>
         ))}
@@ -139,7 +139,7 @@ export function BottomNavBar() {
           <li className="flex-1">
             <button
               type="button"
-              aria-label="More menu"
+              aria-label="Más opciones"
               aria-expanded={sidebarOpen}
               className={clsx(
                 itemClass,
@@ -149,7 +149,7 @@ export function BottomNavBar() {
               onClick={() => setSidebarOpen(true)}
             >
               <MenuAlt3Icon className={iconClassName} aria-hidden="true" />
-              More
+              Más
             </button>
           </li>
         )}
@@ -178,7 +178,7 @@ function NavBarItem(props: {
   const [touched, setTouched] = useState(false)
   const optimisticContext = useOptimisticEntitlements()
 
-  if (item.name === 'Profile' && user) {
+  if (item.name === 'Perfil' && user) {
     const isOnUserProfile = currentPage === `/${user.username}`
 
     // Merge server entitlements with optimistic updates from shop

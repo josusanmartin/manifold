@@ -72,7 +72,7 @@ import { Col } from 'web/components/layout/col'
 import { Modal } from 'web/components/layout/modal'
 import { Page } from 'web/components/layout/page'
 import { Row } from 'web/components/layout/row'
-import { SPEND_MANA_ENABLED } from 'web/components/nav/sidebar'
+import { SPEND_MEX_ENABLED } from 'web/components/nav/sidebar'
 import { SEO } from 'web/components/SEO'
 import {
   Avatar,
@@ -413,7 +413,7 @@ export default function ShopPage() {
   }, [user?.streakForgiveness])
 
   // Allow admins to access shop for testing even when feature flag is off
-  if (!SPEND_MANA_ENABLED && !isAdminOrMod) {
+  if (!SPEND_MEX_ENABLED && !isAdminOrMod) {
     return <Custom404 />
   }
 

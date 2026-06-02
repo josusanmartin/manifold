@@ -2,8 +2,6 @@ import { ArrowDownIcon, ArrowUpIcon } from '@heroicons/react/solid'
 import clsx from 'clsx'
 
 import { resolution } from 'common/contract'
-import { TRADE_TERM } from 'common/envs/constants'
-import { capitalize } from 'lodash'
 import { Button } from '../buttons/button'
 import { Row } from '../layout/row'
 
@@ -43,8 +41,7 @@ export function YesNoSelector(props: {
         )}
         disabled={disabled}
       >
-        {includeWordBet ? capitalize(TRADE_TERM) : ''}{' '}
-        {yesLabel ? yesLabel : 'YES'}
+        {includeWordBet ? 'Comprar' : ''} {yesLabel ? yesLabel : 'SÍ'}
         <ArrowUpIcon className="ml-1 h-4 w-4" />
       </Button>
 
@@ -59,8 +56,7 @@ export function YesNoSelector(props: {
         )}
         disabled={disabled}
       >
-        {includeWordBet ? capitalize(TRADE_TERM) : ''}{' '}
-        {noLabel ? noLabel : 'NO'}
+        {includeWordBet ? 'Comprar' : ''} {noLabel ? noLabel : 'NO'}
         <ArrowDownIcon className="ml-1 h-4 w-4" />
       </Button>
     </Row>
@@ -86,7 +82,7 @@ export function YesNoCancelSelector(props: {
         onClick={() => onSelect('YES')}
         className={btnClassName}
       >
-        YES
+        SÍ
       </Button>
 
       <Button
@@ -102,7 +98,7 @@ export function YesNoCancelSelector(props: {
         onClick={() => onSelect('MKT')}
         className={btnClassName}
       >
-        PARTIAL %
+        PARCIAL %
       </Button>
 
       <Button
@@ -133,7 +129,7 @@ export function ChooseCancelSelector(props: {
         onClick={() => onSelect('CHOOSE_ONE')}
         className={btnClassName}
       >
-        Choose one
+        Elegir una
       </Button>
       <Button
         color={selected === 'CHOOSE_MULTIPLE' ? 'blue' : 'gray'}
@@ -141,7 +137,7 @@ export function ChooseCancelSelector(props: {
         onClick={() => onSelect('CHOOSE_MULTIPLE')}
         className={btnClassName}
       >
-        Choose many
+        Elegir varias
       </Button>
       <Button
         color={selected === 'CANCEL' ? 'yellow' : 'gray'}
@@ -172,7 +168,7 @@ export function NumberCancelSelector(props: {
         onClick={() => onSelect('NUMBER')}
         className={clsx(btnClassName, 'rounded-l-xl rounded-r-none')}
       >
-        Choose value
+        Elegir valor
       </Button>
 
       <Button

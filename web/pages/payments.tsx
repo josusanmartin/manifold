@@ -28,14 +28,12 @@ export const UserPayments = (props: { userId: string }) => {
   if (!user || user.id !== userId) {
     return (
       <Col className="border-ink-200 bg-canvas-50 text-ink-600 rounded-md border p-4 text-sm">
-        Wallet controls are private to the signed-in account.
+        Los controles de la cartera son privados para la cuenta conectada.
       </Col>
     )
   }
 
-  return (
-    <MexasWalletSummary className="w-full" />
-  )
+  return <MexasWalletSummary className="w-full" />
 }
 
 export const PaymentsModal = (props: {
@@ -55,9 +53,9 @@ export const PaymentsModal = (props: {
     <Modal open={show} setOpen={setShow} size="md">
       <Col className="bg-canvas-0 gap-5 overflow-hidden rounded-xl p-5 shadow-xl">
         <Col className="gap-1">
-          <h2 className="text-ink-1000 text-xl font-semibold">MEX Wallet</h2>
+          <h2 className="text-ink-1000 text-xl font-semibold">Cartera MEX</h2>
           <p className="text-ink-600 text-sm">
-            Deposit {MEXAS_TOKEN.symbol} to your Privy wallet on{' '}
+            Deposita {MEXAS_TOKEN.symbol} en tu cartera Privy en{' '}
             {MEXAS_TOKEN.chainName}.
           </p>
         </Col>
@@ -68,7 +66,7 @@ export const PaymentsModal = (props: {
           className="self-end"
           onClick={() => setShow(false)}
         >
-          Close
+          Cerrar
         </Button>
       </Col>
     </Modal>

@@ -11,12 +11,12 @@ function WalletHeader() {
         Arbitrum One
       </div>
       <h1 className="text-ink-1000 text-3xl font-semibold tracking-normal">
-        MEX Wallet
+        Cartera MEX
       </h1>
       <p className="text-ink-600 max-w-2xl text-sm">
-        Deposit, hold, and withdraw {MEXAS_TOKEN.symbol} directly from your
-        Privy wallet. Deposited tokens remain on-chain and available in this
-        wallet.
+        Deposita, conserva y retira {MEXAS_TOKEN.symbol} directamente desde tu
+        cartera Privy. Los tokens depositados permanecen en cadena y disponibles
+        en esta cartera.
       </p>
     </Col>
   )
@@ -26,8 +26,8 @@ export default function WalletPage() {
   return (
     <Page trackPageView="mex wallet page">
       <SEO
-        title="MEX Wallet"
-        description="Deposit and withdraw MEXAS on Arbitrum."
+        title="Cartera MEX"
+        description="Deposita y retira MEXAS en Arbitrum."
         url="/wallet"
       />
       <Col className="mx-auto w-full max-w-3xl gap-6 px-2 py-6">

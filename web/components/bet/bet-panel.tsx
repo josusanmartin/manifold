@@ -1,6 +1,6 @@
 import { LockClosedIcon, LockOpenIcon, XIcon } from '@heroicons/react/outline'
 import clsx from 'clsx'
-import { capitalize, uniq } from 'lodash'
+import { uniq } from 'lodash'
 import { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 
@@ -22,7 +22,6 @@ import {
   MIN_STONK_PROB,
   MultiContract,
 } from 'common/contract'
-import { TRADE_TERM } from 'common/envs/constants'
 import {
   getVerificationStatus,
   PROMPT_USER_VERIFICATION_MESSAGES,
@@ -47,7 +46,6 @@ import {
 } from 'common/util/format'
 import { floatingEqual } from 'common/util/math'
 import { removeUndefinedProps } from 'common/util/object'
-import { LuShare } from 'react-icons/lu'
 import { useFocus } from 'web/hooks/use-focus'
 import { useIsMobile } from 'web/hooks/use-is-mobile'
 import { useIsPageVisible } from 'web/hooks/use-page-visible'
@@ -75,7 +73,6 @@ import {
   OrderClickData,
   YourOrders,
 } from './order-book'
-import { ShareBetModal } from './share-bet'
 import { YesNoSelector } from './yes-no-selector'
 
 const WAIT_TO_DISMISS = 3000
@@ -171,14 +168,14 @@ export function BuyPanel(
               }}
               yesLabel={
                 isPseudoNumeric
-                  ? 'HIGHER'
+                  ? 'MÁS ALTO'
                   : isStonk
                   ? STONK_YES
-                  : customYesText ?? 'YES'
+                  : customYesText ?? 'SÍ'
               }
               noLabel={
                 isPseudoNumeric
-                  ? 'LOWER'
+                  ? 'MÁS BAJO'
                   : isStonk
                   ? STONK_NO
                   : customNoText ?? 'NO'
@@ -300,17 +297,15 @@ export const BuyPanelBody = (
     | null
   >(null)
 
-  const [manaSlippageProtection, setManaSlippageProtection] =
-    usePersistentLocalState(false, 'mana-slippage-protection')
+  const [mexSlippageProtection, setMexSlippageProtection] =
+    usePersistentLocalState(false, 'mex-slippage-protection')
   const [cashSlippageProtection, setCashSlippageProtection] =
     usePersistentLocalState(true, 'cash-slippage-protection')
   const slippageProtection = isCashContract
     ? cashSlippageProtection
-    : manaSlippageProtection
+    : mexSlippageProtection
   const [inputRef, focusAmountInput] = useFocus()
 
-  // State for share row
-  const [isSharing, setIsSharing] = useState(false)
   const [lastBetDetails, setLastBetDetails] = useState<Bet | null>(null)
 
   // State for editing payout
@@ -364,7 +359,7 @@ export const BuyPanelBody = (
       toast.success(
         `${formatMoney(amountFilled)}/${formatMoney(
           orderAmount
-        )} filled for ${formatMoney(sharesFilled)} payout`,
+        )} ejecutado para un pago de ${formatMoney(sharesFilled)}`,
         {
           duration: 5000,
           id: submittedBet.toastId,
@@ -375,7 +370,6 @@ export const BuyPanelBody = (
       const finalBetDetails = updatedBet ?? submittedBet
       if (finalBetDetails) {
         setLastBetDetails(finalBetDetails)
-        setIsSharing(false)
         const timeoutId = setTimeout(() => {
           callOnBuySuccess()
         }, WAIT_TO_DISMISS)
@@ -405,7 +399,7 @@ export const BuyPanelBody = (
     setPrefillLimitOrder({ ...fillParams, timestamp: Date.now() })
     setOutcome(fillParams.outcome)
     setBetTypeSetting('Limit')
-    toast('Expiration set to immediate', { icon: '⏱️' })
+    toast('Vencimiento inmediato configurado', { icon: '⏱️' })
   })
 
   useEffect(() => {
@@ -421,7 +415,7 @@ export const BuyPanelBody = (
   }
 
   const callOnBuySuccess = useEvent(() => {
-    if (onBuySuccess && !isSharing) {
+    if (onBuySuccess) {
       onBuySuccess()
     }
   })
@@ -467,7 +461,7 @@ export const BuyPanelBody = (
     setError(undefined)
     setIsSubmitting(true)
     const toastId = slippageProtection
-      ? toast.loading(`Placing ${TRADE_TERM.toLowerCase()}...`, {
+      ? toast.loading('Enviando operación...', {
           duration: 10000,
         })
       : undefined
@@ -495,7 +489,7 @@ export const BuyPanelBody = (
           toast.success(
             `${formatMoney(bet.amount)}/${formatMoney(
               bet.orderAmount ?? 0
-            )} filled for ${formatMoney(bet.shares)} payout`,
+            )} ejecutado para un pago de ${formatMoney(bet.shares)}`,
             {
               duration: 5000,
               id: toastId,
@@ -511,7 +505,6 @@ export const BuyPanelBody = (
           userId: user.id,
         }
         setLastBetDetails(fullBet)
-        setIsSharing(false)
         // TODO: we could remove the timeout and just not dismiss the modal
         const timeoutId = setTimeout(() => {
           callOnBuySuccess()
@@ -540,7 +533,7 @@ export const BuyPanelBody = (
           console.error('No toastId')
           return
         }
-        toast.loading(`Filling ${TRADE_TERM.toLowerCase()}...`, {
+        toast.loading('Ejecutando operación...', {
           duration: expiresMillisAfter + 100,
           id: toastId,
         })
@@ -560,14 +553,14 @@ export const BuyPanelBody = (
       if (e instanceof APIError) {
         const message = e.message.toString()
         if (message.includes('could not serialize access')) {
-          setError(`Error placing ${TRADE_TERM} (could not serialize access)`)
-          console.error(`Error placing ${TRADE_TERM}`, e)
+          setError('Error al enviar la operación. Inténtalo de nuevo.')
+          console.error('Error placing trade', e)
         } else setError(message)
-        toast.error(`Error submitting ${TRADE_TERM}`, { id: toastId })
+        toast.error('Error al enviar la operación', { id: toastId })
       } else {
         console.error(e)
-        setError(`Error placing ${TRADE_TERM}`)
-        toast.error(`Error submitting ${TRADE_TERM}`, { id: toastId })
+        setError('Error al enviar la operación')
+        toast.error('Error al enviar la operación', { id: toastId })
       }
       setIsSubmitting(false)
       setLastBetDetails(null)
@@ -582,7 +575,7 @@ export const BuyPanelBody = (
     isSubmitting ||
     !betAmount ||
     outcome === undefined ||
-    error === 'Insufficient balance' ||
+    error === 'Saldo insuficiente' ||
     showLocationMonitor ||
     (isCashContract && verificationStatus !== 'success')
 
@@ -611,22 +604,22 @@ export const BuyPanelBody = (
     (betAmount ?? 0) > 10 && probChange > 0.299 && bankrollFraction <= 1
 
   const warning = highBankrollSpend
-    ? `You might not want to spend ${formatPercent(
+    ? `Quizá no quieras usar ${formatPercent(
         bankrollFraction
-      )} of your balance on a single trade. \n\nCurrent balance: ${formatWithToken(
+      )} de tu saldo en una sola operación. \n\nSaldo actual: ${formatWithToken(
         {
           amount: balance,
           token: isCashContract ? 'CASH' : 'M$',
         }
       )}`
     : highProbMove
-    ? `Are you sure you want to move the market to ${displayedAfter}?`
+    ? `¿Seguro que quieres mover el mercado a ${displayedAfter}?`
     : undefined
 
   // Toggle always shows Yes/No - only the main bet button shows custom text
   const choicesMap: { [key: string]: string } = isStonk
-    ? { Buy: 'YES', Short: 'NO' }
-    : { Yes: 'YES', No: 'NO' }
+    ? { Comprar: 'YES', Vender: 'NO' }
+    : { Sí: 'YES', No: 'NO' }
 
   const { pseudonymName: propPseudonymName, pseudonymColor } =
     props.pseudonym?.[outcome as 'YES' | 'NO'] ?? {}
@@ -668,11 +661,11 @@ export const BuyPanelBody = (
         setBetAmount(Math.round(amount * 100) / 100)
         setError(undefined) // Clear potential previous errors
       } else {
-        toast.error('Could not calculate bet for that payout amount')
+        toast.error('No se pudo calcular la operación para ese pago')
       }
     } catch (err) {
       console.error('Error calculating bet amount from shares:', err)
-      toast.error('Error calculating bet amount')
+      toast.error('Error al calcular la cantidad')
     } finally {
       setIsEditingPayout(false)
     }
@@ -731,8 +724,8 @@ export const BuyPanelBody = (
                 currentChoice={betType}
                 color="gray"
                 choicesMap={{
-                  Quick: 'Market',
-                  Limit: 'Limit',
+                  Rápida: 'Market',
+                  Límite: 'Limit',
                 }}
                 setChoice={(val) => {
                   setBetTypeSetting(val as 'Market' | 'Limit')
@@ -756,7 +749,7 @@ export const BuyPanelBody = (
             <Row
               className={clsx('text-ink-600 mb-2 items-center justify-between')}
             >
-              <div className="space-x-3">{capitalize(TRADE_TERM)} amount</div>
+              <div className="space-x-3">Cantidad</div>
             </Row>
 
             <Row
@@ -781,10 +774,10 @@ export const BuyPanelBody = (
                 <Row className="w-full items-baseline justify-between sm:justify-start">
                   <span className="text-ink-600 mr-2 min-w-[120px] whitespace-nowrap">
                     {isPseudoNumeric
-                      ? 'Estimated value'
+                      ? 'Valor estimado'
                       : isStonk
-                      ? 'New stock price'
-                      : 'New probability'}
+                      ? 'Nuevo precio'
+                      : 'Nueva probabilidad'}
                   </span>
                   <Row className="items-baseline gap-1">
                     <span className="text-lg font-semibold">
@@ -802,25 +795,25 @@ export const BuyPanelBody = (
                             Math.abs(probAfter - probBefore)
                           )}
                           {floatingEqual(probAfter, maxProb)
-                            ? ' (max)'
+                            ? ' (máx.)'
                             : floatingEqual(probAfter, minProb)
-                            ? ' (max)'
+                            ? ' (máx.)'
                             : ''}
                         </span>
 
                         <button
                           onClick={() => {
                             toast.success(
-                              `Slippage protection on ${
-                                isCashContract ? 'cash' : 'MEX'
-                              } questions ${
-                                !slippageProtection ? 'enabled' : 'disabled'
-                              }!`
+                              `La protección contra deslizamiento en ${
+                                isCashContract ? 'CASH' : 'MEX'
+                              } quedó ${
+                                !slippageProtection ? 'activada' : 'desactivada'
+                              }.`
                             )
                             if (isCashContract) {
                               setCashSlippageProtection(!cashSlippageProtection)
                             } else {
-                              setManaSlippageProtection(!manaSlippageProtection)
+                              setMexSlippageProtection(!mexSlippageProtection)
                             }
                           }}
                           className="self-center"
@@ -829,10 +822,10 @@ export const BuyPanelBody = (
                             autoHideDuration={isMobile ? 3000 : undefined}
                             text={
                               slippageProtection
-                                ? `Your trades won't move the question probability more than 10 percentage points from displayed probability.`
-                                : `Slippage protection on ${
-                                    isCashContract ? 'cash' : 'MEX'
-                                  } questions is off.`
+                                ? `Tus operaciones no moverán la probabilidad más de 10 puntos porcentuales desde la probabilidad mostrada.`
+                                : `La protección contra deslizamiento en ${
+                                    isCashContract ? 'CASH' : 'MEX'
+                                  } está desactivada.`
                             }
                           >
                             {slippageProtection ? (
@@ -848,7 +841,11 @@ export const BuyPanelBody = (
                 </Row>
                 <Row className="min-w-[128px] items-baseline justify-between sm:justify-start">
                   <div className="text-ink-600 mr-2 min-w-[120px] flex-nowrap whitespace-nowrap">
-                    {isPseudoNumeric || isStonk ? 'Shares' : <>To win</>}
+                    {isPseudoNumeric || isStonk ? (
+                      'Participaciones'
+                    ) : (
+                      <>A ganar</>
+                    )}
                   </div>
                   <Row className="items-baseline">
                     <span className="mr-1 whitespace-nowrap text-lg">
@@ -925,7 +922,7 @@ export const BuyPanelBody = (
             {user ? (
               shouldPromptVerification ? (
                 <span className="text-error">
-                  New sweepstakes signups disabled{' '}
+                  Los registros de sweepstakes están desactivados{' '}
                 </span>
               ) : (
                 <>
@@ -956,10 +953,10 @@ export const BuyPanelBody = (
                     }
                     actionLabel={
                       betDisabled && !outcome ? (
-                        `Select ${formatOutcomeLabel(
+                        `Selecciona ${formatOutcomeLabel(
                           contract,
                           'YES'
-                        )} or ${formatOutcomeLabel(contract, 'NO')}`
+                        )} o ${formatOutcomeLabel(contract, 'NO')}`
                       ) : isStonk ? (
                         <span>
                           {formatOutcomeLabel(contract, outcome, pseudonymName)}{' '}
@@ -970,14 +967,14 @@ export const BuyPanelBody = (
                         </span>
                       ) : (
                         <span>
-                          {customYesText || customNoText ? '' : 'Buy '}
+                          {customYesText || customNoText ? '' : 'Comprar '}
                           {binaryMCOutcomeLabel ??
                             formatOutcomeLabel(
                               contract,
                               outcome,
                               pseudonymName
                             )}{' '}
-                          to win{' '}
+                          para ganar{' '}
                           <MoneyDisplay
                             amount={currentPayout}
                             isCashContract={isCashContract}
@@ -998,7 +995,7 @@ export const BuyPanelBody = (
                 })}
                 className="mb-2 flex-grow"
               >
-                Sign up to {TRADE_TERM}
+                Inicia sesión para operar
               </Button>
             )}
           </Col>
@@ -1022,52 +1019,17 @@ export const BuyPanelBody = (
                 </svg>
               </div>
               <span className="text-ink-600 text-sm">
-                {isSubmitting ? 'Placing trade...' : 'Trade placed'}
+                {isSubmitting ? 'Enviando operación...' : 'Operación enviada'}
               </span>
             </Row>
-            <button
-              className="text-primary-600 hover:text-primary-700 flex items-center gap-1.5 text-sm font-medium transition-colors"
-              onClick={() => setIsSharing(true)}
-            >
-              <LuShare className="h-4 w-4" aria-hidden />
-              Share
-            </button>
           </Row>
-        )}
-
-        {lastBetDetails && isSharing && user && (
-          <ShareBetModal
-            open={isSharing}
-            setOpen={setIsSharing}
-            questionText={contract.question}
-            outcome={formatOutcomeLabel(
-              contract,
-              lastBetDetails.outcome as 'YES' | 'NO'
-            )}
-            answer={multiProps?.answerToBuy.text}
-            avgPrice={formatPercent(
-              lastBetDetails.outcome === 'YES'
-                ? lastBetDetails.amount / lastBetDetails.shares
-                : 1 - lastBetDetails.amount / lastBetDetails.shares
-            )}
-            betAmount={lastBetDetails.amount}
-            winAmount={lastBetDetails.shares}
-            bettor={{
-              id: user.id,
-              name: user.name,
-              username: user.username,
-              avatarUrl: user.avatarUrl,
-            }}
-            isLimitBet={lastBetDetails.limitProb !== undefined}
-            orderAmount={lastBetDetails.orderAmount}
-          />
         )}
 
         {user && (
           <Row className="mt-5 items-start justify-between text-sm">
             <Row className={''}>
               <span className={clsx('text-ink-600 mr-1 whitespace-nowrap ')}>
-                Your MEX balance
+                Tu saldo MEX
               </span>
               <span className="text-ink-600 font-semibold">
                 <MoneyDisplay
@@ -1109,7 +1071,7 @@ export const QuickBetAmountsRow = (props: {
   const QUICK_BET_AMOUNTS = [10, 25, 100]
   return (
     <Row className={clsx('mb-2 items-center space-x-3', className)}>
-      <div className="text-ink-600">Amount</div>
+      <div className="text-ink-600">Cantidad</div>
       <ChoicesToggleGroup
         currentChoice={
           QUICK_BET_AMOUNTS.includes(betAmount ?? 0) ? betAmount : undefined

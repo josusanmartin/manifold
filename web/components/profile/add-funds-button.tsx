@@ -26,7 +26,7 @@ export function AddFundsButton(props: {
         className ?? ''
       }`}
     >
-      Wallet
+      Cartera
     </Button>
   )
 }

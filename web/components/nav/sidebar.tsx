@@ -27,7 +27,7 @@ import { ManifoldLogo } from './manifold-logo'
 import { ProfileSummary } from './profile-summary'
 import { NavItem, SidebarItem } from './sidebar-item'
 
-export const SPEND_MANA_ENABLED = false
+export const SPEND_MEX_ENABLED = false
 
 export default function Sidebar(props: {
   className?: string
@@ -79,7 +79,7 @@ export default function Sidebar(props: {
 
       {!isMobile && (
         <Row className="border-ink-200 mx-1 mb-3 items-center justify-between rounded-md border px-3 py-2 text-xs">
-          <span className="text-ink-500 font-medium">Network</span>
+          <span className="text-ink-500 font-medium">Red</span>
           <span className="font-semibold text-teal-700 dark:text-teal-300">
             Arbitrum MEX
           </span>
@@ -125,35 +125,35 @@ export default function Sidebar(props: {
 const getDesktopNav = (loggedIn: boolean, isAdminOrMod: boolean) => {
   if (loggedIn)
     return buildArray(
-      { name: 'Markets', href: '/checkout', icon: ChartBarIcon },
+      { name: 'Mercados', href: '/checkout', icon: ChartBarIcon },
       {
-        name: 'Inbox',
+        name: 'Buzón',
         href: `/notifications`,
         icon: NotificationsIcon,
       },
       isAdminOrMod && {
-        name: 'Reports',
+        name: 'Reportes',
         href: '/reports',
         icon: ReportsIcon,
       }
     )
 
   return buildArray(
-    { name: 'Markets', href: '/checkout', icon: ChartBarIcon },
-    { name: 'About', href: '/about', icon: QuestionMarkCircleIcon }
+    { name: 'Mercados', href: '/checkout', icon: ChartBarIcon },
+    { name: 'Acerca de', href: '/about', icon: QuestionMarkCircleIcon }
   )
 }
 
 const getMobileNav = (loggedIn: boolean, isAdminOrMod: boolean) => {
   return buildArray<NavItem>(
-    { name: 'Markets', href: '/checkout', icon: ChartBarIcon },
+    { name: 'Mercados', href: '/checkout', icon: ChartBarIcon },
     loggedIn && {
-      name: 'Inbox',
+      name: 'Buzón',
       href: `/notifications`,
       icon: NotificationsIcon,
     },
     isAdminOrMod && {
-      name: 'Reports',
+      name: 'Reportes',
       href: '/reports',
       icon: ReportsIcon,
     }
@@ -169,18 +169,22 @@ const bottomNav = (
   privyLogout: () => Promise<void>
 ) =>
   buildArray<NavItem>(
-    loggedIn && { name: 'About', href: '/about', icon: QuestionMarkCircleIcon },
+    loggedIn && {
+      name: 'Acerca de',
+      href: '/about',
+      icon: QuestionMarkCircleIcon,
+    },
     {
       name: theme ?? 'auto',
       children:
         theme === 'light' ? (
-          'Light'
+          'Claro'
         ) : theme === 'dark' ? (
-          'Dark'
+          'Oscuro'
         ) : (
           <>
-            <span className="hidden dark:inline">Dark</span>
-            <span className="inline dark:hidden">Light</span> (auto)
+            <span className="hidden dark:inline">Oscuro</span>
+            <span className="inline dark:hidden">Claro</span> (auto)
           </>
         ),
       icon: ({ className, ...props }) => (
@@ -198,7 +202,7 @@ const bottomNav = (
       onClick: toggleTheme,
     },
     loggedIn && {
-      name: 'Sign out',
+      name: 'Cerrar sesión',
       icon: LogoutIcon,
       onClick: async () => {
         await withTracking(firebaseLogout, 'sign out')()
@@ -206,5 +210,9 @@ const bottomNav = (
         await router.refresh()
       },
     },
-    !loggedIn && { name: 'Sign in', icon: LoginIcon, onClick: privyLogin }
+    !loggedIn && {
+      name: 'Iniciar sesión',
+      icon: LoginIcon,
+      onClick: privyLogin,
+    }
   )
