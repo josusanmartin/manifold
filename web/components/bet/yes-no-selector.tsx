@@ -67,8 +67,9 @@ export function YesNoCancelSelector(props: {
   selected: resolution | undefined
   onSelect: (selected: resolution) => void
   className?: string
+  includeMkt?: boolean
 }) {
-  const { selected, onSelect, className } = props
+  const { selected, onSelect, className, includeMkt = true } = props
   const btnClassName = clsx(
     '!py-2 flex-1 first:rounded-l-xl last:rounded-r-xl rounded-r-none rounded-l-none whitespace-nowrap',
     className
@@ -93,13 +94,15 @@ export function YesNoCancelSelector(props: {
         NO
       </Button>
 
-      <Button
-        color={selected === 'MKT' ? 'blue' : 'gray'}
-        onClick={() => onSelect('MKT')}
-        className={btnClassName}
-      >
-        PARCIAL %
-      </Button>
+      {includeMkt && (
+        <Button
+          color={selected === 'MKT' ? 'blue' : 'gray'}
+          onClick={() => onSelect('MKT')}
+          className={btnClassName}
+        >
+          PARCIAL %
+        </Button>
+      )}
 
       <Button
         color={selected === 'CANCEL' ? 'yellow' : 'gray'}

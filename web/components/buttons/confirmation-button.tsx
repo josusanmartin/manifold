@@ -127,23 +127,23 @@ export function ResolveConfirmationButton(props: {
     <ConfirmationButton
       openModalBtn={{
         className: clsx('border-none self-start', openModalButtonClass),
-        label: 'Resolve',
+        label: 'Resolver',
         color: color,
         disabled: isSubmitting || disabled,
         size: size,
       }}
       cancelBtn={{
-        label: 'Back',
+        label: 'Volver',
       }}
       submitBtn={{
-        label: `Resolve to ${label}`,
+        label: `Resolver a ${label}`,
         color: color,
         isSubmitting,
       }}
       onSubmit={onResolve}
     >
       <p>
-        Are you sure you want to resolve "{marketTitle}" to <b>{label}</b>?
+        ¿Seguro que quieres resolver "{marketTitle}" a <b>{label}</b>?
         <br />
       </p>
     </ConfirmationButton>

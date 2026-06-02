@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { YesNoCancelSelector } from './bet/yes-no-selector'
 import { Spacer } from './layout/spacer'
 import { ResolveConfirmationButton } from './buttons/confirmation-button'
@@ -10,7 +10,6 @@ import {
   MultiContract,
   resolution,
 } from 'common/contract'
-import { BETTORS } from 'common/user'
 import { Row } from 'web/components/layout/row'
 import { ProbabilityInput } from './widgets/probability-input'
 import { Button } from './buttons/button'
@@ -23,6 +22,19 @@ import clsx from 'clsx'
 import { linkClass } from 'web/components/widgets/site-link'
 import Link from 'next/link'
 import { XIcon } from '@heroicons/react/solid'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+
+type MexasResolutionReadiness = {
+  canResolve: boolean
+  requiresEscrow: boolean
+  filledBetCount: number
+  filledStake: number
+  openReservationRefund: number
+  yesPayout: number
+  noPayout: number
+  cancelPayout: number
+  message?: string
+}
 
 function getResolveButtonColor(outcome: resolution | undefined) {
   return outcome === 'YES'
@@ -44,6 +56,8 @@ function getResolveButtonLabel(
     ? 'N/A'
     : outcome === 'MKT'
     ? `${prob ?? ''}%`
+    : outcome === 'YES'
+    ? 'SÍ'
     : outcome ?? ''
 }
 
@@ -54,6 +68,7 @@ export function ResolutionPanel(props: {
 }) {
   const { contract, inModal, onClose } = props
   const isCreator = useUser()?.id === contract.creatorId
+  const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)
 
   const [outcome, setOutcome] = useState<resolution | undefined>()
 
@@ -63,9 +78,62 @@ export function ResolutionPanel(props: {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
+  const [mexasReadiness, setMexasReadiness] = useState<
+    MexasResolutionReadiness | undefined
+  >()
+  const [mexasReadinessError, setMexasReadinessError] = useState<
+    string | undefined
+  >()
+
+  useEffect(() => {
+    if (!isMexasOrderBookOnly) return
+
+    let cancelled = false
+    setMexasReadiness(undefined)
+    setMexasReadinessError(undefined)
+
+    fetch(
+      `/api/v0/market/${encodeURIComponent(
+        contract.id
+      )}/mexas-resolution-readiness`
+    )
+      .then(async (res) => {
+        const body = await res.json().catch(() => undefined)
+        if (!res.ok) {
+          throw new Error(
+            body?.message ?? 'No se pudo verificar la resolución MEXAS.'
+          )
+        }
+        return body as MexasResolutionReadiness
+      })
+      .then((readiness) => {
+        if (!cancelled) setMexasReadiness(readiness)
+      })
+      .catch((e) => {
+        if (cancelled) return
+        const message =
+          e instanceof Error
+            ? e.message
+            : 'No se pudo verificar la resolución MEXAS.'
+        setMexasReadinessError(message)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [contract.id, isMexasOrderBookOnly])
+
+  const mexasReadinessLoading =
+    isMexasOrderBookOnly && !mexasReadiness && !mexasReadinessError
+  const mexasResolutionBlocked =
+    isMexasOrderBookOnly &&
+    (mexasReadinessLoading ||
+      !!mexasReadinessError ||
+      mexasReadiness?.requiresEscrow === true)
+  const resolveDisabled = !outcome || mexasResolutionBlocked
 
   const resolve = async () => {
-    if (!outcome) return
+    if (!outcome || mexasResolutionBlocked) return
 
     setIsSubmitting(true)
 
@@ -87,7 +155,7 @@ export function ResolutionPanel(props: {
             .includes('serialize access due to read/write dependencies')
         ) {
           setError(
-            'The server is busy. Please try resolving again in a moment.'
+            'El servidor está ocupado. Intenta resolver de nuevo en un momento.'
           )
         } else {
           setError(message)
@@ -102,11 +170,11 @@ export function ResolutionPanel(props: {
             .includes('serialize access due to read/write dependencies')
         ) {
           setError(
-            'The server is busy. Please try resolving again in a moment.'
+            'El servidor está ocupado. Intenta resolver de nuevo en un momento.'
           )
         } else {
           console.error(e)
-          setError('Error resolving question')
+          setError('Error al resolver la pregunta')
         }
       }
     } finally {
@@ -123,26 +191,37 @@ export function ResolutionPanel(props: {
         fullTitle={inModal}
       />
 
-      <YesNoCancelSelector selected={outcome} onSelect={setOutcome} />
+      <YesNoCancelSelector
+        selected={outcome}
+        onSelect={setOutcome}
+        includeMkt={!isMexasOrderBookOnly}
+      />
 
       <Spacer h={4} />
       {!!error && <div className="text-scarlet-500">{error}</div>}
+      {isMexasOrderBookOnly && (
+        <MexasResolutionReadinessNotice
+          readiness={mexasReadiness}
+          error={mexasReadinessError}
+          loading={mexasReadinessLoading}
+        />
+      )}
 
       <Row className={'items-center justify-between gap-3'}>
         <div className="text-sm">
           {outcome === 'YES' ? (
-            <>Pay out {BETTORS} who bought YES.</>
+            <>Paga a quienes compraron SÍ.</>
           ) : outcome === 'NO' ? (
-            <>Pay out {BETTORS} who bought NO.</>
+            <>Paga a quienes compraron NO.</>
           ) : outcome === 'CANCEL' ? (
             <>
-              Cancel all trades and return MEX back to {BETTORS}. You repay
-              earned fees.
+              Cancela el mercado y devuelve el MEX reservado en órdenes
+              abiertas.
             </>
           ) : outcome === 'MKT' ? (
             <Col className="gap-2">
               <Col className=" gap-2">
-                <span>Pay out at this probability:</span>{' '}
+                <span>Pagar con esta probabilidad:</span>{' '}
                 <ProbabilityInput
                   prob={prob}
                   onChange={setProb}
@@ -150,8 +229,8 @@ export function ResolutionPanel(props: {
                 />
               </Col>
               <div className="text-ink-500">
-                Yes holders get this percent of the winnings and No holders get
-                the rest.
+                Quienes tengan SÍ reciben este porcentaje del pago y NO recibe
+                el resto.
               </div>
             </Col>
           ) : (
@@ -164,7 +243,7 @@ export function ResolutionPanel(props: {
             color={getResolveButtonColor(outcome)}
             label={getResolveButtonLabel(outcome, prob)}
             marketTitle={contract.question}
-            disabled={!outcome}
+            disabled={resolveDisabled}
             onResolve={resolve}
             isSubmitting={isSubmitting}
           />
@@ -172,11 +251,11 @@ export function ResolutionPanel(props: {
         {inModal && (
           <Button
             color={getResolveButtonColor(outcome)}
-            disabled={!outcome || isSubmitting}
+            disabled={resolveDisabled || isSubmitting}
             loading={isSubmitting}
             onClick={resolve}
           >
-            Resolve to {getResolveButtonLabel(outcome, prob)}
+            Resolver a {getResolveButtonLabel(outcome, prob)}
           </Button>
         )}
       </Row>
@@ -201,7 +280,7 @@ export function ResolveHeader(props: {
       <Row className="justify-end">
         <Button onClick={onClose} color="gray-white">
           <XIcon className="mr-2 h-4 w-4" />
-          Close
+          Cerrar
         </Button>
       </Row>
       <Row className="mb-6 items-start justify-between">
@@ -213,10 +292,10 @@ export function ResolveHeader(props: {
                   Mod
                 </span>
               )}
-              If {isCreator ? 'your' : 'this'} question closed too early{' '}
+              Si {isCreator ? 'tu' : 'esta'} pregunta cerró demasiado pronto{' '}
             </span>
             <Button color={'gray'} onClick={() => setIsEditingCloseTime(true)}>
-              Extend the close time
+              Extender cierre
             </Button>
           </Col>
         ) : (
@@ -229,12 +308,12 @@ export function ResolveHeader(props: {
             Mod
           </span>
         )}
-        If you know the answer, resolve{' '}
+        Si ya sabes el resultado, resuelve{' '}
         {fullTitle
           ? `"${contract.question}"`
           : isCreator
-          ? 'your question'
-          : contract.creatorName + `'s question`}
+          ? 'tu pregunta'
+          : `la pregunta de ${contract.creatorName}`}
       </div>
       <EditCloseTimeModal
         contract={contract}
@@ -297,7 +376,7 @@ export function MiniResolutionPanel(props: {
             .includes('serialize access due to read/write dependencies')
         ) {
           setError(
-            'The server is busy. Please try resolving again in a moment.'
+            'El servidor está ocupado. Intenta resolver de nuevo en un momento.'
           )
         } else {
           setError(message)
@@ -312,11 +391,11 @@ export function MiniResolutionPanel(props: {
             .includes('serialize access due to read/write dependencies')
         ) {
           setError(
-            'The server is busy. Please try resolving again in a moment.'
+            'El servidor está ocupado. Intenta resolver de nuevo en un momento.'
           )
         } else {
           console.error(e)
-          setError('Error resolving question')
+          setError('Error al resolver la pregunta')
         }
       }
     }
@@ -339,7 +418,7 @@ export function MiniResolutionPanel(props: {
         {outcome === 'MKT' && (
           <Col className="gap-2">
             <Row className="flex-wrap items-center gap-1">
-              Resolve to
+              Resolver a
               <ProbabilityInput
                 prob={prob}
                 onChange={setProb}
@@ -348,13 +427,15 @@ export function MiniResolutionPanel(props: {
               />
             </Row>
             <div className="text-ink-500">
-              Yes holders get this percent of the winnings and No holders get
-              the rest.
+              Quienes tengan SÍ reciben este porcentaje del pago y NO recibe el
+              resto.
             </div>
           </Col>
         )}
         {outcome === 'CANCEL' && (
-          <div className="text-warning">Cancel trades and return MEX</div>
+          <div className="text-warning">
+            Cancelar operaciones y devolver MEX
+          </div>
         )}
         {error && (
           <div className="text-scarlet-500 self-start rounded p-1 text-xs">
@@ -380,16 +461,15 @@ export const ResolutionExplainer = (props: {
   pseudoNumeric?: boolean
 }) => {
   const { independentMulti, pseudoNumeric } = props
-  const answerOrQuestion = independentMulti ? 'answer' : 'question'
   return (
     <div className="text-ink-500 text-sm">
       {!pseudoNumeric && (
         <>
-          Resolves the {answerOrQuestion} and pays out {BETTORS} that got it
-          right. <br />{' '}
+          Resuelve {independentMulti ? 'la respuesta' : 'la pregunta'} y paga a
+          quienes acertaron. <br />{' '}
         </>
       )}
-      If you need help, ask in the comments section below. Or, ask in our{' '}
+      Si necesitas ayuda, revisa las reglas del mercado o pregunta en nuestro{' '}
       <Link
         onClick={(e) => {
           e.stopPropagation()
@@ -400,6 +480,47 @@ export const ResolutionExplainer = (props: {
         Discord
       </Link>
       !
+    </div>
+  )
+}
+
+function MexasResolutionReadinessNotice(props: {
+  readiness: MexasResolutionReadiness | undefined
+  error: string | undefined
+  loading: boolean
+}) {
+  const { readiness, error, loading } = props
+
+  if (loading) {
+    return (
+      <div className="bg-canvas-50 text-ink-600 rounded-md p-3 text-sm">
+        Verificando liquidación MEXAS...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-scarlet-50 text-scarlet-600 rounded-md p-3 text-sm">
+        No se pudo verificar la exposición MEXAS. Recarga antes de resolver.
+      </div>
+    )
+  }
+
+  if (readiness?.requiresEscrow) {
+    return (
+      <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
+        Este mercado tiene {readiness.filledBetCount} posiciones llenadas y la
+        resolución queda bloqueada hasta activar escrow on-chain. Esto evita
+        crear saldos internos MEX sin respaldo.
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-canvas-50 text-ink-600 rounded-md p-3 text-sm">
+      No hay posiciones llenadas pendientes de settlement. Al resolver, las
+      órdenes abiertas se cancelan y el MEX reservado se devuelve.
     </div>
   )
 }

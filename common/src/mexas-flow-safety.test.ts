@@ -455,6 +455,50 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('activar escrow on-chain')
   })
 
+  test('preflights MEXAS resolution exposure before the creator can resolve', () => {
+    const apiSource = readRepoFile(
+      'web/pages/api/v0/market/[contractId]/mexas-resolution-readiness.ts'
+    )
+    const panelSource = readRepoFile('web/components/resolution-panel.tsx')
+    const selectorSource = readRepoFile(
+      'web/components/bet/yes-no-selector.tsx'
+    )
+    const dangerSource = readRepoFile(
+      'web/components/contract/danger-zone.tsx'
+    )
+    const confirmSource = readRepoFile(
+      'web/components/buttons/confirmation-button.tsx'
+    )
+
+    expectMarkersInOrder(apiSource, [
+      'getMexasSettlementAudit(',
+      'await loadContractBets(db, contractId)',
+      'audit.filledBetCount === 0',
+      'canMexasResolveFilledPositions(getMexasSettlementSettings())',
+      'const requiresEscrow = !canResolve && audit.filledBetCount > 0',
+      'requiresEscrow,',
+      'filledBetCount: audit.filledBetCount',
+    ])
+    expect(apiSource).toContain('Market is not available on MEXAS.')
+
+    expectMarkersInOrder(panelSource, [
+      'const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)',
+      '/mexas-resolution-readiness',
+      'const mexasResolutionBlocked =',
+      'mexasReadinessLoading',
+      'mexasReadiness?.requiresEscrow === true',
+      'const resolveDisabled = !outcome || mexasResolutionBlocked',
+      'if (!outcome || mexasResolutionBlocked) return',
+      'includeMkt={!isMexasOrderBookOnly}',
+      'Este mercado tiene {readiness.filledBetCount} posiciones llenadas',
+      'órdenes abiertas se cancelan y el MEX reservado se devuelve',
+    ])
+    expect(selectorSource).toContain('includeMkt?: boolean')
+    expect(dangerSource).toContain('Resolver')
+    expect(confirmSource).toContain('Resolver a ${label}')
+    expect(panelSource).not.toContain('comments section')
+  })
+
   test('renders order book remaining sizes from canonical filled amount', () => {
     const panelSource = readRepoFile(
       'web/components/contract/order-book-panel.tsx'

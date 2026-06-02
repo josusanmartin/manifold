@@ -181,11 +181,11 @@ export function DangerZone(props: {
           }}
         >
           {isCreator
-            ? 'Resolve'
+            ? 'Resolver'
             : isAdmin
-            ? 'Admin resolve'
+            ? 'Resolver como admin'
             : isMod
-            ? 'Mod resolve'
+            ? 'Resolver como mod'
             : ''}
         </Button>
       )}
