@@ -595,6 +595,8 @@ async function loadMexasCrossingOrderRows(
       .eq('contract_id', contractId)
       .eq('is_filled', false)
       .eq('is_cancelled', false)
+      .eq('data->>mexasFundsReserved', 'true')
+      .eq('data->>mexasFundsReleased', 'false')
       .or(`expires_at.is.null,expires_at.gt.${now}`)
       .range(from, from + ORDER_PAGE_SIZE - 1)
 

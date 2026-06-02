@@ -123,6 +123,14 @@ begin
     raise exception 'Only binary MEXAS limit orders can be matched' using errcode = '22023';
   end if;
 
+  if not coalesce((v_taker_data ->> 'mexasFundsReserved')::boolean, false) then
+    raise exception 'Taker MEXAS funds are not reserved' using errcode = '22023';
+  end if;
+
+  if coalesce((v_taker_data ->> 'mexasFundsReleased')::boolean, false) then
+    raise exception 'Taker MEXAS funds are already released' using errcode = '25006';
+  end if;
+
   v_taker_limit_prob := (v_taker_data ->> 'limitProb')::numeric;
   v_taker_order_amount := (v_taker_data ->> 'orderAmount')::numeric;
   v_taker_reserved_amount := coalesce((v_taker_data ->> 'mexasReservedAmount')::numeric, v_taker_order_amount);
@@ -154,6 +162,8 @@ begin
       and b.data ->> 'answerId' is null
       and b.data ->> 'limitProb' is not null
       and b.data ->> 'orderAmount' is not null
+      and coalesce((b.data ->> 'mexasFundsReserved')::boolean, false) = true
+      and coalesce((b.data ->> 'mexasFundsReleased')::boolean, false) = false
       and b.data ->> 'outcome' in ('YES', 'NO')
       and b.data ->> 'outcome' <> v_taker_outcome
       and (b.data ->> 'limitProb')::numeric > 0

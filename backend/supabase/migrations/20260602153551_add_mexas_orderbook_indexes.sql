@@ -17,6 +17,8 @@ where
   and data ->> 'answerId' is null
   and data ->> 'limitProb' is not null
   and data ->> 'orderAmount' is not null
+  and coalesce((data ->> 'mexasFundsReserved')::boolean, false) = true
+  and coalesce((data ->> 'mexasFundsReleased')::boolean, false) = false
   and data ->> 'outcome' = 'NO';
 
 create index if not exists contract_bets_mexas_orderbook_yes_bids_idx
@@ -33,4 +35,6 @@ where
   and data ->> 'answerId' is null
   and data ->> 'limitProb' is not null
   and data ->> 'orderAmount' is not null
+  and coalesce((data ->> 'mexasFundsReserved')::boolean, false) = true
+  and coalesce((data ->> 'mexasFundsReleased')::boolean, false) = false
   and data ->> 'outcome' = 'YES';

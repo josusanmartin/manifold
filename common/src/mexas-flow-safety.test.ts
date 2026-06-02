@@ -532,6 +532,8 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(apiSource, [
       'async function loadMexasCrossingOrderRows',
       'takerUserId: string',
+      ".eq('data->>mexasFundsReserved', 'true')",
+      ".eq('data->>mexasFundsReleased', 'false')",
       'bet.userId !== takerUserId',
       'isMexasCrossingOrder(outcome, limitProb, bet as LimitBet)',
     ])
@@ -741,6 +743,12 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('coalesce(is_cancelled, false) = false')
     expect(source).toContain('coalesce(is_filled, false) = false')
     expect(source).toContain("data ->> 'answerId' is null")
+    expect(source).toContain(
+      "coalesce((data ->> 'mexasFundsReserved')::boolean, false) = true"
+    )
+    expect(source).toContain(
+      "coalesce((data ->> 'mexasFundsReleased')::boolean, false) = false"
+    )
   })
 
   test('keeps the SQL matcher atomic and deterministic under concurrent takers', () => {
@@ -755,9 +763,13 @@ describe('MEXAS flow safety guardrails', () => {
       'from public.contracts',
       'where id = v_taker.contract_id',
       'for update;',
+      "Taker MEXAS funds are not reserved",
+      "Taker MEXAS funds are already released",
       'while v_remaining_amount > v_epsilon',
       'select *',
       'into v_maker',
+      "coalesce((b.data ->> 'mexasFundsReserved')::boolean, false) = true",
+      "coalesce((b.data ->> 'mexasFundsReleased')::boolean, false) = false",
       'order by',
       "case when v_taker_outcome = 'YES' then (b.data ->> 'limitProb')::numeric end asc",
       "case when v_taker_outcome = 'NO' then (b.data ->> 'limitProb')::numeric end desc",
