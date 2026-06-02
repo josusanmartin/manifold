@@ -175,6 +175,36 @@ describe('MEXAS flow safety guardrails', () => {
     expect(meSource).not.toContain('redirectIfLoggedOut')
   })
 
+  test('renders and validates MEX order amounts as MEX, not MANA or M$', () => {
+    const amountSource = readRepoFile('web/components/widgets/amount-input.tsx')
+    const limitSource = readRepoFile('web/components/bet/limit-order-panel.tsx')
+    const betPanelSource = readRepoFile('web/components/bet/bet-panel.tsx')
+
+    expectMarkersInOrder(amountSource, [
+      "token === 'MEX' && user.balance < (amount ?? 0)",
+      "token === 'MEX' ?",
+      'MEX</span>',
+      "allowFloat={token === 'CASH' || token === 'MEX'}",
+    ])
+    expectMarkersInOrder(limitSource, [
+      "const displayToken = orderBookOnly ? 'MEX'",
+      'token={displayToken}',
+      '<MoneyDisplay',
+      'token={displayToken}',
+    ])
+    expectMarkersInOrder(betPanelSource, [
+      "const displayToken = orderBookOnly ? 'MEX'",
+      "error === 'Saldo insuficiente' || error === 'Insufficient balance'",
+      'token={displayToken}',
+      'Tu saldo MEX',
+      'token={displayToken}',
+    ])
+    expect(limitSource).not.toContain("token={isCashContract ? 'CASH' : 'M$'}")
+    expect(betPanelSource).not.toContain(
+      "token={isCashContract ? 'CASH' : 'M$'}"
+    )
+  })
+
   test('syncs wallet balances incrementally instead of restoring spent filled stake', () => {
     const marketSource = readRepoFile('common/src/mexas-market.ts')
     const signupSource = readRepoFile('web/pages/api/privy-user.ts')
@@ -233,8 +263,10 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'export function hasTransactionalMexasMatchingEngine',
       "return settings.matchingEngineMode === 'rpc'",
+      'export function hasOperationalMexasEscrow',
+      "settings.escrowImplementation === 'onchain-transfer'",
       'export function canMexasMatchCrossingOrders',
-      "settings.settlementMode === 'escrow'",
+      'hasOperationalMexasEscrow(settings)',
     ])
   })
 

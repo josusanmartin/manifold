@@ -39,7 +39,6 @@ import {
 } from 'common/tier'
 import {
   formatLargeNumber,
-  formatMoney,
   formatOutcomeLabel,
   formatPercent,
   formatWithToken,
@@ -274,6 +273,8 @@ export const BuyPanelBody = (
       ? multiProps.answerText ?? multiProps.answerToBuy.text
       : undefined
   const isCashContract = contract.token === 'CASH'
+  const orderBookOnly = isMexasOrderBookOnlyContract(contract)
+  const displayToken = orderBookOnly ? 'MEX' : isCashContract ? 'CASH' : 'M$'
 
   const quickAddButtonSize =
     liquidityTier === 0 ||
@@ -363,9 +364,16 @@ export const BuyPanelBody = (
       const sharesFilled = updatedBet?.shares ?? submittedBet.shares
       const orderAmount = updatedBet?.orderAmount ?? submittedBet.orderAmount
       toast.success(
-        `${formatMoney(amountFilled)}/${formatMoney(
-          orderAmount
-        )} ejecutado para un pago de ${formatMoney(sharesFilled)}`,
+        `${formatWithToken({
+          amount: amountFilled,
+          token: displayToken,
+        })}/${formatWithToken({
+          amount: orderAmount,
+          token: displayToken,
+        })} ejecutado para un pago de ${formatWithToken({
+          amount: sharesFilled,
+          token: displayToken,
+        })}`,
         {
           duration: 5000,
           id: submittedBet.toastId,
@@ -385,9 +393,8 @@ export const BuyPanelBody = (
         callOnBuySuccess()
       }
     }
-  }, [updatedBet, submittedBet])
+  }, [updatedBet, submittedBet, displayToken])
 
-  const orderBookOnly = isMexasOrderBookOnlyContract(contract)
   const [betTypeSetting, setBetTypeSetting] = useState<'Market' | 'Limit'>(
     orderBookOnly ? 'Limit' : 'Market'
   )
@@ -498,9 +505,16 @@ export const BuyPanelBody = (
       if (bet.isFilled) {
         if (slippageProtection) {
           toast.success(
-            `${formatMoney(bet.amount)}/${formatMoney(
-              bet.orderAmount ?? 0
-            )} ejecutado para un pago de ${formatMoney(bet.shares)}`,
+            `${formatWithToken({
+              amount: bet.amount,
+              token: displayToken,
+            })}/${formatWithToken({
+              amount: bet.orderAmount ?? 0,
+              token: displayToken,
+            })} ejecutado para un pago de ${formatWithToken({
+              amount: bet.shares,
+              token: displayToken,
+            })}`,
             {
               duration: 5000,
               id: toastId,
@@ -586,7 +600,7 @@ export const BuyPanelBody = (
     isSubmitting ||
     !betAmount ||
     outcome === undefined ||
-    error === 'Saldo insuficiente' ||
+    (error === 'Saldo insuficiente' || error === 'Insufficient balance') ||
     showLocationMonitor ||
     (isCashContract && verificationStatus !== 'success')
 
@@ -620,7 +634,7 @@ export const BuyPanelBody = (
       )} de tu saldo en una sola operación. \n\nSaldo actual: ${formatWithToken(
         {
           amount: balance,
-          token: isCashContract ? 'CASH' : 'M$',
+          token: displayToken,
         }
       )}`
     : highProbMove
@@ -775,7 +789,7 @@ export const BuyPanelBody = (
                 disabled={isSubmitting}
                 inputRef={inputRef}
                 showSlider={true}
-                token={isCashContract ? 'CASH' : 'M$'}
+                token={displayToken}
                 sliderColor={pseudonymColor}
                 disregardUserBalance={shouldPromptVerification}
                 quickButtonAmountSize={quickAddButtonSize}
@@ -974,6 +988,7 @@ export const BuyPanelBody = (
                           <MoneyDisplay
                             amount={betAmount ?? 0}
                             isCashContract={isCashContract}
+                            token={displayToken}
                           />
                         </span>
                       ) : (
@@ -989,6 +1004,7 @@ export const BuyPanelBody = (
                           <MoneyDisplay
                             amount={currentPayout}
                             isCashContract={isCashContract}
+                            token={displayToken}
                           />
                         </span>
                       )
@@ -1046,6 +1062,7 @@ export const BuyPanelBody = (
                 <MoneyDisplay
                   amount={balance}
                   isCashContract={isCashContract}
+                  token={displayToken}
                 />
               </span>
             </Row>

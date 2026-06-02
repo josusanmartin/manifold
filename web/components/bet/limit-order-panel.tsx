@@ -107,6 +107,7 @@ export default function LimitOrderPanel(props: {
 
   const isCashContract = contract.token === 'CASH'
   const orderBookOnly = isMexasOrderBookOnlyContract(contract)
+  const displayToken = orderBookOnly ? 'MEX' : isCashContract ? 'CASH' : 'M$'
 
   const [betAmount, setBetAmount] = useState<number | undefined>(
     props.betAmount
@@ -394,7 +395,7 @@ export default function LimitOrderPanel(props: {
           setError={setError}
           disabled={isSubmitting}
           showSlider
-          token={isCashContract ? 'CASH' : 'M$'}
+          token={displayToken}
           sliderColor={pseudonymColor}
         />
       </Col>
@@ -536,11 +537,13 @@ export default function LimitOrderPanel(props: {
               <MoneyDisplay
                 amount={filledAmount}
                 isCashContract={isCashContract}
+                token={displayToken}
               />{' '}
               of{' '}
               <MoneyDisplay
                 amount={orderAmount}
                 isCashContract={isCashContract}
+                token={displayToken}
               />
             </div>
           </Row>
@@ -590,6 +593,7 @@ export default function LimitOrderPanel(props: {
                     <MoneyDisplay
                       amount={currentPayout}
                       isCashContract={isCashContract}
+                      token={displayToken}
                     />
                   </span>
                 )}
@@ -631,6 +635,7 @@ export default function LimitOrderPanel(props: {
                       <MoneyDisplay
                         amount={betAmount}
                         isCashContract={isCashContract}
+                        token={displayToken}
                       />{' '}
                       {!binaryMCOutcome && !pseudonymName ? outcome : ''} a{' '}
                       {formatPercent(

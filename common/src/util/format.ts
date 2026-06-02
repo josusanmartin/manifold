@@ -39,7 +39,9 @@ export function formatWithToken(variables: {
           maximumFractionDigits: toDecimal,
           minimumFractionDigits: toDecimal,
         })
-      : formatNumber(getMoneyNumber(amount))
+      : amount.toLocaleString('en-US', {
+          maximumFractionDigits: 4,
+        })
     return `MEX ${formatted}`
   }
   if (toDecimal) {

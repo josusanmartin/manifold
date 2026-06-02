@@ -12,6 +12,7 @@ function getMexasSettlementSettings(): MexasSettlementSettings {
   return {
     allowUnescrowedMatching: process.env.MEXAS_ALLOW_UNESCROWED_MATCHING,
     allowUnescrowedResolution: process.env.MEXAS_ALLOW_UNESCROWED_RESOLUTION,
+    escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION,
     matchingEngineMode: process.env.MEXAS_MATCHING_ENGINE_MODE,
     settlementMode: process.env.MEXAS_SETTLEMENT_MODE,
   }

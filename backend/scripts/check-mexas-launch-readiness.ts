@@ -390,6 +390,10 @@ async function runChecks() {
     'MEXAS_SETTLEMENT_MODE',
     vercelEnvValues
   )
+  const escrowImplementation = getEnvOrVercelValue(
+    'MEXAS_ESCROW_IMPLEMENTATION',
+    vercelEnvValues
+  )
   checks.push(
     matchingMode === 'rpc'
       ? pass('matching mode', 'MEXAS_MATCHING_ENGINE_MODE=rpc.')
@@ -404,6 +408,17 @@ async function runChecks() {
       : fail(
           'settlement mode',
           'MEXAS_SETTLEMENT_MODE must be escrow before launch.'
+        )
+  )
+  checks.push(
+    escrowImplementation === 'onchain-transfer'
+      ? pass(
+          'escrow implementation',
+          'MEXAS_ESCROW_IMPLEMENTATION=onchain-transfer.'
+        )
+      : fail(
+          'escrow implementation',
+          'MEXAS_ESCROW_IMPLEMENTATION must be onchain-transfer before live matching or resolving filled MEXAS positions.'
         )
   )
   checks.push(

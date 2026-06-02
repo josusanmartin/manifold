@@ -195,6 +195,7 @@ export function BuyAmountInput(props: {
       user &&
       ((token === 'M$' &&
         (user.balance < (amount ?? 0) || user.balance < MANA_MIN_BET)) ||
+        (token === 'MEX' && user.balance < (amount ?? 0)) ||
         (token === 'CASH' &&
           (user.cashBalance < (amount ?? 0) ||
             user.cashBalance < SWEEPS_MIN_BET)))
@@ -272,6 +273,8 @@ export function BuyAmountInput(props: {
               <SpiceCoin />
             ) : token == 'CASH' ? (
               <SweepiesCoin />
+            ) : token === 'MEX' ? (
+              <span className="text-ink-500 text-xs font-semibold">MEX</span>
             ) : (
               <ManaCoin />
             )
@@ -279,7 +282,7 @@ export function BuyAmountInput(props: {
           amount={amount}
           onChangeAmount={onChange}
           error={!!error}
-          allowFloat={token === 'CASH'}
+          allowFloat={token === 'CASH' || token === 'MEX'}
           disabled={disabled}
           inputRef={inputRef}
           disableClearButton={!disableQuickButtons}

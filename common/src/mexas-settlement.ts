@@ -18,6 +18,7 @@ export type MexasSettlementAudit = {
 export type MexasSettlementSettings = {
   allowUnescrowedMatching?: string
   allowUnescrowedResolution?: string
+  escrowImplementation?: string
   matchingEngineMode?: string
   settlementMode?: string
 }
@@ -74,10 +75,17 @@ export function hasTransactionalMexasMatchingEngine(
   return settings.matchingEngineMode === 'rpc'
 }
 
+export function hasOperationalMexasEscrow(settings: MexasSettlementSettings) {
+  return (
+    settings.settlementMode === 'escrow' &&
+    settings.escrowImplementation === 'onchain-transfer'
+  )
+}
+
 export function canMexasMatchCrossingOrders(settings: MexasSettlementSettings) {
   return (
     hasTransactionalMexasMatchingEngine(settings) &&
-    (settings.settlementMode === 'escrow' ||
+    (hasOperationalMexasEscrow(settings) ||
       settings.allowUnescrowedMatching === 'true')
   )
 }
@@ -86,7 +94,7 @@ export function canMexasResolveFilledPositions(
   settings: MexasSettlementSettings
 ) {
   return (
-    settings.settlementMode === 'escrow' ||
+    hasOperationalMexasEscrow(settings) ||
     settings.allowUnescrowedResolution === 'true'
   )
 }
