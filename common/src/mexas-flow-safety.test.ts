@@ -53,6 +53,21 @@ describe('MEXAS flow safety guardrails', () => {
     ).toBeGreaterThanOrEqual(6)
   })
 
+  test('wallet sync refetches the user row so it preserves active balance locks', () => {
+    const source = readRepoFile('web/pages/api/v0/bet.ts')
+
+    expectMarkersInOrder(source, [
+      'async function syncMexasWalletBalance',
+      ".from('users')",
+      ".select('*')",
+      ".eq('id', userRow.id)",
+      '.single()',
+      'const data = getUserData(freshUserRow)',
+      "let latestUserRow = freshUserRow as Row<'users'>",
+    ])
+    expect(source).not.toContain('let latestUserRow = userRow')
+  })
+
   test('cancels MEXAS orders and refunds reserved funds under the user balance lock', () => {
     const source = readRepoFile('web/pages/api/v0/bet/cancel/[betId].ts')
     const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')

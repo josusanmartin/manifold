@@ -162,16 +162,27 @@ async function syncMexasWalletBalance(
   db: SupabaseClient,
   userRow: Row<'users'>
 ) {
-  const data = getUserData(userRow) as Record<string, unknown>
+  const { data: freshUserRow, error: freshUserError } = await db
+    .from('users')
+    .select('*')
+    .eq('id', userRow.id)
+    .single()
+
+  if (freshUserError) throw freshUserError
+  if (!freshUserRow) throw new APIError(404, 'User not found.')
+
+  const data = getUserData(freshUserRow) as Record<string, unknown>
   const walletAddress =
     typeof data.privyWalletAddress === 'string'
       ? data.privyWalletAddress
       : undefined
 
-  if (!walletAddress || !isAddress(walletAddress)) return userRow
+  if (!walletAddress || !isAddress(walletAddress)) {
+    return freshUserRow as Row<'users'>
+  }
 
   const currentUnits = await getMexasBalanceUnits(walletAddress as Address)
-  let latestUserRow = userRow
+  let latestUserRow = freshUserRow as Row<'users'>
 
   for (let attempt = 0; attempt < BALANCE_UPDATE_ATTEMPTS; attempt++) {
     const latestData = getUserData(latestUserRow) as Record<string, unknown>
