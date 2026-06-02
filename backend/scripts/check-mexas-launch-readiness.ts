@@ -958,7 +958,7 @@ async function checkMexasSettlementExposure(
       .filter(({ audit }) => audit.filledBetCount > 0)
       .map(
         ({ audit, contractId }) =>
-          `${contractId}: ${audit.filledBetCount} filled, YES ${audit.yesPayout}, NO ${audit.noPayout}, CANCEL ${audit.cancelPayout}`
+          `${contractId}: ${audit.filledBetCount} filled, open refunds ${audit.openReservationRefund}, total YES ${audit.yesCredit}, total NO ${audit.noCredit}, total CANCEL ${audit.cancelCredit}`
       )
     if (audit.filledBetCount === 0) {
       return pass(
@@ -970,7 +970,7 @@ async function checkMexasSettlementExposure(
     if (!options.hasOperationalEscrow) {
       return fail(
         'settlement exposure',
-        `${audit.filledBetCount} filled MEXAS positions require escrow before resolution payouts. Max payout exposure: YES ${audit.yesPayout} MEX, NO ${audit.noPayout} MEX, CANCEL ${audit.cancelPayout} MEX. Markets: ${contractExposureDetails
+        `${audit.filledBetCount} filled MEXAS positions require escrow before resolution payouts. Total credit exposure including open reservation refunds: YES ${audit.yesCredit} MEX, NO ${audit.noCredit} MEX, CANCEL ${audit.cancelCredit} MEX. Open reservation refunds: ${audit.openReservationRefund} MEX. Markets: ${contractExposureDetails
           .slice(0, 5)
           .join('; ')}${
           contractExposureDetails.length > 5
@@ -982,7 +982,7 @@ async function checkMexasSettlementExposure(
 
     return pass(
       'settlement exposure',
-      `${audit.filledBetCount} filled MEXAS positions have operational escrow for resolution payouts.`
+      `${audit.filledBetCount} filled MEXAS positions have operational escrow for resolution payouts. Total credit exposure: YES ${audit.yesCredit} MEX, NO ${audit.noCredit} MEX, CANCEL ${audit.cancelCredit} MEX.`
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

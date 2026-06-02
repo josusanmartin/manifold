@@ -2,7 +2,11 @@ import { existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 import { Bet } from 'common/bet'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
-import { getMexasResolvedBetPayout } from 'common/mexas-resolution'
+import {
+  getMexasOpenReservationRefund,
+  getMexasResolutionPayout,
+  getMexasResolvedBetPayout,
+} from 'common/mexas-resolution'
 import {
   getMexasSettlementAudit,
   hasMexasFilledExposure,
@@ -25,10 +29,12 @@ type ContractExposure = {
 type FilledExposure = {
   amount: number
   betId: string
+  cancelCredit: number
   cancelPayout: number
   contractId: string
   createdTime: number
   noPayout: number
+  openReservationRefund: number
   outcome?: string
   shares: number
   userId: string
@@ -134,10 +140,12 @@ function toFilledExposure(bet: Bet): FilledExposure {
   return {
     amount: bet.amount ?? 0,
     betId: bet.id,
+    cancelCredit: getMexasResolutionPayout(bet, 'CANCEL'),
     cancelPayout: getMexasResolvedBetPayout(bet, 'CANCEL'),
     contractId: bet.contractId,
     createdTime: bet.createdTime,
     noPayout: getMexasResolvedBetPayout(bet, 'NO'),
+    openReservationRefund: getMexasOpenReservationRefund(bet),
     outcome: bet.outcome,
     shares: bet.shares ?? 0,
     userId: bet.userId,
@@ -167,6 +175,127 @@ async function loadSettlementExposure(db: SupabaseClient) {
   return exposures
 }
 
+function sqlLiteral(value: string) {
+  return `'${value.replace(/'/g, "''")}'`
+}
+
+function sqlNumber(value: number) {
+  if (!Number.isFinite(value)) {
+    throw new Error(`Invalid SQL number: ${value}`)
+  }
+  return value.toFixed(8).replace(/\.?0+$/, '')
+}
+
+function printTestUnwindSql(exposures: ContractExposure[]) {
+  console.log('-- MEXAS TEST-ONLY FILLED EXPOSURE UNWIND SQL')
+  console.log('-- Review every statement before running it in Supabase SQL Editor.')
+  console.log('-- This credits each user with the CANCEL credit and marks the filled bet cancelled.')
+  console.log('-- The transaction ends with ROLLBACK by default; change ROLLBACK to COMMIT only after review.')
+  console.log('')
+  console.log('begin;')
+  console.log('')
+
+  for (const exposure of exposures) {
+    console.log(
+      `-- ${exposure.contractId} ${exposure.slug}: ${exposure.question}`
+    )
+    for (const bet of exposure.bets) {
+      const creditKey = `mexas-test-unwind:${bet.betId}`
+      console.log('do $$')
+      console.log('declare')
+      console.log(`  v_bet_id text := ${sqlLiteral(bet.betId)};`)
+      console.log(`  v_contract_id text := ${sqlLiteral(bet.contractId)};`)
+      console.log(`  v_user_id text := ${sqlLiteral(bet.userId)};`)
+      console.log(`  v_credit_key text := ${sqlLiteral(creditKey)};`)
+      console.log(`  v_credit_amount numeric := ${sqlNumber(bet.cancelCredit)};`)
+      console.log(`  v_expected_amount numeric := ${sqlNumber(bet.amount)};`)
+      console.log(`  v_expected_shares numeric := ${sqlNumber(bet.shares)};`)
+      console.log('  v_user_data jsonb;')
+      console.log('  v_credit_keys jsonb;')
+      console.log('  v_count integer;')
+      console.log('begin')
+      console.log('  if v_credit_amount <= 0 then')
+      console.log("    raise exception 'Unwind credit must be positive for %', v_bet_id;")
+      console.log('  end if;')
+      console.log('')
+      console.log('  perform 1')
+      console.log('  from public.contracts c')
+      console.log('  where c.id = v_contract_id')
+      console.log("    and c.data ->> 'token' = 'MEX'")
+      console.log("    and c.data ->> 'mechanism' = 'cpmm-1'")
+      console.log("    and c.data ->> 'outcomeType' = 'BINARY'")
+      console.log('    and c.resolution_time is null')
+      console.log('  for update;')
+      console.log('  if not found then')
+      console.log("    raise exception 'MEXAS contract is missing/resolved/not eligible: %', v_contract_id;")
+      console.log('  end if;')
+      console.log('')
+      console.log('  perform 1')
+      console.log('  from public.contract_bets b')
+      console.log('  where b.bet_id = v_bet_id')
+      console.log('    and b.contract_id = v_contract_id')
+      console.log('    and b.user_id = v_user_id')
+      console.log('    and coalesce(b.is_cancelled, false) = false')
+      console.log('    and coalesce(b.is_filled, false) = true')
+      console.log('    and round(coalesce(b.amount, 0)::numeric, 8) = v_expected_amount')
+      console.log('    and round(coalesce(b.shares, 0)::numeric, 8) = v_expected_shares')
+      console.log('  for update;')
+      console.log('  if not found then')
+      console.log("    raise exception 'Filled MEXAS bet changed or is not eligible: %', v_bet_id;")
+      console.log('  end if;')
+      console.log('')
+      console.log('  select coalesce(u.data, \'{}\'::jsonb)')
+      console.log('  into v_user_data')
+      console.log('  from public.users u')
+      console.log('  where u.id = v_user_id')
+      console.log('  for update;')
+      console.log('  if not found then')
+      console.log("    raise exception 'User missing for MEXAS unwind: %', v_user_id;")
+      console.log('  end if;')
+      console.log('')
+      console.log("  v_credit_keys := coalesce(v_user_data -> 'mexasBalanceCreditKeys', '[]'::jsonb);")
+      console.log('  if v_credit_keys ? v_credit_key then')
+      console.log("    raise exception 'Unwind credit key already exists: %', v_credit_key;")
+      console.log('  end if;')
+      console.log('')
+      console.log('  update public.users')
+      console.log('  set')
+      console.log('    balance = round(balance + v_credit_amount, 8),')
+      console.log('    data = v_user_data || jsonb_build_object(')
+      console.log("      'mexasBalanceCreditKeys',")
+      console.log('      v_credit_keys || to_jsonb(v_credit_key)')
+      console.log('    )')
+      console.log('  where id = v_user_id;')
+      console.log('  get diagnostics v_count = row_count;')
+      console.log('  if v_count <> 1 then')
+      console.log("    raise exception 'Expected to credit one user for %, credited %', v_bet_id, v_count;")
+      console.log('  end if;')
+      console.log('')
+      console.log('  update public.contract_bets')
+      console.log('  set')
+      console.log('    is_cancelled = true,')
+      console.log('    data = coalesce(data, \'{}\'::jsonb) || jsonb_build_object(')
+      console.log("      'isCancelled', true,")
+      console.log("      'mexasTestUnwound', true,")
+      console.log("      'mexasTestUnwindCreditKey', v_credit_key,")
+      console.log("      'mexasTestUnwindCreditAmount', v_credit_amount,")
+      console.log("      'mexasTestUnwoundAt', floor(extract(epoch from clock_timestamp()) * 1000)")
+      console.log('    )')
+      console.log('  where bet_id = v_bet_id')
+      console.log('    and coalesce(is_cancelled, false) = false;')
+      console.log('  get diagnostics v_count = row_count;')
+      console.log('  if v_count <> 1 then')
+      console.log("    raise exception 'Expected to cancel one filled bet for %, cancelled %', v_bet_id, v_count;")
+      console.log('  end if;')
+      console.log('end $$;')
+      console.log('')
+    }
+  }
+
+  console.log('-- Keep this as rollback until the reviewed diff/counts are correct.')
+  console.log('rollback;')
+}
+
 function printTextReport(exposures: ContractExposure[]) {
   if (!exposures.length) {
     console.log('PASS No filled MEXAS settlement exposure found.')
@@ -185,11 +314,11 @@ function printTextReport(exposures: ContractExposure[]) {
     console.log(`${exposure.contractId} ${exposure.slug}`)
     console.log(exposure.question)
     console.log(
-      `  filled=${exposure.audit.filledBetCount} stake=${exposure.audit.filledStake} MEX YES=${exposure.audit.yesPayout} MEX NO=${exposure.audit.noPayout} MEX CANCEL=${exposure.audit.cancelPayout} MEX`
+      `  filled=${exposure.audit.filledBetCount} stake=${exposure.audit.filledStake} MEX openRefunds=${exposure.audit.openReservationRefund} MEX totalCredits(YES=${exposure.audit.yesCredit}, NO=${exposure.audit.noCredit}, CANCEL=${exposure.audit.cancelCredit}) MEX`
     )
     for (const bet of exposure.bets) {
       console.log(
-        `  bet=${bet.betId} user=${bet.userId} outcome=${bet.outcome ?? 'n/a'} amount=${bet.amount} shares=${bet.shares} payouts(YES=${bet.yesPayout}, NO=${bet.noPayout}, CANCEL=${bet.cancelPayout})`
+        `  bet=${bet.betId} user=${bet.userId} outcome=${bet.outcome ?? 'n/a'} amount=${bet.amount} shares=${bet.shares} openRefund=${bet.openReservationRefund} payouts(YES=${bet.yesPayout}, NO=${bet.noPayout}, CANCEL=${bet.cancelPayout}) cancelCredit=${bet.cancelCredit}`
       )
     }
     console.log('')
@@ -201,7 +330,7 @@ function printTextReport(exposures: ContractExposure[]) {
     '  2. Resolve only after treasury/escrow can cover the maximum payout exposure.'
   )
   console.log(
-    '  3. For test-only markets, manually unwind after reviewing the JSON report and user balances.'
+    '  3. For test-only markets, run again with --print-test-unwind-sql, review the rollback-protected SQL, then manually decide whether to commit.'
   )
 }
 
@@ -209,6 +338,7 @@ async function main() {
   loadEnvFiles()
 
   const json = process.argv.includes('--json')
+  const printUnwindSql = process.argv.includes('--print-test-unwind-sql')
   const supabaseUrlOrInstanceId = getSupabaseUrlOrInstanceId()
   const supabaseAdminKey = getSupabaseAdminKey()
 
@@ -219,7 +349,9 @@ async function main() {
   const db = createClient(supabaseUrlOrInstanceId, supabaseAdminKey)
   const exposures = await loadSettlementExposure(db)
 
-  if (json) {
+  if (printUnwindSql) {
+    printTestUnwindSql(exposures)
+  } else if (json) {
     console.log(JSON.stringify({ exposures }, null, 2))
   } else {
     printTextReport(exposures)

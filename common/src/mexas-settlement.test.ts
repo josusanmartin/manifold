@@ -82,9 +82,12 @@ describe('MEXAS settlement audit', () => {
     ])
 
     expect(audit).toEqual({
+      cancelCredit: 10,
       filledBetCount: 2,
       filledStake: 10,
+      noCredit: 10,
       openReservationRefund: 0,
+      yesCredit: 10,
       yesPayout: 10,
       noPayout: 10,
       cancelPayout: 10,
@@ -104,9 +107,12 @@ describe('MEXAS settlement audit', () => {
     ])
 
     expect(audit).toEqual({
+      cancelCredit: 5,
       filledBetCount: 1,
       filledStake: 2,
+      noCredit: 3,
       openReservationRefund: 3,
+      yesCredit: 7,
       yesPayout: 4,
       noPayout: 0,
       cancelPayout: 2,
@@ -118,9 +124,12 @@ describe('MEXAS settlement audit', () => {
     const audit = getMexasSettlementAudit([])
 
     expect(audit).toEqual({
+      cancelCredit: 0,
       filledBetCount: 0,
       filledStake: 0,
+      noCredit: 0,
       openReservationRefund: 0,
+      yesCredit: 0,
       yesPayout: 0,
       noPayout: 0,
       cancelPayout: 0,

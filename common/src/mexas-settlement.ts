@@ -25,9 +25,12 @@ export const MEXAS_ONCHAIN_ESCROW_IMPLEMENTED = Object.values(
 ).every(Boolean)
 
 export type MexasSettlementAudit = {
+  cancelCredit: number
   filledBetCount: number
   filledStake: number
+  noCredit: number
   openReservationRefund: number
+  yesCredit: number
   yesPayout: number
   noPayout: number
   cancelPayout: number
@@ -51,16 +54,20 @@ export function hasMexasFilledExposure(bet: Bet) {
 
 export function getMexasSettlementAudit(bets: Bet[]): MexasSettlementAudit {
   const audit: MexasSettlementAudit = {
+    cancelCredit: 0,
     filledBetCount: 0,
     filledStake: 0,
+    noCredit: 0,
     openReservationRefund: 0,
+    yesCredit: 0,
     yesPayout: 0,
     noPayout: 0,
     cancelPayout: 0,
   }
 
   for (const bet of bets) {
-    audit.openReservationRefund += getMexasOpenReservationRefund(bet)
+    const openReservationRefund = getMexasOpenReservationRefund(bet)
+    audit.openReservationRefund += openReservationRefund
 
     if (!hasMexasFilledExposure(bet)) continue
 
@@ -71,10 +78,17 @@ export function getMexasSettlementAudit(bets: Bet[]): MexasSettlementAudit {
     audit.cancelPayout += getMexasResolvedBetPayout(bet, 'CANCEL')
   }
 
+  audit.yesCredit = audit.openReservationRefund + audit.yesPayout
+  audit.noCredit = audit.openReservationRefund + audit.noPayout
+  audit.cancelCredit = audit.openReservationRefund + audit.cancelPayout
+
   return {
+    cancelCredit: roundAmount(audit.cancelCredit),
     filledBetCount: audit.filledBetCount,
     filledStake: roundAmount(audit.filledStake),
+    noCredit: roundAmount(audit.noCredit),
     openReservationRefund: roundAmount(audit.openReservationRefund),
+    yesCredit: roundAmount(audit.yesCredit),
     yesPayout: roundAmount(audit.yesPayout),
     noPayout: roundAmount(audit.noPayout),
     cancelPayout: roundAmount(audit.cancelPayout),

@@ -1170,12 +1170,14 @@ describe('MEXAS flow safety guardrails', () => {
       'if (audit.filledBetCount === 0)',
       'if (!options.hasOperationalEscrow)',
       'filled MEXAS positions require escrow before resolution payouts',
+      'Total credit exposure including open reservation refunds',
       'Markets:',
       'await checkMexasSettlementExposure(supabaseDb, { hasOperationalEscrow })',
     ])
-    expect(source).toContain('YES ${audit.yesPayout} MEX')
-    expect(source).toContain('NO ${audit.noPayout} MEX')
-    expect(source).toContain('CANCEL ${audit.cancelPayout} MEX')
+    expect(source).toContain('YES ${audit.yesCredit} MEX')
+    expect(source).toContain('NO ${audit.noCredit} MEX')
+    expect(source).toContain('CANCEL ${audit.cancelCredit} MEX')
+    expect(source).toContain('Open reservation refunds: ${audit.openReservationRefund} MEX')
   })
 
   test('provides a read-only MEXAS settlement exposure audit script', () => {
@@ -1183,6 +1185,7 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('backend/scripts/audit-mexas-settlement.ts')
 
     expect(packageJson).toContain('"audit:mexas-settlement"')
+    expect(packageJson).toContain('"print:mexas-test-unwind-sql"')
     expectMarkersInOrder(source, [
       'async function loadMexasOrderbookContracts',
       ".contains('data', { token: 'MEX' } as any)",
@@ -1195,7 +1198,12 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(source).toContain('Remediation options:')
     expect(source).toContain('Implement on-chain escrow')
-    expect(source).toContain('manually unwind after reviewing the JSON report')
+    expect(source).toContain('-- MEXAS TEST-ONLY FILLED EXPOSURE UNWIND SQL')
+    expect(source).toContain('The transaction ends with ROLLBACK by default')
+    expect(source).toContain('v_credit_amount numeric := ${sqlNumber(bet.cancelCredit)}')
+    expect(source).toContain("'mexasBalanceCreditKeys'")
+    expect(source).toContain("'mexasTestUnwound', true")
+    expect(source).toContain('rollback;')
     expect(source).not.toContain(".update(")
     expect(source).not.toContain(".insert(")
     expect(source).not.toContain(".delete(")
