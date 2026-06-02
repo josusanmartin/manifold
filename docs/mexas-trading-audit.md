@@ -1,0 +1,51 @@
+# Auditoria del flujo MEXAS
+
+## Alcance
+
+Este flujo aplica a mercados binarios MEXAS con libro de ordenes. El sitio usa
+Privy para identidad y wallet, Supabase para persistir contratos/ordenes/saldos,
+y Arbitrum solo para leer el balance ERC-20 del usuario.
+
+## Garantias actuales
+
+- Las ordenes MEXAS requieren autenticacion Privy server-side.
+- Las ordenes MEXAS solo aceptan ordenes limite.
+- Cada orden abierta descuenta saldo interno y guarda `mexasFundsReserved`.
+- Las ordenes expiradas se cancelan y devuelven solo la reserva pendiente.
+- Las ordenes abiertas sin respaldo on-chain se cancelan sin reembolso interno.
+- El matching usa price-time priority: mejor precio primero, luego orden mas vieja,
+  luego `bet_id` como desempate determinista.
+- La colocacion de ordenes toma un lock por mercado y usa CAS por fila de orden,
+  evitando que dos traders llenen la misma orden si ambos pasan por esta API.
+- La resolucion toma un lock por mercado y rechaza resoluciones concurrentes.
+- Los creditos de cancelacion/resolucion usan claves idempotentes.
+
+## Barrera de settlement
+
+El flujo actual no tiene escrow on-chain. Cuando dos ordenes hacen match, el
+codigo cambia saldos internos, pero no transfiere MEX desde la wallet del
+perdedor a una cuenta custodiada ni al ganador. Por eso un usuario podria mover
+sus MEX fuera de su wallet despues de una operacion llena.
+
+Para no crear saldos internos no respaldados, el API bloquea:
+
+- nuevos cruces de ordenes si no existe `MEXAS_SETTLEMENT_MODE=escrow`, salvo que
+  se active explicitamente `MEXAS_ALLOW_UNESCROWED_MATCHING=true`;
+- resoluciones con posiciones llenadas si no existe `MEXAS_SETTLEMENT_MODE=escrow`,
+  salvo que se active explicitamente `MEXAS_ALLOW_UNESCROWED_RESOLUTION=true`.
+
+Abrir ordenes limite que no cruzan sigue permitido, porque esas ordenes pueden
+cancelarse si el balance on-chain deja de respaldarlas.
+
+## Requisito para produccion real
+
+Para habilitar matching/resolucion sin los flags de riesgo, MEXAS necesita una
+de estas dos piezas:
+
+- escrow contract: al abrir una orden, la wallet transfiere el stake a escrow; al
+  resolver, el escrow paga a ganadores y devuelve cancelaciones;
+- custodia treasury: al abrir una orden, la wallet transfiere MEX a una treasury;
+  al resolver/retirar, un servicio backend firma pagos desde esa treasury.
+
+Sin una de esas dos piezas, el orderbook puede listar ordenes, pero no debe
+prometer settlement real.

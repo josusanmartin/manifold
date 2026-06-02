@@ -96,6 +96,31 @@ describe('MEXAS order book matching', () => {
     expect(result.matches[0].updatedMaker.isFilled).toBe(true)
   })
 
+  test('matches a NO order against crossing YES bids at maker price', () => {
+    const maker = order({
+      id: 'bid-70',
+      outcome: 'YES',
+      limitProb: 0.7,
+      orderAmount: 7,
+    })
+
+    const result = matchMexasLimitOrder({
+      amount: 3,
+      limitProb: 0.6,
+      makers: [maker],
+      outcome: 'NO',
+      takerBetId: 'taker',
+      timestamp: 10,
+    })
+
+    expect(result.matches).toHaveLength(1)
+    expect(result.takerAmount).toBe(3)
+    expect(result.takerShares).toBe(10)
+    expect(result.remainingAmount).toBe(0)
+    expect(result.matches[0].makerAmount).toBe(7)
+    expect(result.matches[0].updatedMaker.isFilled).toBe(true)
+  })
+
   test('leaves unmatched amount open after partial fill', () => {
     const maker = order({
       id: 'small-ask',

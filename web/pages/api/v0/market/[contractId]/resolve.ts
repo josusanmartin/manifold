@@ -8,6 +8,7 @@ import {
   type MexasReservedOrderData,
 } from 'common/mexas-market'
 import { getMexasResolutionCreditEvents } from 'common/mexas-resolution'
+import { getMexasSettlementAudit } from 'common/mexas-settlement'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import {
@@ -22,6 +23,7 @@ import {
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
 } from 'web/lib/api/mexas-orders'
+import { assertMexasCanResolveFilledPositions } from 'web/lib/api/mexas-settlement'
 import { z } from 'zod'
 
 type ErrorResponse = { message: string; details?: unknown }
@@ -257,6 +259,16 @@ async function resolveMexasMarket(
   if (hasFreshResolutionLock(initialContractData)) {
     throw new APIError(503, 'Resolution already in progress. Please retry.')
   }
+
+  await releaseExpiredMexasOrders(db, { contractId })
+  await releaseUnbackedMexasOrders(db, {
+    contractId,
+    requireBalanceRead: true,
+  })
+  const preflightBets = await loadContractBets(db, contractId)
+  assertMexasCanResolveFilledPositions(
+    getMexasSettlementAudit(preflightBets.map((entry) => entry.bet))
+  )
 
   const closedContractRow = await closeContractForResolution(
     db,

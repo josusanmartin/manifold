@@ -35,6 +35,7 @@ import {
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
 } from 'web/lib/api/mexas-orders'
+import { assertMexasCanMatchCrossingOrders } from 'web/lib/api/mexas-settlement'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
 
@@ -788,17 +789,19 @@ async function placeBinaryBet(
         userId
       ) as LimitBet & { outcome: MexasOutcome }
 
+      const crossingOrderRows = await loadMexasCrossingOrderRows(
+        db,
+        params.contractId,
+        bet.outcome,
+        bet.limitProb
+      )
+      assertMexasCanMatchCrossingOrders(crossingOrderRows.length > 0)
+
       if (params.dryRun) {
-        const makerRows = await loadMexasCrossingOrderRows(
-          db,
-          params.contractId,
-          bet.outcome,
-          bet.limitProb
-        )
         const simulated = matchMexasLimitOrder({
           amount: bet.orderAmount,
           limitProb: bet.limitProb,
-          makers: makerRows.map((entry) => entry.bet),
+          makers: crossingOrderRows.map((entry) => entry.bet),
           outcome: bet.outcome,
           takerBetId: 'dry-run',
           timestamp: Date.now(),
