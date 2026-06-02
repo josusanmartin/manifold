@@ -31,6 +31,7 @@ import {
 import { Col } from 'web/components/layout/col'
 import { Row } from 'web/components/layout/row'
 import { LoadingIndicator } from 'web/components/widgets/loading-indicator'
+import { useUser } from 'web/hooks/use-user'
 import { QRCode } from 'web/components/widgets/qr-code'
 import {
   formatMexasUnits,
@@ -58,6 +59,24 @@ function getDisplayBalance(units: bigint | null) {
   const formatted = formatMexasUnits(units)
   if (!formatted.includes('.')) return formatted
   return formatted.replace(/(\.\d{0,4})\d*$/, '$1').replace(/\.?0+$/, '')
+}
+
+function getDisplayAmount(amount: number | undefined) {
+  if (amount === undefined) return '--'
+  return amount.toLocaleString('es-MX', {
+    maximumFractionDigits: 4,
+  })
+}
+
+function mexasAmountToUnits(amount: number) {
+  return parseUnits(
+    Math.max(0, amount).toFixed(MEXAS_TOKEN.decimals),
+    MEXAS_TOKEN.decimals
+  )
+}
+
+function minUnits(a: bigint, b: bigint) {
+  return a < b ? a : b
 }
 
 async function copyToClipboard(
@@ -167,6 +186,7 @@ function MexasWalletPanelInner() {
   const { ready, authenticated, login } = usePrivy()
   const { createWallet } = useCreateWallet()
   const { wallets, ready: walletsReady } = useWallets()
+  const user = useUser()
   const [loadingWallet, setLoadingWallet] = useState(false)
   const [copiedAddress, setCopiedAddress] = useState(false)
   const [balanceUnits, setBalanceUnits] = useState<bigint | null>(null)
@@ -219,8 +239,18 @@ function MexasWalletPanelInner() {
     }
   }, [withdrawAmount])
 
+  const internalAvailableUnits = useMemo(() => {
+    return user ? mexasAmountToUnits(user.balance) : null
+  }, [user])
+  const withdrawableUnits =
+    balanceUnits !== null && internalAvailableUnits !== null
+      ? minUnits(balanceUnits, internalAvailableUnits)
+      : balanceUnits ?? internalAvailableUnits
+
   const setMaxWithdraw = () => {
-    if (balanceUnits !== null) setWithdrawAmount(formatMexasUnits(balanceUnits))
+    if (withdrawableUnits !== null) {
+      setWithdrawAmount(formatMexasUnits(withdrawableUnits))
+    }
   }
 
   const withdraw = async () => {
@@ -237,8 +267,13 @@ function MexasWalletPanelInner() {
       setWithdrawError('Ingresa una cantidad mayor que 0 MEX.')
       return
     }
-    if (balanceUnits !== null && parsedWithdrawAmount > balanceUnits) {
-      setWithdrawError('La cantidad supera tu saldo disponible de MEX.')
+    if (
+      withdrawableUnits !== null &&
+      parsedWithdrawAmount > withdrawableUnits
+    ) {
+      setWithdrawError(
+        'La cantidad supera tu MEX disponible. Cancela órdenes abiertas antes de retirar MEX comprometido.'
+      )
       return
     }
 
@@ -330,7 +365,7 @@ function MexasWalletPanelInner() {
       <Row className="flex-wrap items-start justify-between gap-4">
         <Col className="gap-1">
           <div className="text-ink-500 text-xs font-medium uppercase">
-            MEX disponible
+            MEX on-chain
           </div>
           <Row className="items-baseline gap-2">
             <span className="text-ink-1000 text-4xl font-semibold tracking-normal">
@@ -340,6 +375,10 @@ function MexasWalletPanelInner() {
               {MEXAS_TOKEN.symbol}
             </span>
           </Row>
+          <div className="text-ink-500 text-sm">
+            Disponible para órdenes: {getDisplayAmount(user?.balance)}{' '}
+            {MEXAS_TOKEN.symbol}
+          </div>
         </Col>
         <Button color="gray-white" size="sm" onClick={refreshBalance}>
           <RefreshIcon className="mr-1 h-4 w-4" />
