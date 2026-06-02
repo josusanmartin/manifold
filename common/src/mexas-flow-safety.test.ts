@@ -313,11 +313,18 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
-  test('the SQL matcher rejects closed/resolved markets and expired orders', () => {
+  test('the SQL matcher rejects non-MEXAS markets, closed/resolved markets, and expired orders', () => {
     const source = readRepoFile(
       'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
     )
 
+    expectMarkersInOrder(source, [
+      "v_contract.token = 'MEX'",
+      "v_contract.data ->> 'token' = 'MEX'",
+      "v_contract.data ->> 'mechanism' = 'cpmm-1'",
+      "v_contract.data ->> 'outcomeType' = 'BINARY'",
+      "raise exception 'MEXAS matching only supports MEX binary orderbook markets'",
+    ])
     expectMarkersInOrder(source, [
       'if v_contract.resolution_time is not null',
       "raise exception 'Market is resolved'",

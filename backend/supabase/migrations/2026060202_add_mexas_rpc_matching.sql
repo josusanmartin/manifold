@@ -78,6 +78,15 @@ begin
     raise exception 'Contract not found' using errcode = 'P0002';
   end if;
 
+  if not (
+    v_contract.token = 'MEX'
+    and v_contract.data ->> 'token' = 'MEX'
+    and v_contract.data ->> 'mechanism' = 'cpmm-1'
+    and v_contract.data ->> 'outcomeType' = 'BINARY'
+  ) then
+    raise exception 'MEXAS matching only supports MEX binary orderbook markets' using errcode = '22023';
+  end if;
+
   if v_contract.resolution_time is not null or coalesce((v_contract.data ->> 'isResolved')::boolean, false) then
     raise exception 'Market is resolved' using errcode = '25006';
   end if;
