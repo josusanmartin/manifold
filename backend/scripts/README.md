@@ -52,6 +52,21 @@ $ yarn --cwd backend/scripts check:mexas-launch
 
 This script loads local `.env` files, checks production Vercel env names, verifies the Supabase matching health RPC, checks required settlement flags, and smoke-tests the main public MEXAS pages. A failing result means production is not ready to launch with live matching.
 
+To apply the required MEXAS SQL migrations and normalize the two published
+market rows, run:
+
+```shell
+$ yarn --cwd backend/scripts apply:mexas-launch-sql
+```
+
+This requires `MEXAS_SUPABASE_DB_URL`, `SUPABASE_DB_URL`, `DATABASE_URL`,
+`MEXAS_SUPABASE_DB_PASSWORD`, or `SUPABASE_DB_PASSWORD`. To review or paste the
+SQL manually in Supabase, run:
+
+```shell
+$ yarn --silent --cwd backend/scripts apply:mexas-launch-sql --print-sql > mexas-launch.sql
+```
+
 For a narrower production UI/API smoke test that should pass before every deploy,
 run:
 

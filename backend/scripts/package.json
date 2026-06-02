@@ -5,13 +5,15 @@
     "firestore": "dev-mantic-markets.appspot.com"
   },
   "scripts": {
+    "apply:mexas-launch-sql": "ts-node apply-mexas-launch-sql.ts",
     "check:mexas-launch": "ts-node check-mexas-launch-readiness.ts",
     "check:mexas-smoke": "ts-node check-mexas-production-smoke.ts",
     "code": "ts-node manicode.ts"
   },
   "dependencies": {
     "json2csv": "6.0.0-alpha.2",
-    "lodash": "4.17.21"
+    "lodash": "4.17.21",
+    "pg": "8.13.0"
   },
   "devDependencies": {
     "@types/json2csv": "5.0.3",
