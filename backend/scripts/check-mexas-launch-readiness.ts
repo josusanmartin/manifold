@@ -143,6 +143,50 @@ function getVercelProductionEnvValues() {
   return env
 }
 
+function getCurrentGitCommitInfo() {
+  try {
+    const hash = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: resolve(__dirname, '../..'),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    const timestampSeconds = Number(
+      execFileSync('git', ['show', '-s', '--format=%ct', 'HEAD'], {
+        cwd: resolve(__dirname, '../..'),
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim()
+    )
+
+    if (!hash || !Number.isFinite(timestampSeconds)) return undefined
+    return { hash, timestampMs: timestampSeconds * 1000 }
+  } catch {
+    return undefined
+  }
+}
+
+function getVercelProductionDeployment(siteUrl: string) {
+  try {
+    const host = new URL(siteUrl).host
+    const output = execFileSync('vercel', ['inspect', host, '--format=json'], {
+      cwd: resolve(__dirname, '../..'),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    const deployment = JSON.parse(output) as {
+      createdAt?: number
+      id?: string
+      readyState?: string
+      target?: string
+      uid?: string
+      url?: string
+    }
+    return deployment
+  } catch {
+    return undefined
+  }
+}
+
 function hasEnvOrVercelEnv(name: string, vercelEnvNames: Set<string>) {
   return hasEnv(name) || vercelEnvNames.has(name)
 }
@@ -338,6 +382,48 @@ async function runChecks() {
     process.env.MEXAS_SITE_URL ||
     process.env.NEXT_PUBLIC_SITE_URL ||
     'https://mexas-manifold.vercel.app'
+
+  const commitInfo = getCurrentGitCommitInfo()
+  const deployment = getVercelProductionDeployment(siteUrl)
+  if (!commitInfo) {
+    checks.push(warn('deployment freshness', 'Could not read local git HEAD.'))
+  } else if (!deployment) {
+    checks.push(
+      fail('deployment freshness', 'Could not inspect production deployment.')
+    )
+  } else if (
+    deployment.readyState !== 'READY' ||
+    deployment.target !== 'production'
+  ) {
+    checks.push(
+      fail(
+        'deployment freshness',
+        `Production deployment is ${deployment.readyState ?? 'unknown'} / ${
+          deployment.target ?? 'unknown'
+        }.`
+      )
+    )
+  } else if ((deployment.createdAt ?? 0) < commitInfo.timestampMs) {
+    checks.push(
+      fail(
+        'deployment freshness',
+        `Active deployment ${
+          deployment.id ?? deployment.uid ?? deployment.url ?? 'unknown'
+        } predates HEAD ${commitInfo.hash.slice(0, 9)}. Redeploy production.`
+      )
+    )
+  } else {
+    checks.push(
+      pass(
+        'deployment freshness',
+        `Production deployment includes code at or after HEAD ${commitInfo.hash.slice(
+          0,
+          9
+        )}.`
+      )
+    )
+  }
+
   for (const path of [
     '/wallet',
     '/checkout',

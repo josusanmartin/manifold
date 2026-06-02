@@ -59,6 +59,20 @@ const PAGES = [
   },
 ]
 
+const REDIRECTS = [
+  { destination: '/wallet', path: '/payments' },
+  { destination: '/wallet', path: '/add-funds' },
+  { destination: '/wallet', path: '/links' },
+  { destination: '/checkout', path: '/comments' },
+  { destination: '/checkout', path: '/leaderboards' },
+  { destination: '/checkout', path: '/mana-auction' },
+  { destination: '/checkout', path: '/manachan' },
+  { destination: '/checkout', path: '/predictle' },
+  { destination: '/checkout', path: '/prize' },
+  { destination: '/checkout', path: '/shop' },
+  { destination: '/checkout', path: '/sitemap' },
+]
+
 function pass(name: string, details: string): SmokeResult {
   return { details, name, status: 'pass' }
 }
@@ -92,6 +106,23 @@ async function fetchText(path: string) {
   const response = await fetch(`${SITE_URL}${path}`, { redirect: 'follow' })
   const text = await response.text()
   return { response, text }
+}
+
+async function checkRedirect(path: string, destination: string) {
+  const response = await fetch(`${SITE_URL}${path}`, { redirect: 'manual' })
+  const location = response.headers.get('location') ?? ''
+  const locationPath = location.startsWith('http')
+    ? new URL(location).pathname
+    : location.split('?')[0]
+
+  return response.status >= 300 &&
+    response.status < 400 &&
+    locationPath === destination
+    ? pass(`redirect ${path}`, `${response.status} -> ${destination}`)
+    : fail(
+        `redirect ${path}`,
+        `${response.status} -> ${location || 'no location'}`
+      )
 }
 
 async function checkPage(path: string, required: string[]) {
@@ -148,6 +179,10 @@ async function runSmoke() {
 
   for (const page of PAGES) {
     results.push(...(await checkPage(page.path, page.required)))
+  }
+
+  for (const redirect of REDIRECTS) {
+    results.push(await checkRedirect(redirect.path, redirect.destination))
   }
 
   results.push(await checkOrderBook('mexwcwin26a'))
