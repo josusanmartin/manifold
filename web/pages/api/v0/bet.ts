@@ -134,6 +134,39 @@ function hasFreshMexasResolutionLock(data: Record<string, unknown>) {
   return locked && Date.now() - since < RESOLUTION_LOCK_TIMEOUT_MS
 }
 
+function getMexasOrderLockPredicates(data: Record<string, unknown>) {
+  if (data.mexasOrderLock === true) {
+    const owner = data.mexasOrderLockOwner
+    if (typeof owner === 'string') {
+      return [`data->>mexasOrderLockOwner.eq.${owner}`]
+    }
+
+    const since = data.mexasOrderLockSince
+    if (typeof since === 'number') {
+      return [`data->>mexasOrderLockSince.eq.${since}`]
+    }
+  }
+
+  return ['data->>mexasOrderLock.is.null', 'data->>mexasOrderLock.eq.false']
+}
+
+function getNoMexasResolutionLockPredicates() {
+  return ['data->>mexasResolving.is.null', 'data->>mexasResolving.eq.false']
+}
+
+function combinePostgrestAndPredicates(predicateGroups: string[][]) {
+  return predicateGroups
+    .reduce<string[]>((combinations, group) => {
+      return combinations.flatMap((combination) =>
+        group.map((predicate) =>
+          combination ? `${combination},${predicate}` : predicate
+        )
+      )
+    }, [''])
+    .map((predicate) => `and(${predicate})`)
+    .join(',')
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -475,6 +508,12 @@ async function acquireMexasOrderLock(db: SupabaseClient, contractId: string) {
         last_updated_time: millisToTs(now),
       })
       .eq('id', contractId)
+      .or(
+        combinePostgrestAndPredicates([
+          getMexasOrderLockPredicates(contractData),
+          getNoMexasResolutionLockPredicates(),
+        ])
+      )
 
     query = typedContractRow.last_updated_time
       ? query.eq('last_updated_time', typedContractRow.last_updated_time)

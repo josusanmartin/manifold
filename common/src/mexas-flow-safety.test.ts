@@ -45,6 +45,31 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('acquires the MEXAS order lock with predicates against same-millisecond lock races', () => {
+    const source = readRepoFile('web/pages/api/v0/bet.ts')
+
+    expectMarkersInOrder(source, [
+      'function getMexasOrderLockPredicates',
+      'data.mexasOrderLock === true',
+      'data->>mexasOrderLockOwner.eq.${owner}',
+      'data->>mexasOrderLockSince.eq.${since}',
+      'data->>mexasOrderLock.is.null',
+      'data->>mexasOrderLock.eq.false',
+    ])
+    expectMarkersInOrder(source, [
+      'function getNoMexasResolutionLockPredicates',
+      'data->>mexasResolving.is.null',
+      'data->>mexasResolving.eq.false',
+    ])
+    expectMarkersInOrder(source, [
+      'async function acquireMexasOrderLock',
+      'combinePostgrestAndPredicates([',
+      'getMexasOrderLockPredicates(contractData)',
+      'getNoMexasResolutionLockPredicates()',
+      '.eq(\'last_updated_time\', typedContractRow.last_updated_time)',
+    ])
+  })
+
   test('does not recursively acquire user locks during already-locked cleanup', () => {
     const source = readRepoFile('web/pages/api/v0/bet.ts')
 
@@ -241,6 +266,36 @@ describe('MEXAS flow safety guardrails', () => {
       'mexasReleaseCreditKey: getMexasOrderReleaseCreditKey(currentBet.id)',
       "mexasReleaseReason: 'resolution'",
       ".eq('updated_time', typedCurrentRow.updated_time)",
+    ])
+  })
+
+  test('closes MEXAS resolution with predicates against concurrent order locks', () => {
+    const source = readRepoFile(
+      'web/pages/api/v0/market/[contractId]/resolve.ts'
+    )
+
+    expectMarkersInOrder(source, [
+      'function getMexasOrderLockPredicates',
+      'data.mexasOrderLock === true',
+      'data->>mexasOrderLockOwner.eq.${owner}',
+      'data->>mexasOrderLockSince.eq.${since}',
+      'data->>mexasOrderLock.is.null',
+      'data->>mexasOrderLock.eq.false',
+    ])
+    expectMarkersInOrder(source, [
+      'function getMexasResolutionLockPredicates',
+      'data.mexasResolving === true',
+      'data->>mexasResolvingSince.eq.${since}',
+      'data->>mexasResolvingOutcome.eq.${outcome}',
+      'data->>mexasResolving.is.null',
+      'data->>mexasResolving.eq.false',
+    ])
+    expectMarkersInOrder(source, [
+      'async function closeContractForResolution',
+      'combinePostgrestAndPredicates([',
+      'getMexasOrderLockPredicates(contractData)',
+      'getMexasResolutionLockPredicates(contractData)',
+      ".eq('last_updated_time', contractRow.last_updated_time)",
     ])
   })
 

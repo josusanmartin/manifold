@@ -125,6 +125,51 @@ function getResolutionLockOutcome(data: Record<string, unknown>) {
     : undefined
 }
 
+function getMexasOrderLockPredicates(data: Record<string, unknown>) {
+  if (data.mexasOrderLock === true) {
+    const owner = data.mexasOrderLockOwner
+    if (typeof owner === 'string') {
+      return [`data->>mexasOrderLockOwner.eq.${owner}`]
+    }
+
+    const since = data.mexasOrderLockSince
+    if (typeof since === 'number') {
+      return [`data->>mexasOrderLockSince.eq.${since}`]
+    }
+  }
+
+  return ['data->>mexasOrderLock.is.null', 'data->>mexasOrderLock.eq.false']
+}
+
+function getMexasResolutionLockPredicates(data: Record<string, unknown>) {
+  if (data.mexasResolving === true) {
+    const since = data.mexasResolvingSince
+    if (typeof since === 'number') {
+      return [`data->>mexasResolvingSince.eq.${since}`]
+    }
+
+    const outcome = getResolutionLockOutcome(data)
+    if (outcome) {
+      return [`data->>mexasResolvingOutcome.eq.${outcome}`]
+    }
+  }
+
+  return ['data->>mexasResolving.is.null', 'data->>mexasResolving.eq.false']
+}
+
+function combinePostgrestAndPredicates(predicateGroups: string[][]) {
+  return predicateGroups
+    .reduce<string[]>((combinations, group) => {
+      return combinations.flatMap((combination) =>
+        group.map((predicate) =>
+          combination ? `${combination},${predicate}` : predicate
+        )
+      )
+    }, [''])
+    .map((predicate) => `and(${predicate})`)
+    .join(',')
+}
+
 async function loadContractRows(db: SupabaseClient, contractId: string) {
   const { data, error } = await db
     .from('contracts')
@@ -160,6 +205,12 @@ async function closeContractForResolution(
     })
     .eq('id', contractRow.id)
     .is('resolution_time', null)
+    .or(
+      combinePostgrestAndPredicates([
+        getMexasOrderLockPredicates(contractData),
+        getMexasResolutionLockPredicates(contractData),
+      ])
+    )
 
   query = contractRow.last_updated_time
     ? query.eq('last_updated_time', contractRow.last_updated_time)
