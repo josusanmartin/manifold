@@ -2,6 +2,7 @@ import { LimitBet } from './bet'
 import {
   getMexasLimitOrderExpiresAt,
   getMexasOpenOrderAmount,
+  getMexasCrossingOrders,
   hasValidMexasLimitOrderExpiration,
   matchMexasLimitOrder,
   sortMexasMakersForTaker,
@@ -164,6 +165,49 @@ describe('MEXAS order book matching', () => {
     expect(result.matches).toHaveLength(0)
     expect(result.takerAmount).toBe(0)
     expect(result.remainingAmount).toBe(5)
+  })
+
+  test('detects only open crossing MEXAS orders in price-time priority', () => {
+    const makers = [
+      order({
+        id: 'filled-better-ask',
+        outcome: 'NO',
+        limitProb: 0.5,
+        isFilled: true,
+      }),
+      order({
+        id: 'cancelled-better-ask',
+        outcome: 'NO',
+        limitProb: 0.55,
+        isCancelled: true,
+      }),
+      order({
+        id: 'old-crossing-ask',
+        outcome: 'NO',
+        limitProb: 0.7,
+        createdTime: 2,
+      }),
+      order({
+        id: 'new-crossing-ask',
+        outcome: 'NO',
+        limitProb: 0.7,
+        createdTime: 3,
+      }),
+      order({
+        id: 'non-crossing-ask',
+        outcome: 'NO',
+        limitProb: 0.9,
+      }),
+      order({ id: 'same-side', outcome: 'YES', limitProb: 0.6 }),
+    ]
+
+    expect(
+      getMexasCrossingOrders({
+        limitProb: 0.8,
+        makers,
+        outcome: 'YES',
+      }).map((o) => o.id)
+    ).toEqual(['old-crossing-ask', 'new-crossing-ask'])
   })
 
   test('derives and validates order expiration times', () => {

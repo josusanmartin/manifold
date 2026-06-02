@@ -13,12 +13,13 @@ import {
   MultiContract,
 } from 'common/contract'
 import { TRADE_TERM } from 'common/envs/constants'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+import { getMexasCrossingOrders } from 'common/mexas-order-book'
 import { CandidateBet } from 'common/new-bet'
 import { getPseudoProbability } from 'common/pseudo-numeric'
 import { formatPercent } from 'common/util/format'
 import { removeUndefinedProps } from 'common/util/object'
 import { DAY_MS, HOUR_MS, MINUTE_MS, MONTH_MS, WEEK_MS } from 'common/util/time'
-import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import dayjs from 'dayjs'
 import { clamp } from 'lodash'
 import { useEffect, useRef, useState } from 'react'
@@ -206,13 +207,6 @@ export default function LimitOrderPanel(props: {
 
   const hasLimitBet = !!limitProbInt && !!betAmount
 
-  const betDisabled =
-    isSubmitting ||
-    !outcome ||
-    !betAmount ||
-    !hasLimitBet ||
-    error === 'Insufficient balance'
-
   const preLimitProb =
     limitProbInt === undefined
       ? undefined
@@ -234,6 +228,23 @@ export default function LimitOrderPanel(props: {
       : getBinaryMCProb(preLimitProb, outcome as 'YES' | 'NO')
 
   const amount = betAmount ?? 0
+  const crossingMexasOrders =
+    orderBookOnly && outcome && limitProb !== undefined
+      ? getMexasCrossingOrders({
+          limitProb,
+          makers: unfilledBets,
+          outcome,
+        })
+      : []
+  const mexasCrossingBlocked = crossingMexasOrders.length > 0
+
+  const betDisabled =
+    isSubmitting ||
+    !outcome ||
+    !betAmount ||
+    !hasLimitBet ||
+    error === 'Insufficient balance' ||
+    mexasCrossingBlocked
 
   function onBetChange(newAmount: number | undefined) {
     setBetAmount(newAmount)
@@ -616,6 +627,13 @@ export default function LimitOrderPanel(props: {
         <Col className="gap-2">
           {user ? (
             <>
+              {mexasCrossingBlocked && (
+                <div className="border-scarlet-200 bg-scarlet-50 text-scarlet-700 rounded-md border px-3 py-2 text-sm">
+                  Esta orden cruzaría con el libro actual. Los cruces están
+                  desactivados hasta que exista settlement atómico; ajusta el
+                  precio para abrir una orden pasiva.
+                </div>
+              )}
               <Row className="items-center justify-between gap-2">
                 <Button
                   size="xl"
@@ -633,6 +651,8 @@ export default function LimitOrderPanel(props: {
                 >
                   {isSubmitting ? (
                     'Enviando...'
+                  ) : mexasCrossingBlocked ? (
+                    'Cruce desactivado'
                   ) : !outcome ? (
                     'Elige SÍ o NO'
                   ) : !limitProb ? (
