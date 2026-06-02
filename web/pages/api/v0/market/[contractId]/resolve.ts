@@ -7,7 +7,10 @@ import {
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
-import { getMexasResolutionCreditEvents } from 'common/mexas-resolution'
+import {
+  getMexasOrderReleaseCreditKey,
+  getMexasResolutionCreditEvents,
+} from 'common/mexas-resolution'
 import { getMexasSettlementAudit } from 'common/mexas-settlement'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
@@ -197,22 +200,48 @@ async function releaseOpenOrder(
   db: SupabaseClient,
   entry: { row: Row<'contract_bets'>; bet: Bet }
 ) {
-  const bet = entry.bet as LimitBet & MexasReservedOrderData
-  if (bet.limitProb === undefined || bet.orderAmount === undefined) return
-  if (bet.isCancelled && bet.mexasFundsReleased === true) return
+  const entryBet = entry.bet as LimitBet & MexasReservedOrderData
+  if (entryBet.limitProb === undefined || entryBet.orderAmount === undefined) {
+    return
+  }
 
-  const data = getRowData(entry.row)
+  const { data: currentRow, error: readError } = await db
+    .from('contract_bets')
+    .select('*')
+    .eq('bet_id', entryBet.id)
+    .maybeSingle()
+
+  if (readError) throw readError
+  if (!currentRow) return
+
+  const typedCurrentRow = currentRow as Row<'contract_bets'>
+  const currentBet = convertBet(typedCurrentRow) as LimitBet &
+    MexasReservedOrderData
+  if (
+    currentBet.limitProb === undefined ||
+    currentBet.orderAmount === undefined
+  ) {
+    return
+  }
+  if (currentBet.isCancelled && currentBet.mexasFundsReleased === true) return
+
+  const data = getRowData(typedCurrentRow)
+  const now = Date.now()
   const { error } = await db
     .from('contract_bets')
     .update({
-      is_cancelled: bet.isFilled ? bet.isCancelled : true,
+      is_cancelled: currentBet.isFilled ? currentBet.isCancelled : true,
       data: {
         ...data,
-        isCancelled: bet.isFilled ? bet.isCancelled : true,
+        isCancelled: currentBet.isFilled ? currentBet.isCancelled : true,
         mexasFundsReleased: true,
+        mexasReleaseCreditKey: getMexasOrderReleaseCreditKey(currentBet.id),
+        mexasReleaseReason: 'resolution',
+        mexasReleasedAt: now,
       } as any,
     })
-    .eq('bet_id', bet.id)
+    .eq('bet_id', currentBet.id)
+    .eq('updated_time', typedCurrentRow.updated_time)
 
   if (error) throw error
 }

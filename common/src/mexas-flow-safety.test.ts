@@ -99,6 +99,15 @@ describe('MEXAS flow safety guardrails', () => {
       'await releaseOpenOrder(db, entry)',
       'await releaseMexasUserBalanceLock(db, eventUserId, balanceLockOwner)',
     ])
+    expectMarkersInOrder(source, [
+      'async function releaseOpenOrder',
+      ".from('contract_bets')",
+      ".eq('bet_id', entryBet.id)",
+      'const currentBet = convertBet(typedCurrentRow)',
+      'mexasReleaseCreditKey: getMexasOrderReleaseCreditKey(currentBet.id)',
+      "mexasReleaseReason: 'resolution'",
+      ".eq('updated_time', typedCurrentRow.updated_time)",
+    ])
   })
 
   test('syncs Privy wallet balances under the user balance lock', () => {
