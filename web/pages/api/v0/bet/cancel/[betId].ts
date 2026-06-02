@@ -3,11 +3,9 @@ import { APIError } from 'common/api/utils'
 import { LimitBet } from 'common/bet'
 import { MarketContract } from 'common/contract'
 import {
-  getMexasRemainingReservedAmount,
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
-import { getMexasOrderReleaseCreditKey } from 'common/mexas-resolution'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import { createClient, type Row } from 'common/supabase/utils'
@@ -15,9 +13,11 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import {
   acquireMexasUserBalanceLock,
   releaseMexasUserBalanceLock,
-  updateMexasUserBalanceCas,
 } from 'web/lib/api/mexas-balance'
-import { releaseUnbackedMexasOrders } from 'web/lib/api/mexas-orders'
+import {
+  releaseCancelledMexasOrder,
+  releaseUnbackedMexasOrders,
+} from 'web/lib/api/mexas-orders'
 
 type ErrorResponse = { message: string }
 const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
@@ -106,43 +106,6 @@ function hasFreshMexasOrderLock(data: Record<string, unknown>) {
   return locked && Date.now() - since < ORDER_LOCK_TIMEOUT_MS
 }
 
-async function releaseMexasCancelledOrderFunds(
-  db: ReturnType<typeof getSupabaseAdminClient>,
-  betRow: Row<'contract_bets'>,
-  userId: string,
-  refundAmount: number,
-  creditKey: string
-) {
-  if (refundAmount > 0) {
-    await updateMexasUserBalanceCas(db, userId, refundAmount, { creditKey })
-  }
-
-  const data = getBetData(betRow)
-  const { data: releasedBetRow, error } = await db
-    .from('contract_bets')
-    .update({
-      data: {
-        ...data,
-        isCancelled: true,
-        mexasFundsReleased: true,
-        mexasReleaseCreditKey: refundAmount > 0 ? creditKey : undefined,
-        mexasReleaseReason: 'cancelled',
-        mexasReleasedAt: Date.now(),
-      } as any,
-    })
-    .eq('bet_id', betRow.bet_id)
-    .eq('updated_time', betRow.updated_time)
-    .eq('is_filled', false)
-    .select()
-    .maybeSingle()
-
-  if (error) throw error
-  if (!releasedBetRow) {
-    throw new APIError(503, 'Order changed. Please refresh and try again.')
-  }
-  return (releasedBetRow ?? betRow) as Row<'contract_bets'>
-}
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<LimitBet | ErrorResponse>
@@ -213,24 +176,22 @@ export default async function handler(
         isMexasOrderBookOnlyContract(contract) &&
         betData.mexasFundsReserved === true &&
         betData.mexasFundsReleased !== true
-      const refundAmount = shouldReleaseMexasFunds
-        ? getMexasRemainingReservedAmount({
-            amount: limitBet.amount,
-            orderAmount: limitBet.orderAmount,
-            mexasReservedAmount: betData.mexasReservedAmount,
-          })
-        : 0
-      const creditKey = getMexasOrderReleaseCreditKey(bet.id)
 
       if (bet.isCancelled) {
         if (shouldReleaseMexasFunds) {
-          const releasedBetRow = await releaseMexasCancelledOrderFunds(
+          const releasedBetRow = await releaseCancelledMexasOrder(
             db,
             typedBetRow,
-            userId,
-            refundAmount,
-            creditKey
+            {
+              skipUserBalanceLock: true,
+            }
           )
+          if (!releasedBetRow) {
+            throw new APIError(
+              503,
+              'Order changed. Please refresh and try again.'
+            )
+          }
           return res.status(200).json(convertBet(releasedBetRow) as LimitBet)
         }
         throw new APIError(403, 'Order already cancelled.')
@@ -239,36 +200,15 @@ export default async function handler(
         throw new APIError(403, 'Order already filled.')
       }
 
-      const { data: updatedBetRow, error: updateError } = await db
-        .from('contract_bets')
-        .update({
-          is_cancelled: true,
-          data: {
-            ...betData,
-            isCancelled: true,
-            mexasFundsReleased: betData.mexasFundsReleased,
-          },
-        })
-        .eq('bet_id', betId)
-        .eq('updated_time', typedBetRow.updated_time)
-        .eq('is_cancelled', false)
-        .select()
-        .maybeSingle()
+      const releasedBetRow = shouldReleaseMexasFunds
+        ? await releaseCancelledMexasOrder(db, typedBetRow, {
+            skipUserBalanceLock: true,
+          })
+        : await cancelNonReservedMexasOrder(db, typedBetRow, betData)
 
-      if (updateError) throw updateError
-      if (!updatedBetRow) {
+      if (!releasedBetRow) {
         throw new APIError(503, 'Order changed. Please refresh and try again.')
       }
-
-      const releasedBetRow = shouldReleaseMexasFunds
-        ? await releaseMexasCancelledOrderFunds(
-            db,
-            updatedBetRow as Row<'contract_bets'>,
-            userId,
-            refundAmount,
-            creditKey
-          )
-        : (updatedBetRow as Row<'contract_bets'>)
 
       return res
         .status(200)
@@ -287,4 +227,30 @@ export default async function handler(
       error instanceof Error ? error.message : 'Could not cancel order.'
     return res.status(500).json({ message })
   }
+}
+
+async function cancelNonReservedMexasOrder(
+  db: ReturnType<typeof getSupabaseAdminClient>,
+  betRow: Row<'contract_bets'>,
+  betData: MexasReservedOrderData & Record<string, unknown>
+) {
+  const { data: updatedBetRow, error: updateError } = await db
+    .from('contract_bets')
+    .update({
+      is_cancelled: true,
+      data: {
+        ...betData,
+        isCancelled: true,
+        mexasFundsReleased: betData.mexasFundsReleased,
+      },
+    })
+    .eq('bet_id', betRow.bet_id)
+    .eq('updated_time', betRow.updated_time)
+    .eq('is_cancelled', false)
+    .eq('is_filled', false)
+    .select()
+    .maybeSingle()
+
+  if (updateError) throw updateError
+  return updatedBetRow as Row<'contract_bets'> | undefined
 }

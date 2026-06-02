@@ -55,6 +55,7 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('cancels MEXAS orders and refunds reserved funds under the user balance lock', () => {
     const source = readRepoFile('web/pages/api/v0/bet/cancel/[betId].ts')
+    const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')
 
     expectMarkersInOrder(source, [
       'const contract = convertContract(typedContractRow) as MarketContract',
@@ -66,18 +67,43 @@ describe('MEXAS flow safety guardrails', () => {
       'const balanceLockOwner = await acquireMexasUserBalanceLock(db, userId)',
       'await releaseUnbackedMexasOrders(db',
       'const releasedBetRow = shouldReleaseMexasFunds',
+      'await releaseCancelledMexasOrder(db, typedBetRow',
       'await releaseMexasUserBalanceLock(db, userId, balanceLockOwner)',
     ])
-    expectMarkersInOrder(source, [
-      'async function releaseMexasCancelledOrderFunds',
-      'await updateMexasUserBalanceCas(db, userId, refundAmount',
-      "mexasReleaseReason: 'cancelled'",
-      'mexasReleasedAt: Date.now()',
-      ".eq('updated_time', betRow.updated_time)",
-      ".eq('is_filled', false)",
-      "throw new APIError(503, 'Order changed. Please refresh and try again.')",
-    ])
+    expect(source).toContain('releaseCancelledMexasOrder')
     expect(source).toContain('skipUserBalanceLock: true')
+    expect(source).not.toContain('async function releaseMexasCancelledOrderFunds')
+    expect(source).not.toContain('updateMexasUserBalanceCas')
+    expectMarkersInOrder(ordersSource, [
+      'async function prepareOpenMexasOrderRelease',
+      'mexasReleaseReason: releaseReason',
+      ".eq('is_cancelled', false)",
+      ".eq('is_filled', false)",
+      ".eq('updated_time', row.updated_time)",
+    ])
+    expectMarkersInOrder(ordersSource, [
+      'async function prepareCancelledMexasOrderRelease',
+      'const creditKey =',
+      'getMexasOrderReleaseCreditKey(bet.id)',
+      ".eq('is_cancelled', true)",
+      ".eq('is_filled', false)",
+      ".eq('updated_time', row.updated_time)",
+    ])
+    expectMarkersInOrder(ordersSource, [
+      'async function completePreparedMexasOrderRelease',
+      'await updateMexasUserBalanceCas(db, bet.userId, refundAmount',
+      'mexasFundsReleased: true',
+      ".eq('is_cancelled', true)",
+      ".eq('is_filled', false)",
+      ".eq('updated_time', row.updated_time)",
+    ])
+    expectMarkersInOrder(ordersSource, [
+      'export async function releaseCancelledMexasOrder',
+      'prepareAndCompleteMexasOrderRelease(',
+      'bet.isCancelled',
+      '? prepareCancelledMexasOrderRelease',
+      ': prepareOpenMexasOrderRelease',
+    ])
   })
 
   test('lists bets only after resolving MEXAS orderbook contract ids', () => {
@@ -100,20 +126,34 @@ describe('MEXAS flow safety guardrails', () => {
 
     expect(source).toContain(".lte('expires_at', now)")
     expectMarkersInOrder(source, [
-      'async function releaseOpenMexasOrder',
+      'async function prepareOpenMexasOrderRelease',
       'const { data: preparedRow, error } = await db',
       'mexasFundsReleased:',
       'refundAmount > 0',
       ".eq('is_cancelled', false)",
       ".eq('is_filled', false)",
       ".eq('updated_time', row.updated_time)",
-      'if (!preparedRow) return 0',
-      'await completePreparedMexasOrderRelease(',
+      'return preparedRow',
+    ])
+    expectMarkersInOrder(source, [
+      'async function prepareAndCompleteMexasOrderRelease',
+      'const preparedRow = await prepareRelease(db, row, releaseReason)',
+      'if (!preparedRow) return',
+      'if (data.mexasFundsReleased === true) return preparedRow',
+      'return await completePreparedMexasOrderRelease(',
+    ])
+    expectMarkersInOrder(source, [
+      'async function releaseOpenMexasOrder',
+      'prepareAndCompleteMexasOrderRelease(',
+      'prepareOpenMexasOrderRelease',
+      'return releasedRow ? 1 : 0',
     ])
     expectMarkersInOrder(source, [
       'async function completePreparedMexasOrderRelease',
       'await updateMexasUserBalanceCas(db, bet.userId, refundAmount',
       'mexasFundsReleased: true',
+      ".eq('is_cancelled', true)",
+      ".eq('is_filled', false)",
       ".eq('updated_time', row.updated_time)",
     ])
     expectMarkersInOrder(source, [
