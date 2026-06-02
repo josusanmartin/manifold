@@ -5,8 +5,8 @@ import { getNewBetId, LimitBet, type Bet } from 'common/bet'
 import { getCpmmProbability } from 'common/calculate-cpmm'
 import { MarketContract } from 'common/contract'
 import {
-  getMexasAvailableBalance,
   getMexasRemainingReservedAmount,
+  getMexasSyncedAvailableBalance,
   isMexasOrderBookOnlyContract,
 } from 'common/mexas-market'
 import {
@@ -183,8 +183,10 @@ async function syncMexasWalletBalance(
     const openReservedAmount = await getOpenReservedMexasAmount(db, {
       userId: latestUserRow.id,
     })
-    const balance = getMexasAvailableBalance({
+    const balance = getMexasSyncedAvailableBalance({
+      currentBalance: latestUserRow.balance,
       onChainAmount,
+      onChainDeltaAmount: deltaAmount,
       openReservedAmount,
     })
     const totalDeposits =

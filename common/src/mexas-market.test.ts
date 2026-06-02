@@ -1,5 +1,6 @@
 import {
   getMexasAvailableBalance,
+  getMexasSyncedAvailableBalance,
   isMexasOrderBookOnlyContract,
   getTotalMexasRemainingReservedAmount,
   getUnbackedMexasOrderIds,
@@ -106,5 +107,43 @@ describe('MEXAS reserved order backing', () => {
         openReservedAmount: 0.000000004,
       })
     ).toBe(10.12345679)
+  })
+
+  test('syncs wallet balance incrementally without restoring spent filled stake', () => {
+    expect(
+      getMexasSyncedAvailableBalance({
+        currentBalance: 0,
+        onChainAmount: 10,
+        onChainDeltaAmount: 0,
+        openReservedAmount: 0,
+      })
+    ).toBe(0)
+    expect(
+      getMexasSyncedAvailableBalance({
+        currentBalance: 0,
+        onChainAmount: 15,
+        onChainDeltaAmount: 5,
+        openReservedAmount: 0,
+      })
+    ).toBe(5)
+    expect(
+      getMexasSyncedAvailableBalance({
+        currentBalance: 10,
+        onChainAmount: 8,
+        onChainDeltaAmount: -2,
+        openReservedAmount: 0,
+      })
+    ).toBe(8)
+  })
+
+  test('caps synced wallet balance by on-chain backing after open reservations', () => {
+    expect(
+      getMexasSyncedAvailableBalance({
+        currentBalance: 20,
+        onChainAmount: 12,
+        onChainDeltaAmount: 0,
+        openReservedAmount: 5,
+      })
+    ).toBe(7)
   })
 })

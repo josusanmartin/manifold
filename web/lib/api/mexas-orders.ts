@@ -1,7 +1,7 @@
 import { LimitBet } from 'common/bet'
 import {
-  getMexasAvailableBalance,
   getMexasRemainingReservedAmount,
+  getMexasSyncedAvailableBalance,
   getTotalMexasRemainingReservedAmount,
   getUnbackedMexasOrderIds,
   type MexasReservedOrderData,
@@ -48,6 +48,7 @@ function mexasUnitsToAmount(units: bigint) {
 }
 
 async function syncAvailableBalanceFromBacking(params: {
+  currentBalance: number
   db: SupabaseClient
   onChainAmount: number
   onChainUnits: bigint
@@ -59,8 +60,10 @@ async function syncAvailableBalanceFromBacking(params: {
   return await setMexasUserBalanceCas(
     params.db,
     params.userId,
-    getMexasAvailableBalance({
+    getMexasSyncedAvailableBalance({
+      currentBalance: params.currentBalance,
       onChainAmount: params.onChainAmount,
+      onChainDeltaAmount: 0,
       openReservedAmount,
     }),
     {
@@ -345,7 +348,7 @@ export async function releaseUnbackedMexasOrders(
   const userIds = [...rowsByUserId.keys()]
   const { data: userRows, error: userError } = await db
     .from('users')
-    .select('id,data')
+    .select('id,balance,data')
     .in('id', userIds)
 
   if (userError) throw userError
@@ -382,6 +385,7 @@ export async function releaseUnbackedMexasOrders(
       if (userReleased && typeof onChainAmount !== 'number') {
         await syncAvailableBalanceFromBacking({
           db,
+          currentBalance: userRowById.get(userId)?.balance ?? 0,
           userId,
           onChainAmount: onChainAmount.amount,
           onChainUnits: onChainAmount.units,

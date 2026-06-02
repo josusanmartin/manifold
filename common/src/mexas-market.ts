@@ -56,6 +56,28 @@ export function getMexasAvailableBalance(params: {
   )
 }
 
+function roundMexasAmount(amount: number) {
+  return Math.round(amount * 1e8) / 1e8
+}
+
+export function getMexasSyncedAvailableBalance(params: {
+  currentBalance: number
+  onChainAmount: number
+  onChainDeltaAmount: number
+  openReservedAmount: number
+}) {
+  const ledgerAvailableAmount = Math.max(
+    0,
+    roundMexasAmount(params.currentBalance + params.onChainDeltaAmount)
+  )
+  const backedAvailableAmount = getMexasAvailableBalance({
+    onChainAmount: params.onChainAmount,
+    openReservedAmount: params.openReservedAmount,
+  })
+
+  return Math.min(ledgerAvailableAmount, backedAvailableAmount)
+}
+
 export function getUnbackedMexasOrderIds(
   orders: (MexasReservedOrderData & { id: string })[],
   backedAmount: number

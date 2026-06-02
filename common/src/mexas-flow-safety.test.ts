@@ -112,6 +112,31 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('syncs wallet balances incrementally instead of restoring spent filled stake', () => {
+    const marketSource = readRepoFile('common/src/mexas-market.ts')
+    const signupSource = readRepoFile('web/pages/api/privy-user.ts')
+    const betSource = readRepoFile('web/pages/api/v0/bet.ts')
+    const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')
+
+    expectMarkersInOrder(marketSource, [
+      'export function getMexasSyncedAvailableBalance',
+      'currentBalance: number',
+      'onChainDeltaAmount: number',
+      'const ledgerAvailableAmount = Math.max',
+      'const backedAvailableAmount = getMexasAvailableBalance',
+      'return Math.min(ledgerAvailableAmount, backedAvailableAmount)',
+    ])
+    expect(signupSource).toContain('getMexasSyncedAvailableBalance')
+    expect(signupSource).toContain('currentBalance: row.balance')
+    expect(signupSource).toContain('onChainDeltaAmount: deltaAmount')
+    expect(betSource).toContain('getMexasSyncedAvailableBalance')
+    expect(betSource).toContain('currentBalance: latestUserRow.balance')
+    expect(betSource).toContain('onChainDeltaAmount: deltaAmount')
+    expect(ordersSource).toContain(".select('id,balance,data')")
+    expect(ordersSource).toContain('currentBalance: userRowById.get(userId)?.balance ?? 0')
+    expect(ordersSource).toContain('onChainDeltaAmount: 0')
+  })
+
   test('limits wallet withdrawals to synced MEX and refreshes after the chain receipt', () => {
     const source = readRepoFile('web/components/crypto/mexas-wallet-panel.tsx')
 
@@ -157,6 +182,16 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('matchMexasOrderbookLimitOrderRpc')
     expect(source).not.toContain('async function matchMexasOrder(')
     expect(source).not.toContain('async function updateLimitBetCas(')
+  })
+
+  test('allows crossing MEXAS limit orders through the UI so the RPC can match them', () => {
+    const source = readRepoFile('web/components/bet/limit-order-panel.tsx')
+
+    expect(source).not.toContain('mexasCrossingBlocked')
+    expect(source).not.toContain('Cruce desactivado')
+    expect(source).not.toContain('Los cruces están desactivados')
+    expect(source).toContain('const bet = await api(')
+    expect(source).toContain("'bet'")
   })
 
   test('refunds the inserted MEXAS order when post-insert matching fails', () => {
@@ -246,6 +281,36 @@ describe('MEXAS flow safety guardrails', () => {
     expect(sql).toMatch(
       /update public\.contract_bets set amount = v_taker_amount, shares = v_taker_shares, is_filled = v_remaining_amount <= v_epsilon, data = v_taker_data where bet_id = v_taker\.bet_id/
     )
+  })
+
+  test('SQL matcher credits any unused reserved MEX before marking filled order funds released', () => {
+    const source = readRepoFile(
+      'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
+    )
+
+    expectMarkersInOrder(source, [
+      'v_taker_reserved_amount := coalesce',
+      'v_taker_unused_refund := case',
+      'update public.users',
+      'set balance = round(balance + v_taker_unused_refund, 8)',
+      'where id = v_taker.user_id',
+      "'mexasReleaseCreditKey'",
+      "'mexas-order-price-improvement:' || v_taker.bet_id",
+      "'mexasReleaseReason'",
+      "'price-improvement'",
+      'update public.contract_bets',
+      'amount = v_taker_amount',
+    ])
+    expectMarkersInOrder(source, [
+      'v_maker_reserved_amount := coalesce',
+      'v_maker_unused_refund := case',
+      'update public.users',
+      'set balance = round(balance + v_maker_unused_refund, 8)',
+      'where id = v_maker.user_id',
+      "'mexas-order-price-improvement:' || v_maker.bet_id",
+      'update public.contract_bets',
+      'amount = v_maker_amount',
+    ])
   })
 
   test('the SQL matcher rejects closed/resolved markets and expired orders', () => {

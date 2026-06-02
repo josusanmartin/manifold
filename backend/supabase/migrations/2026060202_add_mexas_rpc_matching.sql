@@ -23,12 +23,16 @@ declare
   v_taker_outcome text;
   v_taker_limit_prob numeric;
   v_taker_order_amount numeric;
+  v_taker_reserved_amount numeric;
   v_taker_amount numeric;
   v_taker_shares numeric;
+  v_taker_unused_refund numeric := 0;
   v_maker_limit_prob numeric;
   v_maker_order_amount numeric;
+  v_maker_reserved_amount numeric;
   v_maker_amount numeric;
   v_maker_shares numeric;
+  v_maker_unused_refund numeric := 0;
   v_remaining_amount numeric;
   v_maker_remaining_amount numeric;
   v_price numeric;
@@ -112,6 +116,7 @@ begin
 
   v_taker_limit_prob := (v_taker_data ->> 'limitProb')::numeric;
   v_taker_order_amount := (v_taker_data ->> 'orderAmount')::numeric;
+  v_taker_reserved_amount := coalesce((v_taker_data ->> 'mexasReservedAmount')::numeric, v_taker_order_amount);
   v_taker_amount := coalesce(v_taker.amount, 0);
   v_taker_shares := coalesce(v_taker.shares, 0);
   v_taker_fills := coalesce(v_taker_data -> 'fills', '[]'::jsonb);
@@ -163,6 +168,7 @@ begin
     v_maker_data := coalesce(v_maker.data, '{}'::jsonb);
     v_maker_limit_prob := (v_maker_data ->> 'limitProb')::numeric;
     v_maker_order_amount := (v_maker_data ->> 'orderAmount')::numeric;
+    v_maker_reserved_amount := coalesce((v_maker_data ->> 'mexasReservedAmount')::numeric, v_maker_order_amount);
     v_maker_amount := coalesce(v_maker.amount, 0);
     v_maker_shares := coalesce(v_maker.shares, 0);
     v_maker_remaining_amount := greatest(0, v_maker_order_amount - v_maker_amount);
@@ -184,6 +190,14 @@ begin
     v_maker_shares := round(v_maker_shares + v_shares, 8);
     v_remaining_amount := greatest(0, round(v_taker_order_amount - v_taker_amount, 8));
     v_maker_remaining_amount := greatest(0, round(v_maker_order_amount - v_maker_amount, 8));
+    v_maker_unused_refund := case
+      when
+        v_maker_remaining_amount <= v_epsilon
+        and coalesce((v_maker_data ->> 'mexasFundsReserved')::boolean, false)
+        and not coalesce((v_maker_data ->> 'mexasFundsReleased')::boolean, false)
+      then greatest(0, round(v_maker_reserved_amount - v_maker_amount, 8))
+      else 0
+    end;
 
     v_taker_fills := v_taker_fills || jsonb_build_array(
       jsonb_build_object(
@@ -197,6 +211,16 @@ begin
         p_timestamp_ms
       )
     );
+
+    if v_maker_unused_refund > v_epsilon then
+      update public.users
+      set balance = round(balance + v_maker_unused_refund, 8)
+      where id = v_maker.user_id;
+
+      if not found then
+        raise exception 'Maker user not found' using errcode = 'P0002';
+      end if;
+    end if;
 
     v_maker_data := v_maker_data || jsonb_build_object(
       'amount',
@@ -224,6 +248,17 @@ begin
         else coalesce((v_maker_data ->> 'mexasFundsReleased')::boolean, false)
       end
     );
+
+    if v_maker_unused_refund > v_epsilon then
+      v_maker_data := v_maker_data || jsonb_build_object(
+        'mexasReleaseCreditKey',
+        'mexas-order-price-improvement:' || v_maker.bet_id,
+        'mexasReleaseReason',
+        'price-improvement',
+        'mexasUnusedReservationRefund',
+        v_maker_unused_refund
+      );
+    end if;
 
     update public.contract_bets
     set
@@ -255,6 +290,25 @@ begin
     v_match_count := v_match_count + 1;
   end loop;
 
+  v_taker_unused_refund := case
+    when
+      v_remaining_amount <= v_epsilon
+      and coalesce((v_taker_data ->> 'mexasFundsReserved')::boolean, false)
+      and not coalesce((v_taker_data ->> 'mexasFundsReleased')::boolean, false)
+    then greatest(0, round(v_taker_reserved_amount - v_taker_amount, 8))
+    else 0
+  end;
+
+  if v_taker_unused_refund > v_epsilon then
+    update public.users
+    set balance = round(balance + v_taker_unused_refund, 8)
+    where id = v_taker.user_id;
+
+    if not found then
+      raise exception 'Taker user not found' using errcode = 'P0002';
+    end if;
+  end if;
+
   v_taker_data := v_taker_data || jsonb_build_object(
     'amount',
     v_taker_amount,
@@ -270,6 +324,17 @@ begin
       else coalesce((v_taker_data ->> 'mexasFundsReleased')::boolean, false)
     end
   );
+
+  if v_taker_unused_refund > v_epsilon then
+    v_taker_data := v_taker_data || jsonb_build_object(
+      'mexasReleaseCreditKey',
+      'mexas-order-price-improvement:' || v_taker.bet_id,
+      'mexasReleaseReason',
+      'price-improvement',
+      'mexasUnusedReservationRefund',
+      v_taker_unused_refund
+    );
+  end if;
 
   update public.contract_bets
   set

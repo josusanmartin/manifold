@@ -571,7 +571,9 @@ function MexasWalletPanelInner() {
 
       <div className="text-ink-600 border-ink-200 rounded-md border bg-teal-50/70 p-3 text-sm dark:bg-teal-950/20">
         Deposita {MEXAS_TOKEN.symbol} directamente en esta Wallet en{' '}
-        {MEXAS_TOKEN.chainName}. No hay conversión ni saldo interno separado.
+        {MEXAS_TOKEN.chainName}. No hay compra de fondos ni conversión; las
+        órdenes abiertas reservan MEX hasta que se ejecutan, expiran o se
+        cancelan.
       </div>
 
       {balanceError && (

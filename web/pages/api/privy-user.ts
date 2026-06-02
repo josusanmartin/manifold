@@ -6,7 +6,7 @@ import { type UserAndPrivateUser, type PrivateUser } from 'common/user'
 import { getDefaultNotificationPreferences } from 'common/user-notification-preferences'
 import { cleanDisplayName, cleanUsername } from 'common/util/clean-username'
 import { randomString } from 'common/util/random'
-import { getMexasAvailableBalance } from 'common/mexas-market'
+import { getMexasSyncedAvailableBalance } from 'common/mexas-market'
 import { convertPrivateUser, convertUser } from 'common/supabase/users'
 import {
   createClient,
@@ -167,8 +167,10 @@ async function getMexasWalletSync(
     const openReservedAmount = await getOpenReservedMexasAmount(db, {
       userId: row.id,
     })
-    const balance = getMexasAvailableBalance({
+    const balance = getMexasSyncedAvailableBalance({
+      currentBalance: row.balance,
       onChainAmount,
+      onChainDeltaAmount: deltaAmount,
       openReservedAmount,
     })
     const totalDeposits =
