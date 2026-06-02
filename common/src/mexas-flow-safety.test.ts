@@ -1364,4 +1364,18 @@ describe('MEXAS flow safety guardrails', () => {
     expect(tokenSource).not.toContain('getMexasPurchaseMessage')
     expect(tokenSource).not.toContain('Authorize MEXAS account credit')
   })
+
+  test('backend API Privy auth does not depend on broken SDK declaration files', () => {
+    const source = readRepoFile('backend/api/src/helpers/endpoint.ts')
+
+    expect(source).not.toContain("import { PrivyClient } from '@privy-io/node'")
+    expectMarkersInOrder(source, [
+      'type PrivyVerifiedAccessToken =',
+      'type PrivyClientLike =',
+      'type PrivyClientConstructor =',
+      "const { PrivyClient } = require('@privy-io/node') as",
+      'let privyClient: PrivyClientLike | undefined',
+      'verifyAccessToken(payload)',
+    ])
+  })
 })

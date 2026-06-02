@@ -1,6 +1,5 @@
 import { NextFunction, Request, Response } from 'express'
 import * as admin from 'firebase-admin'
-import { PrivyClient } from '@privy-io/node'
 import { z } from 'zod'
 
 import { APIError } from 'common//api/utils'
@@ -39,7 +38,37 @@ type JwtCredentials = { kind: 'jwt'; data: admin.auth.DecodedIdToken }
 type KeyCredentials = { kind: 'key'; data: string }
 type Credentials = JwtCredentials | KeyCredentials
 
-let privyClient: PrivyClient | undefined
+type PrivyVerifiedAccessToken = {
+  app_id: string
+  expiration: number
+  issued_at: number
+  issuer: string
+  user_id: string
+}
+
+type PrivyClientLike = {
+  utils: () => {
+    auth: () => {
+      verifyAccessToken: (
+        payload: string
+      ) => Promise<PrivyVerifiedAccessToken>
+    }
+  }
+}
+
+type PrivyClientConstructor = new (options: {
+  appId: string
+  appSecret: string
+}) => PrivyClientLike
+
+// The Privy 0.19.0 package ships broken declaration files for this backend
+// tsconfig. Keep the runtime dependency, but type only the auth surface we use.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { PrivyClient } = require('@privy-io/node') as {
+  PrivyClient: PrivyClientConstructor
+}
+
+let privyClient: PrivyClientLike | undefined
 
 const getPrivyClient = () => {
   const appId = process.env.PRIVY_APP_ID || process.env.NEXT_PUBLIC_PRIVY_APP_ID
