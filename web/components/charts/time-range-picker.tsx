@@ -7,7 +7,7 @@ const labels: { [label: string]: Period } = {
   '1D': 'daily',
   '1W': 'weekly',
   '1M': 'monthly',
-  ALL: 'allTime',
+  TODO: 'allTime',
 }
 export const TimeRangePicker = (props: {
   currentTimePeriod: Period | 'custom'

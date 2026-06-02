@@ -47,7 +47,7 @@ export const UserPositionSearchButton = (props: {
                 'hover:bg-ink-200 cursor-pointer rounded-lg px-2 py-1.5'
               }
             >
-              <Tooltip text={'Change or clear user positions'}>
+              <Tooltip text={'Cambiar o quitar posiciones de usuario'}>
                 <Avatar
                   username={displayUser.username}
                   avatarUrl={displayUser.avatarUrl}
@@ -61,14 +61,14 @@ export const UserPositionSearchButton = (props: {
           items={[
             {
               icon: <XIcon className={'h-4 w-4'} />,
-              name: 'Clear user',
+              name: 'Quitar usuario',
               onClick: () => {
                 setDisplayUser(undefined)
               },
             },
             {
               icon: <TbUserSearch className={'h-4 w-4'} />,
-              name: 'Change user',
+              name: 'Cambiar usuario',
               onClick: () => {
                 setSearchUsers(true)
               },
@@ -79,7 +79,9 @@ export const UserPositionSearchButton = (props: {
         <IconButton
           size={'xs'}
           aria-label={
-            searchUsers ? 'Close user position search' : 'Graph user positions'
+            searchUsers
+              ? 'Cerrar busqueda de posiciones'
+              : 'Graficar posiciones de usuario'
           }
           onClick={() => {
             track('click graph user positions button')
@@ -96,7 +98,7 @@ export const UserPositionSearchButton = (props: {
           {searchUsers ? (
             <XIcon className={'h-5 w-5'} />
           ) : (
-            <Tooltip text={'Graph user positions'}>
+            <Tooltip text={'Graficar posiciones de usuario'}>
               <TbUserSearch className={'h-5 w-5'} />
             </Tooltip>
           )}
@@ -107,7 +109,7 @@ export const UserPositionSearchButton = (props: {
           <Input
             ref={ref}
             autoFocus={true}
-            placeholder={'Search users'}
+            placeholder={'Buscar usuarios'}
             type={'text'}
             className={'w-full'}
             value={term}
