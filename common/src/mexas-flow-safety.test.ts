@@ -56,6 +56,15 @@ describe('MEXAS flow safety guardrails', () => {
       'const releasedBetRow = shouldReleaseMexasFunds',
       'await releaseMexasUserBalanceLock(db, userId, balanceLockOwner)',
     ])
+    expectMarkersInOrder(source, [
+      'async function releaseMexasCancelledOrderFunds',
+      'await updateMexasUserBalanceCas(db, userId, refundAmount',
+      "mexasReleaseReason: 'cancelled'",
+      'mexasReleasedAt: Date.now()',
+      ".eq('updated_time', betRow.updated_time)",
+      ".eq('is_filled', false)",
+      "throw new APIError(503, 'Order changed. Please refresh and try again.')",
+    ])
     expect(source).toContain('skipUserBalanceLock: true')
   })
 
@@ -171,6 +180,13 @@ describe('MEXAS flow safety guardrails', () => {
       'const withdrawableUnits =',
       'balanceUnits !== null && internalAvailableUnits !== null',
       '? minUnits(balanceUnits, internalAvailableUnits)',
+      ': null',
+    ])
+    expectMarkersInOrder(source, [
+      'if (withdrawableUnits === null)',
+      'Espera a que se sincronicen tus saldos antes de retirar MEX.',
+      'return',
+      'if (parsedWithdrawAmount > withdrawableUnits)',
     ])
     expectMarkersInOrder(source, [
       'eth_sendTransaction',
@@ -235,6 +251,20 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(checkoutSource).not.toContain('fills?:')
     expect(checkoutSource).not.toContain('order.fills')
+  })
+
+  test('serves public order book rows only for MEXAS orderbook markets', () => {
+    const source = readRepoFile('web/pages/api/mexas-order-book.ts')
+
+    expectMarkersInOrder(source, [
+      ".from('contracts')",
+      ".eq('id', contractId)",
+      'if (!contractRow)',
+      'return res.status(404)',
+      'if (!isMexasOrderBookOnlyContract(convertContract(contractRow)))',
+      'return res.status(404)',
+      ".from('contract_bets')",
+    ])
   })
 
   test('refunds the inserted MEXAS order when post-insert matching fails', () => {

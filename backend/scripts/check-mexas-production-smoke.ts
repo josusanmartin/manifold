@@ -227,6 +227,15 @@ async function checkOrderBook(contractId: string) {
   }
 }
 
+async function checkBlockedOrderBook(contractId: string) {
+  const { response } = await fetchText(
+    `/api/mexas-order-book?contractId=${encodeURIComponent(contractId)}`
+  )
+  return response.status === 404
+    ? pass(`blocked orderbook ${contractId}`, '404')
+    : fail(`blocked orderbook ${contractId}`, `${response.status}`)
+}
+
 async function checkBlockedApi(path: string) {
   const response = await fetch(`${SITE_URL}${path}`, { redirect: 'manual' })
   return response.status === 404
@@ -251,6 +260,7 @@ async function runSmoke() {
 
   results.push(await checkOrderBook('mexwcwin26a'))
   results.push(await checkOrderBook('ukrwarend26a'))
+  results.push(await checkBlockedOrderBook('not-a-mexas-market'))
   return results
 }
 

@@ -288,7 +288,7 @@ function MexasWalletPanelInner() {
   const withdrawableUnits =
     balanceUnits !== null && internalAvailableUnits !== null
       ? minUnits(balanceUnits, internalAvailableUnits)
-      : balanceUnits ?? internalAvailableUnits
+      : null
 
   const setMaxWithdraw = () => {
     if (withdrawableUnits !== null) {
@@ -310,10 +310,13 @@ function MexasWalletPanelInner() {
       setWithdrawError('Ingresa una cantidad mayor que 0 MEX.')
       return
     }
-    if (
-      withdrawableUnits !== null &&
-      parsedWithdrawAmount > withdrawableUnits
-    ) {
+    if (withdrawableUnits === null) {
+      setWithdrawError(
+        'Espera a que se sincronicen tus saldos antes de retirar MEX.'
+      )
+      return
+    }
+    if (parsedWithdrawAmount > withdrawableUnits) {
       setWithdrawError(
         'La cantidad supera tu MEX disponible. Cancela órdenes abiertas antes de retirar MEX comprometido.'
       )

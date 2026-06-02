@@ -126,13 +126,20 @@ async function releaseMexasCancelledOrderFunds(
         isCancelled: true,
         mexasFundsReleased: true,
         mexasReleaseCreditKey: refundAmount > 0 ? creditKey : undefined,
+        mexasReleaseReason: 'cancelled',
+        mexasReleasedAt: Date.now(),
       } as any,
     })
     .eq('bet_id', betRow.bet_id)
+    .eq('updated_time', betRow.updated_time)
+    .eq('is_filled', false)
     .select()
     .maybeSingle()
 
   if (error) throw error
+  if (!releasedBetRow) {
+    throw new APIError(503, 'Order changed. Please refresh and try again.')
+  }
   return (releasedBetRow ?? betRow) as Row<'contract_bets'>
 }
 

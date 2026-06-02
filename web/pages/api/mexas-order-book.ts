@@ -1,5 +1,7 @@
 import type { Bet } from 'common/bet'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { convertBet } from 'common/supabase/bets'
+import { convertContract } from 'common/supabase/contracts'
 import { createClient, type Row } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import {
@@ -54,6 +56,20 @@ export default async function handler(
   try {
     const db = getSupabaseAdminClient()
     const now = new Date().toISOString()
+    const { data: contractRow, error: contractError } = await db
+      .from('contracts')
+      .select('*')
+      .eq('id', contractId)
+      .maybeSingle()
+
+    if (contractError) throw contractError
+    if (!contractRow) {
+      return res.status(404).json({ message: 'Contract not found.' })
+    }
+    if (!isMexasOrderBookOnlyContract(convertContract(contractRow))) {
+      return res.status(404).json({ message: 'Order book not found.' })
+    }
+
     await releaseClosedMexasMarketOrders(db, { contractId })
     await releaseExpiredMexasOrders(db, { contractId })
     await releaseUnbackedMexasOrders(db, { contractId })
