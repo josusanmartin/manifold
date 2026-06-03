@@ -218,7 +218,10 @@ async function syncMexasWalletBalance(
       : undefined
 
   if (!walletAddress || !isAddress(walletAddress)) {
-    return freshUserRow as Row<'users'>
+    throw new APIError(
+      403,
+      'Conecta una Wallet Privy antes de abrir órdenes MEX.'
+    )
   }
 
   const currentUnits = await getMexasBalanceUnits(walletAddress as Address)

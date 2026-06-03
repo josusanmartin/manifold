@@ -706,6 +706,11 @@ describe('MEXAS flow safety guardrails', () => {
     expect(signupSource).toContain('currentBalance: row.balance')
     expect(signupSource).toContain('onChainDeltaAmount: deltaAmount')
     expect(betSource).toContain('getMexasSyncedAvailableBalance')
+    expectMarkersInOrder(betSource, [
+      'async function syncMexasWalletBalance',
+      'if (!walletAddress || !isAddress(walletAddress))',
+      'Conecta una Wallet Privy antes de abrir órdenes MEX.',
+    ])
     expect(betSource).toContain('currentBalance: latestUserRow.balance')
     expect(betSource).toContain('onChainDeltaAmount: deltaAmount')
     expectMarkersInOrder(betSource, [
