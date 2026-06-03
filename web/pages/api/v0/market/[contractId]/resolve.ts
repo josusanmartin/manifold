@@ -4,6 +4,7 @@ import { APIError } from 'common/api/utils'
 import { LimitBet, type Bet } from 'common/bet'
 import { type resolution } from 'common/contract'
 import {
+  hasMexasEscrowedStake,
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
@@ -40,8 +41,7 @@ type ErrorResponse = { message: string; details?: unknown }
 const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
 const CONTRACT_BETS_PAGE_SIZE = 1000
 const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000
-const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =
-  'mexasWalletOpenReservedAmount'
+const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY = 'mexasWalletOpenReservedAmount'
 
 let privyClient: PrivyClient | undefined
 
@@ -162,13 +162,16 @@ function getMexasResolutionLockPredicates(data: Record<string, unknown>) {
 
 function combinePostgrestAndPredicates(predicateGroups: string[][]) {
   return predicateGroups
-    .reduce<string[]>((combinations, group) => {
-      return combinations.flatMap((combination) =>
-        group.map((predicate) =>
-          combination ? `${combination},${predicate}` : predicate
+    .reduce<string[]>(
+      (combinations, group) => {
+        return combinations.flatMap((combination) =>
+          group.map((predicate) =>
+            combination ? `${combination},${predicate}` : predicate
+          )
         )
-      )
-    }, [''])
+      },
+      ['']
+    )
     .map((predicate) => `and(${predicate})`)
     .join(',')
 }
@@ -278,6 +281,12 @@ async function releaseOpenOrder(
     return
   }
   if (currentBet.isCancelled && currentBet.mexasFundsReleased === true) return
+  if (hasMexasEscrowedStake(currentBet)) {
+    throw new APIError(
+      503,
+      'MEXAS escrowed stake resolution release is not implemented.'
+    )
+  }
 
   const data = getRowData(typedCurrentRow)
   const now = Date.now()
@@ -308,14 +317,30 @@ async function releaseOpenOrder(
   }
 }
 
+function assertNoEscrowedMexasResolutionStake(
+  entries: { row: Row<'contract_bets'>; bet: Bet }[]
+) {
+  const escrowedEntry = entries.find((entry) =>
+    hasMexasEscrowedStake(entry.bet as LimitBet & MexasReservedOrderData)
+  )
+  if (!escrowedEntry) return
+
+  throw new APIError(
+    503,
+    `MEXAS escrowed stake on order ${escrowedEntry.bet.id} cannot be resolved through the internal credit path.`
+  )
+}
+
 async function refreshMexasOpenReservedAmount(
   db: SupabaseClient,
   userId: string
 ) {
   await updateMexasUserBalanceCas(db, userId, 0, {
     dataPatch: {
-      [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]:
-        await getOpenReservedMexasAmount(db, { userId }),
+      [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: await getOpenReservedMexasAmount(
+        db,
+        { userId }
+      ),
     },
   })
 }
@@ -443,6 +468,7 @@ async function resolveMexasMarket(
   assertMexasCanResolveFilledPositions(
     getMexasSettlementAudit(bets.map((entry) => entry.bet))
   )
+  assertNoEscrowedMexasResolutionStake(bets)
   const creditEvents = getMexasResolutionCreditEvents(
     bets.map((entry) => entry.bet),
     outcome

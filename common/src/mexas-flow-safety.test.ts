@@ -468,7 +468,8 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'async function refreshMexasOpenReservedAmount',
       '[MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]:',
-      'await getOpenReservedMexasAmount(db, { userId })',
+      'await getOpenReservedMexasAmount(',
+      '{ userId }',
     ])
     expectMarkersInOrder(source, [
       'async function releaseOpenOrder',
@@ -2256,6 +2257,15 @@ describe('MEXAS flow safety guardrails', () => {
       'backend/scripts/check-mexas-launch-readiness.ts'
     )
     const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')
+    const resolveSource = readRepoFile(
+      'web/pages/api/v0/market/[contractId]/resolve.ts'
+    )
+    const matchingSqlSource = readRepoFile(
+      'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
+    )
+    const indexSqlSource = readRepoFile(
+      'backend/supabase/migrations/20260602153551_add_mexas_orderbook_indexes.sql'
+    )
     const schedulerSource = readRepoFile(
       'backend/shared/src/expire-limit-orders.ts'
     )
@@ -2282,9 +2292,46 @@ describe('MEXAS flow safety guardrails', () => {
       'async function prepareCancelledMexasOrderRelease',
       'MEXAS escrowed stake release is not implemented.',
     ])
+    expectMarkersInOrder(resolveSource, [
+      'hasMexasEscrowedStake',
+      'async function releaseOpenOrder',
+      'MEXAS escrowed stake resolution release is not implemented.',
+      'function assertNoEscrowedMexasResolutionStake',
+      'cannot be resolved through the internal credit path',
+      'assertNoEscrowedMexasResolutionStake(bets)',
+      'const creditEvents = getMexasResolutionCreditEvents',
+    ])
+    expectMarkersInOrder(matchingSqlSource, [
+      "coalesce((v_taker_data ->> 'mexasFundsReleased')::boolean, false)",
+      "coalesce((v_taker_data ->> 'mexasStakeEscrowed')::boolean, false)",
+      'Taker escrowed MEXAS stake cannot be matched by the internal settlement RPC',
+      "coalesce((b.data ->> 'mexasStakeEscrowed')::boolean, false) = false",
+    ])
+    expect(indexSqlSource).toContain(
+      "coalesce((data ->> 'mexasStakeEscrowed')::boolean, false) = false"
+    )
     expect(schedulerSource).toContain(
       "coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = false"
     )
+  })
+
+  test('launch readiness reports active escrowed stake that cannot be released safely', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('type EscrowedOpenMexasLimitOrder')
+    expectMarkersInOrder(source, [
+      'hasMexasEscrowCaptureMetadata',
+      'hasMexasEscrowedStake',
+      'async function loadOpenEscrowedMexasLimitOrders',
+      ".eq('data->>mexasStakeEscrowed', 'true')",
+      'hasCaptureMetadata: hasMexasEscrowCaptureMetadata',
+      'async function checkEscrowedMexasStakeReleaseReadiness',
+      'missing escrow capture metadata',
+      'active escrowed MEXAS orders require operational treasury release/payout code',
+      'checks.push(\n      await checkEscrowedMexasStakeReleaseReadiness',
+    ])
   })
 
   test('legacy MEXAS treasury purchase endpoint fails closed', () => {

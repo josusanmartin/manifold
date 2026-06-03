@@ -2,9 +2,7 @@
 --
 -- The matching RPC repeatedly selects the best opposite-side maker by
 -- price-time priority. Keep that lookup index-backed for large books.
-
-create index if not exists contract_bets_mexas_orderbook_no_asks_idx
-on public.contract_bets (
+create index if not exists contract_bets_mexas_orderbook_no_asks_idx on public.contract_bets (
   contract_id,
   ((data ->> 'limitProb')::numeric) asc,
   created_time asc,
@@ -19,10 +17,10 @@ where
   and data ->> 'orderAmount' is not null
   and coalesce((data ->> 'mexasFundsReserved')::boolean, false) = true
   and coalesce((data ->> 'mexasFundsReleased')::boolean, false) = false
+  and coalesce((data ->> 'mexasStakeEscrowed')::boolean, false) = false
   and data ->> 'outcome' = 'NO';
 
-create index if not exists contract_bets_mexas_orderbook_yes_bids_idx
-on public.contract_bets (
+create index if not exists contract_bets_mexas_orderbook_yes_bids_idx on public.contract_bets (
   contract_id,
   ((data ->> 'limitProb')::numeric) desc,
   created_time asc,
@@ -37,4 +35,5 @@ where
   and data ->> 'orderAmount' is not null
   and coalesce((data ->> 'mexasFundsReserved')::boolean, false) = true
   and coalesce((data ->> 'mexasFundsReleased')::boolean, false) = false
+  and coalesce((data ->> 'mexasStakeEscrowed')::boolean, false) = false
   and data ->> 'outcome' = 'YES';

@@ -29,6 +29,8 @@ y Arbitrum solo para leer el balance ERC-20 del usuario.
   tesoreria.
 - La validacion pura de captura escrow comprueba recibos ERC-20 confirmados,
   payer, tesoreria y monto minimo requerido.
+- El RPC interno de matching rechaza stake marcado como escrowed y no lo incluye
+  como maker hasta que exista el release/payout on-chain correspondiente.
 - El matching usa price-time priority: mejor precio primero, luego orden mas vieja,
   luego `bet_id` como desempate determinista.
 - La colocacion de ordenes toma un lock por mercado y usa CAS por fila de orden,
@@ -78,6 +80,8 @@ Los blockers de launch real siguen siendo estructurales:
   `releaseOpenOrderStake` y `payoutResolvedPositions`;
 - agregar un ledger idempotente para pagos salientes de tesoreria antes de
   activar cancelaciones/resoluciones on-chain;
+- mantener el RPC interno cerrado para stake escrowed hasta que esos pagos
+  salientes existan;
 - desplegar/confirmar el scheduler runtime despues de aplicar el SQL.
 
 ## Superficie publica MEXAS

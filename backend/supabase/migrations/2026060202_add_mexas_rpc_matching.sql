@@ -4,15 +4,14 @@
 -- Supabase exposes public-schema functions through the Data API unless execute
 -- privileges are revoked, so keep anon/authenticated clients out of the
 -- matching engine.
-create or replace function public.mexas_match_orderbook_limit_order (
+create
+or replace function public.mexas_match_orderbook_limit_order (
   p_taker_bet_id text,
   p_timestamp_ms bigint,
   p_max_matches integer default 100
-) returns jsonb
-language plpgsql
-security invoker
-set search_path = public
-as $function$
+) returns jsonb language plpgsql security invoker
+set
+  search_path = public as $function$
 declare
   v_contract public.contracts%rowtype;
   v_taker public.contract_bets%rowtype;
@@ -139,6 +138,10 @@ begin
     raise exception 'Taker MEXAS funds are already released' using errcode = '25006';
   end if;
 
+  if coalesce((v_taker_data ->> 'mexasStakeEscrowed')::boolean, false) then
+    raise exception 'Taker escrowed MEXAS stake cannot be matched by the internal settlement RPC' using errcode = '25006';
+  end if;
+
   v_taker_limit_prob := (v_taker_data ->> 'limitProb')::numeric;
   v_taker_order_amount := (v_taker_data ->> 'orderAmount')::numeric;
   v_taker_reserved_amount := coalesce((v_taker_data ->> 'mexasReservedAmount')::numeric, v_taker_order_amount);
@@ -172,6 +175,7 @@ begin
       and b.data ->> 'orderAmount' is not null
       and coalesce((b.data ->> 'mexasFundsReserved')::boolean, false) = true
       and coalesce((b.data ->> 'mexasFundsReleased')::boolean, false) = false
+      and coalesce((b.data ->> 'mexasStakeEscrowed')::boolean, false) = false
       and b.data ->> 'outcome' in ('YES', 'NO')
       and b.data ->> 'outcome' <> v_taker_outcome
       and (b.data ->> 'limitProb')::numeric > 0
@@ -500,5 +504,12 @@ begin
 end
 $function$;
 
-revoke execute on function public.mexas_match_orderbook_limit_order(text, bigint, integer) from public, anon, authenticated;
-grant execute on function public.mexas_match_orderbook_limit_order(text, bigint, integer) to service_role;
+revoke
+execute on function public.mexas_match_orderbook_limit_order (text, bigint, integer)
+from
+  public,
+  anon,
+  authenticated;
+
+grant
+execute on function public.mexas_match_orderbook_limit_order (text, bigint, integer) to service_role;

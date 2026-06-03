@@ -2,6 +2,7 @@ import { execFileSync } from 'child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
+import { type LimitBet } from 'common/bet'
 import {
   getMissingMexasEscrowCapabilities,
   getMexasSettlementAudit,
@@ -10,6 +11,8 @@ import {
 import { MEXAS_PUBLIC_RPC_URL, MEXAS_TOKEN } from 'common/crypto/mexas'
 import {
   hasActiveMexasWalletReservation,
+  hasMexasEscrowCaptureMetadata,
+  hasMexasEscrowedStake,
   getMexasRemainingReservedAmount,
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
@@ -86,6 +89,10 @@ type OpenMexasLimitOrder = {
 
 type UnsafeOpenMexasLimitOrder = OpenMexasLimitOrder & {
   reasons: string[]
+}
+
+type EscrowedOpenMexasLimitOrder = OpenMexasLimitOrder & {
+  hasCaptureMetadata: boolean
 }
 
 type MexasMarketLockIssue = {
@@ -858,6 +865,57 @@ async function loadUnsafeOpenMexasLimitOrders(
   return unsafeOrders
 }
 
+async function loadOpenEscrowedMexasLimitOrders(
+  db: SupabaseClient,
+  contractIds: string[]
+) {
+  if (!contractIds.length) return []
+
+  const now = new Date().toISOString()
+  const orders: EscrowedOpenMexasLimitOrder[] = []
+
+  for (let from = 0; ; from += OPEN_ORDER_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('contract_bets')
+      .select('*')
+      .in('contract_id', contractIds)
+      .eq('is_filled', false)
+      .eq('is_cancelled', false)
+      .eq('data->>mexasFundsReserved', 'true')
+      .eq('data->>mexasFundsReleased', 'false')
+      .eq('data->>mexasStakeEscrowed', 'true')
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
+
+    if (error) throw error
+
+    for (const row of (data ?? []) as Row<'contract_bets'>[]) {
+      const bet = convertBet(row)
+      if (bet.answerId) continue
+      if (bet.outcome !== 'YES' && bet.outcome !== 'NO') continue
+      if (typeof bet.limitProb !== 'number') continue
+
+      const reservedBet = bet as LimitBet & MexasReservedOrderData
+      if (!hasMexasEscrowedStake(reservedBet)) continue
+
+      const openAmount = getMexasOpenOrderAmount(reservedBet)
+      if (openAmount <= EPSILON) continue
+
+      orders.push({
+        betId: bet.id,
+        contractId: bet.contractId,
+        hasCaptureMetadata: hasMexasEscrowCaptureMetadata(reservedBet),
+        limitProb: bet.limitProb,
+        openAmount,
+        outcome: bet.outcome,
+      })
+    }
+    if ((data ?? []).length < OPEN_ORDER_PAGE_SIZE) break
+  }
+
+  return orders
+}
+
 function formatProbability(prob: number) {
   return `${(prob * 100).toFixed(2)}%`
 }
@@ -993,6 +1051,61 @@ async function checkNoUnsafeOpenMexasOrders(
   } catch (error) {
     const message = formatDiagnosticError(error)
     return fail('open order reservation flags', message)
+  }
+}
+
+async function checkEscrowedMexasStakeReleaseReadiness(
+  db: SupabaseClient,
+  hasOperationalEscrow: boolean
+): Promise<CheckResult> {
+  try {
+    const contractIds = await loadOpenMexasOrderbookContractIds(db)
+    const escrowedOrders = await loadOpenEscrowedMexasLimitOrders(
+      db,
+      contractIds
+    )
+
+    if (!escrowedOrders.length) {
+      return pass(
+        'escrowed stake release readiness',
+        'No active escrowed MEXAS order stake requires treasury release.'
+      )
+    }
+
+    const missingMetadata = escrowedOrders.filter(
+      (order) => !order.hasCaptureMetadata
+    )
+    if (missingMetadata.length) {
+      return fail(
+        'escrowed stake release readiness',
+        `${missingMetadata
+          .slice(0, 5)
+          .map(
+            (order) =>
+              `${order.contractId}/${order.betId} missing escrow capture metadata`
+          )
+          .join('; ')}${
+          missingMetadata.length > 5
+            ? `; ${missingMetadata.length - 5} more`
+            : ''
+        }`
+      )
+    }
+
+    if (!hasOperationalEscrow) {
+      return fail(
+        'escrowed stake release readiness',
+        `${escrowedOrders.length} active escrowed MEXAS orders require operational treasury release/payout code before matching, cancel, or resolution can be enabled.`
+      )
+    }
+
+    return pass(
+      'escrowed stake release readiness',
+      `${escrowedOrders.length} active escrowed MEXAS orders have capture metadata and operational escrow is enabled.`
+    )
+  } catch (error) {
+    const message = formatDiagnosticError(error)
+    return fail('escrowed stake release readiness', message)
   }
 }
 
@@ -1501,6 +1614,12 @@ async function runChecks() {
   if (supabaseDb) {
     checks.push(
       await checkMexasSettlementExposure(supabaseDb, { hasOperationalEscrow })
+    )
+    checks.push(
+      await checkEscrowedMexasStakeReleaseReadiness(
+        supabaseDb,
+        hasOperationalEscrow
+      )
     )
   }
   checks.push(
