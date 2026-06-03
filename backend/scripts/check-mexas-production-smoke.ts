@@ -42,7 +42,10 @@ const PAGES = [
   },
   {
     path: '/login',
-    required: ['Continuar con Privy', 'Privy crea la cuenta y la Wallet integrada'],
+    required: [
+      'Continuar con Privy',
+      'Privy crea la cuenta y la Wallet integrada',
+    ],
   },
   {
     path: '/wallet',
@@ -189,9 +192,7 @@ async function fetchManual(path: string, init?: RequestInit) {
 async function checkRedirect(path: string, destination: string) {
   const response = await fetch(`${SITE_URL}${path}`, { redirect: 'manual' })
   const location = response.headers.get('location') ?? ''
-  const locationUrl = location
-    ? new URL(location, SITE_URL)
-    : undefined
+  const locationUrl = location ? new URL(location, SITE_URL) : undefined
   const actualDestination = locationUrl
     ? destination.includes('?')
       ? `${locationUrl.pathname}${locationUrl.search}`
@@ -472,8 +473,14 @@ async function runSmoke() {
       { method: 'POST' }
     )
   )
+  results.push(await checkExpectedStatus('method bet GET', '/api/v0/bet', 405))
   results.push(
-    await checkExpectedStatus('method bet GET', '/api/v0/bet', 405)
+    await checkExpectedStatus('method privy-user GET', '/api/privy-user', 405)
+  )
+  results.push(
+    await checkExpectedStatus('auth privy-user POST', '/api/privy-user', 401, {
+      method: 'POST',
+    })
   )
   results.push(
     await checkExpectedStatus('auth bet POST', '/api/v0/bet', 401, {

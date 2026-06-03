@@ -72,7 +72,7 @@ describe('MEXAS flow safety guardrails', () => {
       'combinePostgrestAndPredicates([',
       'getMexasOrderLockPredicates(contractData)',
       'getNoMexasResolutionLockPredicates()',
-      '.eq(\'last_updated_time\', typedContractRow.last_updated_time)',
+      ".eq('last_updated_time', typedContractRow.last_updated_time)",
     ])
   })
 
@@ -101,9 +101,47 @@ describe('MEXAS flow safety guardrails', () => {
       '[MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: openReservedAmount',
     ])
     expect(source).toContain(
-      "const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =\n  'mexasWalletOpenReservedAmount'"
+      "const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY = 'mexasWalletOpenReservedAmount'"
     )
     expect(source).not.toContain('let latestUserRow = userRow')
+  })
+
+  test('MEXAS user balance writes CAS against balance and user data', () => {
+    const balanceSource = readRepoFile('web/lib/api/mexas-balance.ts')
+    const betSource = readRepoFile('web/pages/api/v0/bet.ts')
+    const privySource = readRepoFile('web/pages/api/privy-user.ts')
+
+    expectMarkersInOrder(balanceSource, [
+      'async function acquireMexasUserBalanceLock',
+      '.update({ data: lockedData as any })',
+      ".eq('id', userId)",
+      ".filter('data', 'eq', JSON.stringify(userRow.data))",
+    ])
+    expectMarkersInOrder(balanceSource, [
+      'export async function updateMexasUserBalanceCas',
+      ".eq('balance', userRow.balance)",
+      ".filter('data', 'eq', JSON.stringify(userRow.data))",
+    ])
+    expectMarkersInOrder(balanceSource, [
+      'export async function setMexasUserBalanceCas',
+      ".eq('balance', userRow.balance)",
+      ".filter('data', 'eq', JSON.stringify(userRow.data))",
+    ])
+    expectMarkersInOrder(betSource, [
+      'async function syncMexasWalletBalance',
+      ".eq('balance', latestUserRow.balance)",
+      ".filter('data', 'eq', JSON.stringify(latestUserRow.data))",
+    ])
+    expectMarkersInOrder(betSource, [
+      'async function updateUserBalanceCas',
+      ".eq('balance', userRow.balance)",
+      ".filter('data', 'eq', JSON.stringify(userRow.data))",
+    ])
+    expectMarkersInOrder(privySource, [
+      'async function updateExistingUser',
+      ".eq('balance', latestUserRow.balance)",
+      ".filter('data', 'eq', JSON.stringify(latestUserRow.data))",
+    ])
   })
 
   test('cancels MEXAS orders and refunds reserved funds under the user balance lock', () => {
@@ -125,7 +163,9 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(source).toContain('releaseCancelledMexasOrder')
     expect(source).toContain('skipUserBalanceLock: true')
-    expect(source).not.toContain('async function releaseMexasCancelledOrderFunds')
+    expect(source).not.toContain(
+      'async function releaseMexasCancelledOrderFunds'
+    )
     expect(source).not.toContain('updateMexasUserBalanceCas')
     expectMarkersInOrder(ordersSource, [
       'async function prepareOpenMexasOrderRelease',
@@ -179,7 +219,9 @@ describe('MEXAS flow safety guardrails', () => {
       'const mexasContractIds = await getMexasContractIds(db, contractId)',
       'query = query.in',
     ])
-    expect(source).toContain("query = query.in('contract_id', mexasContractIds)")
+    expect(source).toContain(
+      "query = query.in('contract_id', mexasContractIds)"
+    )
     expect(source).not.toContain("query.eq('contract_id', contractId)")
     expect(source).not.toContain("query.in('contract_id', contractId)")
   })
@@ -287,7 +329,8 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(betSource, [
       'const lockedContract = lock.contract',
       'const latestSyncedUserRow = await syncMexasWalletBalance(',
-      'if (lockedContract.closeTime && Date.now() >= lockedContract.closeTime)',
+      'lockedContract.closeTime &&',
+      'Date.now() >= lockedContract.closeTime',
       "throw new APIError(403, 'Trading is closed.')",
       'if (lockedContract.isResolved)',
       "throw new APIError(403, 'Market is resolved.')",
@@ -358,9 +401,7 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('uses a consistent fresh order-lock timeout across order, cancel, and resolve flows', () => {
     const betSource = readRepoFile('web/pages/api/v0/bet.ts')
-    const cancelSource = readRepoFile(
-      'web/pages/api/v0/bet/cancel/[betId].ts'
-    )
+    const cancelSource = readRepoFile('web/pages/api/v0/bet/cancel/[betId].ts')
     const resolveSource = readRepoFile(
       'web/pages/api/v0/market/[contractId]/resolve.ts'
     )
@@ -376,6 +417,12 @@ describe('MEXAS flow safety guardrails', () => {
     const userSource = readRepoFile('common/src/user.ts')
 
     expectMarkersInOrder(source, [
+      'async function readMexasWalletBalance',
+      'await getMexasBalanceUnits(walletAddress as Address)',
+      'throw new APIError(\n      503',
+      'No se pudo leer el balance MEXAS de tu Wallet.',
+    ])
+    expectMarkersInOrder(source, [
       'const balanceLockOwner = await acquireMexasUserBalanceLock(db, userRow.id)',
       'const { data: lockedUserRow, error: lockedUserError } = await db',
       ".eq('id', userRow.id)",
@@ -386,6 +433,8 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expectMarkersInOrder(source, [
       'async function getMexasWalletSync',
+      'const walletBalance = await readMexasWalletBalance(',
+      "'existing-user'",
       'await releaseClosedMexasMarketOrders(db',
       'await releaseExpiredMexasOrders(db',
       'await releaseUnbackedMexasOrders(db',
@@ -393,9 +442,14 @@ describe('MEXAS flow safety guardrails', () => {
       '[MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: openReservedAmount',
     ])
     expect(source).toContain(
-      "const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =\n  'mexasWalletOpenReservedAmount'"
+      "const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY = 'mexasWalletOpenReservedAmount'"
     )
     expect(userSource).toContain('mexasWalletOpenReservedAmount?: number')
+    expectMarkersInOrder(source, [
+      'async function getNewUserMexasWalletBalance',
+      "return readMexasWalletBalance(walletAddress, 'new-user')",
+    ])
+    expect(source).not.toContain('Failed to sync MEXAS wallet balance')
   })
 
   test('keeps logged-in balance UI on Privy/MEX instead of Firebase/MANA', () => {
@@ -444,7 +498,9 @@ describe('MEXAS flow safety guardrails', () => {
     expect(profileSource).not.toContain('Rank {leagueInfo.rank}')
     expect(profileSource).not.toContain("title: 'Comments'")
     expect(profileSource).not.toContain("title: 'Achievements'")
-    expect(profileSource).toContain("tab !== 'achievements' && tab !== 'comments'")
+    expect(profileSource).toContain(
+      "tab !== 'achievements' && tab !== 'comments'"
+    )
     expect(profileSource).toContain("tab: 'summary'")
     expectMarkersInOrder(smokeSource, [
       "path: '/josusanmartin?tab=comments'",
@@ -644,7 +700,9 @@ describe('MEXAS flow safety guardrails', () => {
       'const matchedBet = hasCrossingOrders',
     ])
     expect(ordersSource).toContain(".select('id,balance,data')")
-    expect(ordersSource).toContain('currentBalance: userRowById.get(userId)?.balance ?? 0')
+    expect(ordersSource).toContain(
+      'currentBalance: userRowById.get(userId)?.balance ?? 0'
+    )
     expect(ordersSource).toContain('onChainDeltaAmount: 0')
   })
 
@@ -708,9 +766,7 @@ describe('MEXAS flow safety guardrails', () => {
       'export function canMexasResolveFilledPositions',
       'return hasOperationalMexasEscrow(settings)',
     ])
-    expect(source).not.toContain(
-      "settings.allowUnescrowedMatching === 'true'"
-    )
+    expect(source).not.toContain("settings.allowUnescrowedMatching === 'true'")
     expect(source).not.toContain(
       "settings.allowUnescrowedResolution === 'true'"
     )
@@ -788,9 +844,7 @@ describe('MEXAS flow safety guardrails', () => {
     const selectorSource = readRepoFile(
       'web/components/bet/yes-no-selector.tsx'
     )
-    const dangerSource = readRepoFile(
-      'web/components/contract/danger-zone.tsx'
-    )
+    const dangerSource = readRepoFile('web/components/contract/danger-zone.tsx')
     const proxySource = readRepoFile('web/proxy.ts')
     const confirmSource = readRepoFile(
       'web/components/buttons/confirmation-button.tsx'
@@ -838,7 +892,9 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('common/src/user.ts')
 
     expect(source).toContain('MEXAS disables market comments entirely.')
-    expect(source).toContain('export const canCommentOnMarket = (_user: User) => false')
+    expect(source).toContain(
+      'export const canCommentOnMarket = (_user: User) => false'
+    )
     expect(source).not.toContain(
       'MEXAS markets do not require identity verification or a prior purchase to comment.'
     )
@@ -849,9 +905,9 @@ describe('MEXAS flow safety guardrails', () => {
       'web/pages/api/v0/market/[contractId]/resolve.ts'
     )
 
-    expect(countOccurrences(source, 'assertMexasCanResolveFilledPositions(')).toBe(
-      2
-    )
+    expect(
+      countOccurrences(source, 'assertMexasCanResolveFilledPositions(')
+    ).toBe(2)
     expectMarkersInOrder(source, [
       'const preflightBets = await loadContractBets(db, contractId)',
       'assertMexasCanResolveFilledPositions(',
@@ -905,6 +961,10 @@ describe('MEXAS flow safety guardrails', () => {
       '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
       'method bet GET',
       '/api/v0/bet',
+      'method privy-user GET',
+      '/api/privy-user',
+      'auth privy-user POST',
+      '/api/privy-user',
       'auth bet POST',
       'auth cancel POST',
       '/api/v0/bet/cancel/__missing_bet__',
@@ -1000,6 +1060,29 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('serves public order book rows by best price-time per side, not newest rows', () => {
+    const source = readRepoFile('web/pages/api/mexas-order-book.ts')
+
+    expectMarkersInOrder(source, [
+      'const ORDER_BOOK_PAGE_SIZE = 1000',
+      'const MAX_ORDER_BOOK_ROWS = 5000',
+      'function sortMexasSidePriceTime',
+      "side === 'YES'",
+      '(b.limitProb ?? 0) - (a.limitProb ?? 0)',
+      ': (a.limitProb ?? 0) - (b.limitProb ?? 0)',
+      'const timeDiff = (a.createdTime ?? 0) - (b.createdTime ?? 0)',
+      'return a.id.localeCompare(b.id)',
+      'function getBestOpenMexasOrders',
+      "orders.filter((order) => order.outcome === 'YES')",
+      "orders.filter((order) => order.outcome === 'NO')",
+      'rows.map((row) => convertBet(row)).filter(isVisibleMexasLimitOrder)',
+    ])
+    expect(source).toContain(".order('created_time', { ascending: true })")
+    expect(source).toContain(".order('bet_id', { ascending: true })")
+    expect(source).not.toContain(".order('created_time', { ascending: false })")
+    expect(source).not.toContain('.limit(limit)')
+  })
+
   test('refunds the inserted MEXAS order when post-insert matching fails', () => {
     const source = readRepoFile('web/pages/api/v0/bet.ts')
 
@@ -1087,8 +1170,8 @@ describe('MEXAS flow safety guardrails', () => {
       'from public.contracts',
       'where id = v_taker.contract_id',
       'for update;',
-      "Taker MEXAS funds are not reserved",
-      "Taker MEXAS funds are already released",
+      'Taker MEXAS funds are not reserved',
+      'Taker MEXAS funds are already released',
       'while v_remaining_amount > v_epsilon',
       'select *',
       'into v_maker',
@@ -1195,7 +1278,7 @@ describe('MEXAS flow safety guardrails', () => {
       'returning *',
       'into v_maker',
       'into v_maker_open_reserved_amount',
-      "where\n      b.user_id = v_maker.user_id",
+      'where\n      b.user_id = v_maker.user_id',
       "'{mexasWalletOpenReservedAmount}'",
       'to_jsonb(v_maker_open_reserved_amount)',
       'where id = v_maker.user_id',
@@ -1205,7 +1288,7 @@ describe('MEXAS flow safety guardrails', () => {
       'returning *',
       'into v_taker',
       'into v_taker_open_reserved_amount',
-      "where\n    b.user_id = v_taker.user_id",
+      'where\n    b.user_id = v_taker.user_id',
       "'{mexasWalletOpenReservedAmount}'",
       'to_jsonb(v_taker_open_reserved_amount)',
       'where id = v_taker.user_id',
@@ -1245,9 +1328,7 @@ describe('MEXAS flow safety guardrails', () => {
     const readinessSource = readRepoFile(
       'web/pages/api/v0/market/[contractId]/mexas-order-readiness.ts'
     )
-    const panelSource = readRepoFile(
-      'web/components/bet/limit-order-panel.tsx'
-    )
+    const panelSource = readRepoFile('web/components/bet/limit-order-panel.tsx')
     const proxySource = readRepoFile('web/proxy.ts')
     const smokeSource = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'
@@ -1359,11 +1440,17 @@ describe('MEXAS flow safety guardrails', () => {
       'await client.query(sql)',
       "await client.query('commit')",
     ])
-    expect(source).toContain('-- Verification block for manual Supabase SQL Editor runs')
-    expect(source).toContain("raise exception 'MEXAS launch SQL verification failed: %'")
-    expect(source).toContain("raise notice 'PASS MEXAS launch SQL applied and verified.'")
     expect(source).toContain(
-      "public.mexas_orderbook_matching_engine_ready() is distinct from true"
+      '-- Verification block for manual Supabase SQL Editor runs'
+    )
+    expect(source).toContain(
+      "raise exception 'MEXAS launch SQL verification failed: %'"
+    )
+    expect(source).toContain(
+      "raise notice 'PASS MEXAS launch SQL applied and verified.'"
+    )
+    expect(source).toContain(
+      'public.mexas_orderbook_matching_engine_ready() is distinct from true'
     )
     expect(source).toContain(
       "to_regclass('public.contract_bets_mexas_orderbook_no_asks_idx') is null"
@@ -1443,9 +1530,7 @@ describe('MEXAS flow safety guardrails', () => {
       'apply:mexas-launch-sql --print-sql',
       'Service-role REST cannot apply this',
     ])
-    expect(source).toContain(
-      'contracts_token_check still needs the launch SQL'
-    )
+    expect(source).toContain('contracts_token_check still needs the launch SQL')
     expect(source).toContain('RPC/index DDL require Postgres SQL access')
   })
 
@@ -1487,7 +1572,7 @@ describe('MEXAS flow safety guardrails', () => {
       ".eq('data->>mexasFundsReleased', 'false')",
       'getMexasRemainingReservedAmount',
       'walletUnits < backing.requiredUnits',
-      "checks.push(await checkOpenMexasOrderBacking(db))",
+      'checks.push(await checkOpenMexasOrderBacking(db))',
     ])
     expectMarkersInOrder(source, [
       'async function readMexasWalletBalanceUnits',
@@ -1519,9 +1604,9 @@ describe('MEXAS flow safety guardrails', () => {
       'const reasons = getUnsafeOpenMexasOrderReasons',
       'async function checkNoUnsafeOpenMexasOrders',
       "fail(\n        'open order reservation flags'",
-      "checks.push(await checkNoUnsafeOpenMexasOrders(db))",
-      "checks.push(await checkNoMexasMarketLocks(db))",
-      "checks.push(await checkOpenMexasOrderBacking(db))",
+      'checks.push(await checkNoUnsafeOpenMexasOrders(db))',
+      'checks.push(await checkNoMexasMarketLocks(db))',
+      'checks.push(await checkOpenMexasOrderBacking(db))',
     ])
     expect(source).toContain('funds not reserved')
     expect(source).toContain('funds already released')
@@ -1543,14 +1628,14 @@ describe('MEXAS flow safety guardrails', () => {
       'const contractIds = await loadOpenMexasOrderbookContractIds(db)',
       ".from('contracts')",
       ".select('*')",
-      "function getMexasMarketLockIssues",
+      'function getMexasMarketLockIssues',
       'data.mexasOrderLock === true',
       'data.mexasResolving === true',
       'async function checkNoMexasMarketLocks',
       'const issues = rows.flatMap(getMexasMarketLockIssues)',
       "fail(\n        'market lock residue'",
       "pass(\n      'market lock residue'",
-      "checks.push(await checkNoMexasMarketLocks(db))",
+      'checks.push(await checkNoMexasMarketLocks(db))',
     ])
     expect(source).toContain('formatLockAge')
     expect(source).toContain('fresh')
@@ -1694,14 +1779,16 @@ describe('MEXAS flow safety guardrails', () => {
     )
     expect(source).toContain('-- MEXAS TEST-ONLY FILLED EXPOSURE UNWIND SQL')
     expect(source).toContain('The transaction ends with ROLLBACK by default')
-    expect(source).toContain('v_credit_amount numeric := ${sqlNumber(bet.cancelCredit)}')
+    expect(source).toContain(
+      'v_credit_amount numeric := ${sqlNumber(bet.cancelCredit)}'
+    )
     expect(source).toContain("'mexasBalanceCreditKeys'")
     expect(source).toContain("'mexasTestUnwound', true")
     expect(source).toContain('rollback;')
-    expect(source).not.toContain(".update(")
-    expect(source).not.toContain(".insert(")
-    expect(source).not.toContain(".delete(")
-    expect(source).not.toContain(".rpc(")
+    expect(source).not.toContain('.update(')
+    expect(source).not.toContain('.insert(')
+    expect(source).not.toContain('.delete(')
+    expect(source).not.toContain('.rpc(')
     expectMarkersInOrder(unwindSource, [
       "const TEST_UNWIND_CONTRACT_IDS = ['ukrwarend26a'] as const",
       "const apply = process.argv.includes('--apply')",
@@ -1729,9 +1816,7 @@ describe('MEXAS flow safety guardrails', () => {
       'backend/scripts/check-mexas-launch-readiness.ts'
     )
 
-    expect(source).toContain(
-      'getMissingMexasEscrowCapabilities'
-    )
+    expect(source).toContain('getMissingMexasEscrowCapabilities')
     expectMarkersInOrder(source, [
       'const hasOperationalEscrow = hasOperationalMexasEscrow',
       'escrowImplementation,',

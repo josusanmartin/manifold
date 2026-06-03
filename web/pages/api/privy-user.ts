@@ -33,8 +33,7 @@ type JsonObject = Record<string, unknown>
 
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
-const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =
-  'mexasWalletOpenReservedAmount'
+const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY = 'mexasWalletOpenReservedAmount'
 const USER_UPDATE_ATTEMPTS = 5
 
 const bodySchema = z
@@ -158,6 +157,29 @@ function mexasUnitsDeltaToAmount(deltaUnits: bigint) {
   return sign * mexasUnitsToAmount(absUnits)
 }
 
+async function readMexasWalletBalance(
+  walletAddress: string,
+  context: 'new-user' | 'existing-user'
+) {
+  try {
+    const units = await getMexasBalanceUnits(walletAddress as Address)
+    return {
+      units,
+      amount: mexasUnitsToAmount(units),
+    }
+  } catch (error) {
+    console.error('Failed to load MEXAS wallet balance', {
+      context,
+      walletAddress,
+      error,
+    })
+    throw new APIError(
+      503,
+      'No se pudo leer el balance MEXAS de tu Wallet. Intenta de nuevo.'
+    )
+  }
+}
+
 async function getMexasWalletSync(
   db: SupabaseClient,
   row: Row<'users'>,
@@ -165,64 +187,56 @@ async function getMexasWalletSync(
 ) {
   if (!walletAddress || !isAddress(walletAddress)) return undefined
 
-  try {
-    const data = getUserData(row)
-    const currentUnits = await getMexasBalanceUnits(walletAddress as Address)
-    const previousUnits = parseSyncedMexasUnits(data)
-    const deltaAmount = mexasUnitsDeltaToAmount(currentUnits - previousUnits)
-    const onChainAmount = mexasUnitsToAmount(currentUnits)
-    await releaseClosedMexasMarketOrders(db, {
-      userId: row.id,
-      skipUserBalanceLock: true,
-    })
-    await releaseExpiredMexasOrders(db, {
-      userId: row.id,
-      skipUserBalanceLock: true,
-    })
-    await releaseUnbackedMexasOrders(db, {
-      userId: row.id,
-      requireBalanceRead: true,
-      skipUserBalanceLock: true,
-    })
-    const openReservedAmount = await getOpenReservedMexasAmount(db, {
-      userId: row.id,
-    })
-    const balance = getMexasSyncedAvailableBalance({
-      currentBalance: row.balance,
-      onChainAmount,
-      onChainDeltaAmount: deltaAmount,
-      openReservedAmount,
-    })
-    const totalDeposits =
-      deltaAmount > 0 ? row.total_deposits + deltaAmount : row.total_deposits
+  const data = getUserData(row)
+  const walletBalance = await readMexasWalletBalance(
+    walletAddress,
+    'existing-user'
+  )
+  const previousUnits = parseSyncedMexasUnits(data)
+  const deltaAmount = mexasUnitsDeltaToAmount(
+    walletBalance.units - previousUnits
+  )
+  await releaseClosedMexasMarketOrders(db, {
+    userId: row.id,
+    skipUserBalanceLock: true,
+  })
+  await releaseExpiredMexasOrders(db, {
+    userId: row.id,
+    skipUserBalanceLock: true,
+  })
+  await releaseUnbackedMexasOrders(db, {
+    userId: row.id,
+    requireBalanceRead: true,
+    skipUserBalanceLock: true,
+  })
+  const openReservedAmount = await getOpenReservedMexasAmount(db, {
+    userId: row.id,
+  })
+  const balance = getMexasSyncedAvailableBalance({
+    currentBalance: row.balance,
+    onChainAmount: walletBalance.amount,
+    onChainDeltaAmount: deltaAmount,
+    openReservedAmount,
+  })
+  const totalDeposits =
+    deltaAmount > 0 ? row.total_deposits + deltaAmount : row.total_deposits
 
-    return {
-      data: {
-        ...data,
-        [MEXAS_WALLET_SYNC_UNITS_KEY]: currentUnits.toString(),
-        [MEXAS_WALLET_SYNC_TIME_KEY]: Date.now(),
-        [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: openReservedAmount,
-      },
-      balance,
-      totalDeposits,
-    }
-  } catch (error) {
-    console.error('Failed to sync MEXAS wallet balance', error)
-    return undefined
+  return {
+    data: {
+      ...data,
+      [MEXAS_WALLET_SYNC_UNITS_KEY]: walletBalance.units.toString(),
+      [MEXAS_WALLET_SYNC_TIME_KEY]: Date.now(),
+      [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: openReservedAmount,
+    },
+    balance,
+    totalDeposits,
   }
 }
 
 async function getNewUserMexasWalletBalance(walletAddress?: string) {
   if (!walletAddress || !isAddress(walletAddress)) return undefined
 
-  try {
-    const units = await getMexasBalanceUnits(walletAddress as Address)
-    const amount = mexasUnitsToAmount(units)
-    return { units, amount }
-  } catch (error) {
-    console.error('Failed to load MEXAS wallet balance for new user', error)
-    return undefined
-  }
+  return readMexasWalletBalance(walletAddress, 'new-user')
 }
 
 async function getAvailableUsername(db: SupabaseClient, name: string) {
@@ -363,6 +377,7 @@ async function updateExistingUser(params: {
         })
         .eq('id', latestUserRow.id)
         .eq('balance', latestUserRow.balance)
+        .filter('data', 'eq', JSON.stringify(latestUserRow.data))
         .select()
         .maybeSingle()
 

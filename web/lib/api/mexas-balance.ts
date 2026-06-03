@@ -78,6 +78,7 @@ export async function acquireMexasUserBalanceLock(
       .from('users')
       .update({ data: lockedData as any })
       .eq('id', userId)
+      .filter('data', 'eq', JSON.stringify(userRow.data))
 
     if (isStaleLocked && typeof previousOwner === 'string') {
       query = query.eq('data->>mexasBalanceLockOwner', previousOwner)
@@ -129,6 +130,7 @@ export async function releaseMexasUserBalanceLock(
       } as any,
     })
     .eq('id', userId)
+    .filter('data', 'eq', JSON.stringify(userRow.data))
     .eq('data->>mexasBalanceLockOwner', lockOwner)
 }
 
@@ -178,6 +180,7 @@ export async function updateMexasUserBalanceCas(
       })
       .eq('id', userId)
       .eq('balance', userRow.balance)
+      .filter('data', 'eq', JSON.stringify(userRow.data))
       .select('id,balance,data')
       .maybeSingle()
 
@@ -220,6 +223,7 @@ export async function setMexasUserBalanceCas(
       })
       .eq('id', userId)
       .eq('balance', userRow.balance)
+      .filter('data', 'eq', JSON.stringify(userRow.data))
       .select('id,balance,data')
       .maybeSingle()
 

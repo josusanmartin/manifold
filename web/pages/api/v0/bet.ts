@@ -52,8 +52,7 @@ type ErrorResponse = { message: string; details?: unknown }
 
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
-const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =
-  'mexasWalletOpenReservedAmount'
+const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY = 'mexasWalletOpenReservedAmount'
 const BALANCE_UPDATE_ATTEMPTS = 5
 const ORDER_PAGE_SIZE = 1000
 const ORDER_LOCK_ATTEMPTS = 20
@@ -161,13 +160,16 @@ function getNoMexasResolutionLockPredicates() {
 
 function combinePostgrestAndPredicates(predicateGroups: string[][]) {
   return predicateGroups
-    .reduce<string[]>((combinations, group) => {
-      return combinations.flatMap((combination) =>
-        group.map((predicate) =>
-          combination ? `${combination},${predicate}` : predicate
+    .reduce<string[]>(
+      (combinations, group) => {
+        return combinations.flatMap((combination) =>
+          group.map((predicate) =>
+            combination ? `${combination},${predicate}` : predicate
+          )
         )
-      )
-    }, [''])
+      },
+      ['']
+    )
     .map((predicate) => `and(${predicate})`)
     .join(',')
 }
@@ -256,6 +258,7 @@ async function syncMexasWalletBalance(
       })
       .eq('id', latestUserRow.id)
       .eq('balance', latestUserRow.balance)
+      .filter('data', 'eq', JSON.stringify(latestUserRow.data))
       .select()
       .maybeSingle()
 
@@ -374,8 +377,10 @@ async function getOpenReservedMexasDataPatch(
   userId: string
 ) {
   return {
-    [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]:
-      await getOpenReservedMexasAmount(db, { userId }),
+    [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: await getOpenReservedMexasAmount(
+      db,
+      { userId }
+    ),
   }
 }
 
@@ -486,6 +491,7 @@ async function updateUserBalanceCas(
       })
       .eq('id', userId)
       .eq('balance', userRow.balance)
+      .filter('data', 'eq', JSON.stringify(userRow.data))
       .select()
       .maybeSingle()
 
@@ -779,7 +785,10 @@ async function placeBinaryBet(
           db,
           syncedUserRow as Row<'users'>
         )
-        if (lockedContract.closeTime && Date.now() >= lockedContract.closeTime) {
+        if (
+          lockedContract.closeTime &&
+          Date.now() >= lockedContract.closeTime
+        ) {
           throw new APIError(403, 'Trading is closed.')
         }
         if (lockedContract.isResolved) {

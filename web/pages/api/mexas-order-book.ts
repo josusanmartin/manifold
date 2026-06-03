@@ -1,5 +1,6 @@
-import type { Bet } from 'common/bet'
+import { LimitBet, type Bet } from 'common/bet'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+import { getMexasOpenOrderAmount } from 'common/mexas-order-book'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import { createClient, type Row } from 'common/supabase/utils'
@@ -11,6 +12,8 @@ import {
 } from 'web/lib/api/mexas-orders'
 
 type ErrorResponse = { message: string }
+const ORDER_BOOK_PAGE_SIZE = 1000
+const MAX_ORDER_BOOK_ROWS = 5000
 
 function getSupabaseAdminClient() {
   const key =
@@ -32,6 +35,45 @@ function getSupabaseAdminClient() {
 
 function getSingleQueryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
+}
+
+function isVisibleMexasLimitOrder(bet: Bet): bet is LimitBet {
+  return (
+    bet.limitProb !== undefined &&
+    bet.orderAmount !== undefined &&
+    !bet.answerId &&
+    !bet.isFilled &&
+    !bet.isCancelled &&
+    (bet.outcome === 'YES' || bet.outcome === 'NO') &&
+    getMexasOpenOrderAmount(bet as LimitBet) > 0
+  )
+}
+
+function sortMexasSidePriceTime(orders: LimitBet[], side: 'YES' | 'NO') {
+  return [...orders].sort((a, b) => {
+    const priceDiff =
+      side === 'YES'
+        ? (b.limitProb ?? 0) - (a.limitProb ?? 0)
+        : (a.limitProb ?? 0) - (b.limitProb ?? 0)
+    if (Math.abs(priceDiff) > 1e-9) return priceDiff
+
+    const timeDiff = (a.createdTime ?? 0) - (b.createdTime ?? 0)
+    if (timeDiff !== 0) return timeDiff
+    return a.id.localeCompare(b.id)
+  })
+}
+
+function getBestOpenMexasOrders(orders: LimitBet[], sideLimit: number) {
+  const bids = sortMexasSidePriceTime(
+    orders.filter((order) => order.outcome === 'YES'),
+    'YES'
+  ).slice(0, sideLimit)
+  const asks = sortMexasSidePriceTime(
+    orders.filter((order) => order.outcome === 'NO'),
+    'NO'
+  ).slice(0, sideLimit)
+
+  return [...bids, ...asks]
 }
 
 export default async function handler(
@@ -74,22 +116,33 @@ export default async function handler(
     await releaseExpiredMexasOrders(db, { contractId })
     await releaseUnbackedMexasOrders(db, { contractId })
 
-    const { data, error } = await db
-      .from('contract_bets')
-      .select('*')
-      .eq('contract_id', contractId)
-      .eq('is_filled', false)
-      .eq('is_cancelled', false)
-      .eq('data->>mexasFundsReserved', 'true')
-      .eq('data->>mexasFundsReleased', 'false')
-      .or(`expires_at.is.null,expires_at.gt.${now}`)
-      .order('created_time', { ascending: false })
-      .limit(limit)
+    const rows: Row<'contract_bets'>[] = []
+    for (
+      let from = 0;
+      rows.length < MAX_ORDER_BOOK_ROWS;
+      from += ORDER_BOOK_PAGE_SIZE
+    ) {
+      const { data, error } = await db
+        .from('contract_bets')
+        .select('*')
+        .eq('contract_id', contractId)
+        .eq('is_filled', false)
+        .eq('is_cancelled', false)
+        .eq('data->>mexasFundsReserved', 'true')
+        .eq('data->>mexasFundsReleased', 'false')
+        .or(`expires_at.is.null,expires_at.gt.${now}`)
+        .order('created_time', { ascending: true })
+        .order('bet_id', { ascending: true })
+        .range(from, from + ORDER_BOOK_PAGE_SIZE - 1)
 
-    if (error) throw error
+      if (error) throw error
+      rows.push(...((data ?? []) as Row<'contract_bets'>[]))
+      if ((data ?? []).length < ORDER_BOOK_PAGE_SIZE) break
+    }
 
-    const bets = (data ?? []).map((row) =>
-      convertBet(row as Row<'contract_bets'>)
+    const bets = getBestOpenMexasOrders(
+      rows.map((row) => convertBet(row)).filter(isVisibleMexasLimitOrder),
+      limit
     )
     res.setHeader('Cache-Control', 's-maxage=5, stale-while-revalidate=30')
     return res.status(200).json(bets)
