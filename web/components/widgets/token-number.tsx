@@ -3,7 +3,7 @@ import {
   formatSweepiesNumber,
   getMoneyNumberToDecimal,
 } from 'common/util/format'
-import { ManaCoin } from 'web/public/custom-components/manaCoin'
+import { ManaCoin } from 'web/components/custom-components/mex-coin'
 import { Row } from '../layout/row'
 import { useAnimatedNumber } from 'web/hooks/use-animated-number'
 import { animated } from '@react-spring/web'

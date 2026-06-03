@@ -3,8 +3,7 @@ User-agent: *
 Allow: /
 
 # Host
-Host: https://manifold.markets
+Host: https://mexas-manifold.vercel.app
 
 # Sitemaps
-Sitemap: https://manifold.markets/server-sitemap.xml
-Sitemap: https://manifold.markets/sitemap.xml
+Sitemap: https://mexas-manifold.vercel.app/sitemap.xml

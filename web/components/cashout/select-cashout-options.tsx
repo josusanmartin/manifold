@@ -15,7 +15,7 @@ import {
 import { Col } from 'web/components/layout/col'
 import { Row } from 'web/components/layout/row'
 import { CashoutPagesType } from 'web/pages/redeem'
-import { ManaCoin } from 'web/public/custom-components/manaCoin'
+import { ManaCoin } from 'web/components/custom-components/mex-coin'
 import { TokenNumber } from '../widgets/token-number'
 import { formatMoney, formatMoneyUSD, formatSweepies } from 'common/util/format'
 import { ReactNode, useState } from 'react'

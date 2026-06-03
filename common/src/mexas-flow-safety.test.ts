@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 
 function readRepoFile(path: string) {
@@ -998,6 +998,85 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain("'Open options'")
   })
 
+  test('production smoke covers public static discovery files', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-production-smoke.ts'
+    )
+    const sitemap = readRepoFile('web/public/sitemap.xml')
+    const robots = readRepoFile('web/public/robots.txt')
+    const opensearch = readRepoFile('web/public/opensearch.xml')
+    const serverSitemap = readRepoFile('web/pages/server-sitemap.xml.tsx')
+    const proxySource = readRepoFile('web/proxy.ts')
+    const publicSurfaceSource = readRepoFile(
+      'common/src/mexas-public-surface.ts'
+    )
+
+    expectMarkersInOrder(source, [
+      'const STATIC_FILES = [',
+      "path: '/sitemap.xml'",
+      'https://mexas-manifold.vercel.app/checkout',
+      "path: '/robots.txt'",
+      'Host: https://mexas-manifold.vercel.app',
+      "path: '/opensearch.xml'",
+      '<ShortName>MEXAS</ShortName>',
+      "path: '/testimonials/testimonials.json'",
+      '"testimonials": []',
+      'const BLOCKED_STATIC_PATHS = [...MEXAS_BLOCKED_PUBLIC_PATHS]',
+      'async function checkStaticFile',
+      'static legacy copy',
+      'async function checkBlockedStaticFile',
+      'blocked static',
+      'for (const file of STATIC_FILES)',
+      'await checkStaticFile(file.path, file.required)',
+      'for (const path of BLOCKED_STATIC_PATHS)',
+      'await checkBlockedStaticFile(path)',
+    ])
+    expect(proxySource).toContain("from 'common/mexas-public-surface'")
+    expect(proxySource).toContain('isBlockedMexasPublicPath(url.pathname)')
+    expect(proxySource).toContain('status: 404')
+    expect(proxySource).toContain(
+      "'/((?!_next/static|_next/image|favicon.ico).*)'"
+    )
+    for (const blockedPath of [
+      "'/pairs-trader.html'",
+      "'/mtg/index.html'",
+      "'/custom-components/manaCoin.tsx'",
+      "'/mana.svg'",
+      "'/predictle-logo.png'",
+    ]) {
+      expect(publicSurfaceSource).toContain(blockedPath)
+    }
+    for (const file of [sitemap, robots, opensearch]) {
+      expect(file).toContain('mexas-manifold.vercel.app')
+      expect(file).not.toContain('manifold.markets')
+      expect(file).not.toContain('Predictle')
+      expect(file).not.toContain('Manifold')
+    }
+    expect(readRepoFile('web/public/testimonials/testimonials.json')).toBe(
+      '{\n  "testimonials": []\n}\n'
+    )
+    for (const path of [
+      'web/public/pairs-trader.html',
+      'web/public/rps.html',
+      'web/public/mtg/index.html',
+      'web/public/mtg/jsons/set.json',
+      'web/public/custom-components/manaCoin.tsx',
+      'web/public/custom-components/manaFlatCoin.tsx',
+      'web/public/mana.svg',
+      'web/public/manaFlat.svg',
+      'web/public/predictle-logo.png',
+      'web/public/prize-drawing-og.png',
+      'web/public/manachan.png',
+      'web/public/buy-mana-graphics/10k.png',
+      'web/public/welcome/manifold-example.gif',
+    ]) {
+      expect(existsSync(join(__dirname, '..', '..', path))).toBe(false)
+    }
+    expect(serverSitemap).toContain("import { MEXAS_SITE_URL }")
+    expect(serverSitemap).toContain('loc: `${MEXAS_SITE_URL}/')
+    expect(serverSitemap).not.toContain('https://manifold.markets/')
+  })
+
   test('production smoke covers broad legacy API blockers', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'
@@ -1512,9 +1591,14 @@ describe('MEXAS flow safety guardrails', () => {
   test('fails closed before proxying unknown Manifold API endpoints', () => {
     const source = readRepoFile('web/proxy.ts')
 
-    expect(source).toContain("'/api/:path*'")
+    expect(source).toContain(
+      "'/((?!_next/static|_next/image|favicon.ico).*)'"
+    )
     expect(source).not.toContain("'/api/v0/:path*'")
     expectMarkersInOrder(source, [
+      'if (isBlockedMexasPublicPath(url.pathname))',
+      'return NextResponse.json(MEXAS_API_UNAVAILABLE_RESPONSE, { status: 404 })',
+      "if (url.pathname.startsWith('/api/'))",
       'if (shouldSkipProxy(path))',
       'if (isBlockedMexasApiProxyPath(path))',
       'if (!isAllowedMexasApiProxyPath(path))',

@@ -3,6 +3,7 @@ import {
   isAllowedMexasApiProxyPath,
   isBlockedMexasApiProxyPath,
 } from 'common/mexas-api-surface'
+import { isBlockedMexasPublicPath } from 'common/mexas-public-surface'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const MEXAS_API_UNAVAILABLE_RESPONSE = {
@@ -24,6 +25,10 @@ export async function proxy(req: NextRequest) {
     } else {
       return NextResponse.redirect(url, 308)
     }
+  }
+
+  if (isBlockedMexasPublicPath(url.pathname)) {
+    return NextResponse.json(MEXAS_API_UNAVAILABLE_RESPONSE, { status: 404 })
   }
 
   // Only run API proxy logic for API requests
@@ -56,13 +61,8 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // API proxy
-    '/api/:path*',
-    // Contract pages - be specific about the format
-    // This matches /username/contract-slug but not / or /browse etc
-    '/([^/]+)/([^/]+)',
-    // Embed pages
-    '/embed/([^/]+)/([^/]+)',
+    // API proxy, legacy public path blockers, and play-param normalization.
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }
 

@@ -1,4 +1,5 @@
 import { MEXAS_BLOCKED_API_SMOKE_PATHS } from 'common/mexas-api-surface'
+import { MEXAS_BLOCKED_PUBLIC_PATHS } from 'common/mexas-public-surface'
 
 type SmokeResult = {
   details: string
@@ -148,6 +149,37 @@ const BLOCKED_API_PATHS = [
   '/api/v0/user/by-id/balance',
 ]
 
+const STATIC_FILES = [
+  {
+    path: '/sitemap.xml',
+    required: [
+      'https://mexas-manifold.vercel.app/checkout',
+      'https://mexas-manifold.vercel.app/wallet',
+      'ganara-mexico-la-copa-mundial-2026',
+    ],
+  },
+  {
+    path: '/robots.txt',
+    required: [
+      'Host: https://mexas-manifold.vercel.app',
+      'Sitemap: https://mexas-manifold.vercel.app/sitemap.xml',
+    ],
+  },
+  {
+    path: '/opensearch.xml',
+    required: [
+      '<ShortName>MEXAS</ShortName>',
+      'https://mexas-manifold.vercel.app/checkout',
+    ],
+  },
+  {
+    path: '/testimonials/testimonials.json',
+    required: ['"testimonials": []'],
+  },
+]
+
+const BLOCKED_STATIC_PATHS = [...MEXAS_BLOCKED_PUBLIC_PATHS]
+
 function pass(name: string, details: string): SmokeResult {
   return { details, name, status: 'pass' }
 }
@@ -240,6 +272,42 @@ async function checkPage(path: string, required: string[]) {
   )
 
   return results
+}
+
+async function checkStaticFile(path: string, required: string[]) {
+  const results: SmokeResult[] = []
+  const { response, text } = await fetchText(path)
+
+  results.push(
+    response.status >= 200 && response.status < 400
+      ? pass(`static ${path}`, `${response.status}`)
+      : fail(`static ${path}`, `${response.status}`)
+  )
+
+  const missingRequired = required.filter((copy) => !text.includes(copy))
+  results.push(
+    missingRequired.length
+      ? fail(`static copy ${path}`, `Missing: ${missingRequired.join(', ')}`)
+      : pass(`static copy ${path}`, 'Required static copy is present.')
+  )
+
+  const forbidden = FORBIDDEN_VISIBLE_COPY.filter((copy) =>
+    text.includes(copy)
+  )
+  results.push(
+    forbidden.length
+      ? fail(`static legacy copy ${path}`, `Found: ${forbidden.join(', ')}`)
+      : pass(`static legacy copy ${path}`, 'No forbidden static copy found.')
+  )
+
+  return results
+}
+
+async function checkBlockedStaticFile(path: string) {
+  const { response } = await fetchManual(path)
+  return response.status === 404
+    ? pass(`blocked static ${path}`, '404')
+    : fail(`blocked static ${path}`, `${response.status}`)
 }
 
 async function checkOrderBook(contractId: string) {
@@ -403,6 +471,14 @@ async function runSmoke() {
 
   for (const page of PAGES) {
     results.push(...(await checkPage(page.path, page.required)))
+  }
+
+  for (const file of STATIC_FILES) {
+    results.push(...(await checkStaticFile(file.path, file.required)))
+  }
+
+  for (const path of BLOCKED_STATIC_PATHS) {
+    results.push(await checkBlockedStaticFile(path))
   }
 
   for (const redirect of REDIRECTS) {

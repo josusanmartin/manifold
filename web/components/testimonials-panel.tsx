@@ -13,10 +13,18 @@ import QuoteIcon from 'web/lib/icons/quote.svg'
 import testimonials from '../public/testimonials/testimonials.json'
 import { PlayMoneyDisclaimer } from './play-money-disclaimer'
 
+type TestimonialData = {
+  testimonial: string
+  name: string
+  credit: string
+  icon: string
+  src: string
+}
+
 export function TestimonialsPanel() {
   const isMobile = useIsMobile()
   const [pageNumber, setPageNumber] = useState(0)
-  const testimonialList = testimonials.testimonials
+  const testimonialList = testimonials.testimonials as TestimonialData[]
   const maxPage = testimonialList.length - 1
   const hasTestimonials = maxPage >= 0
 

@@ -15,11 +15,11 @@ import { randomString } from 'common/util/random'
 import { ArrowLeftIcon } from '@heroicons/react/solid'
 import { Row } from '../layout/row'
 import { Col } from '../layout/col'
-import { ManaCoin } from 'web/public/custom-components/manaCoin'
+import { ManaCoin } from 'web/components/custom-components/mex-coin'
 import { SweepiesCoin } from 'web/public/custom-components/sweepiesCoin'
 
 import clsx from 'clsx'
-import { ManaFlatCoin } from 'web/public/custom-components/manaFlatCoin'
+import { ManaFlatCoin } from 'web/components/custom-components/mex-coin'
 import { SweepiesFlatCoin } from 'web/public/custom-components/sweepiesFlatCoin'
 import PlaceholderGraph from 'web/lib/icons/placeholder-graph.svg'
 

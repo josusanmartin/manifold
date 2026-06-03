@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ManaFlatCoin } from 'web/public/custom-components/manaFlatCoin'
+import { ManaFlatCoin } from 'web/components/custom-components/mex-coin'
 import { SweepiesFlatCoin } from 'web/public/custom-components/sweepiesFlatCoin'
 import { useSweepstakes } from 'web/components/sweepstakes-provider'
 import { Tooltip } from 'web/components/widgets/tooltip'
