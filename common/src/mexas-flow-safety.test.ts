@@ -718,10 +718,21 @@ describe('MEXAS flow safety guardrails', () => {
       ': null',
     ])
     expectMarkersInOrder(source, [
-      'if (withdrawableUnits === null)',
-      'Espera a que se sincronicen tus saldos antes de retirar MEX.',
-      'return',
-      'if (parsedWithdrawAmount > withdrawableUnits)',
+      'const syncInternalWalletBalance = useCallback(async (options?:',
+      'throwOnError?: boolean',
+      'throw new Error(body?.message ??',
+      'if (options?.throwOnError) throw error',
+    ])
+    expectMarkersInOrder(source, [
+      'setWithdrawing(true)',
+      'const latestBalanceUnits = await getMexasBalanceUnits(walletAddress)',
+      'setBalanceUnits(latestBalanceUnits)',
+      'const syncedUser = await syncInternalWalletBalance({ throwOnError: true })',
+      'No se pudo sincronizar tu Wallet antes del retiro.',
+      'const latestWithdrawableUnits = minUnits(',
+      'latestBalanceUnits',
+      'mexasAmountToUnits(syncedUser.user.balance)',
+      'if (parsedWithdrawAmount > latestWithdrawableUnits)',
     ])
     expectMarkersInOrder(source, [
       'eth_sendTransaction',
@@ -1470,6 +1481,8 @@ describe('MEXAS flow safety guardrails', () => {
   test('fails closed before proxying unknown Manifold API endpoints', () => {
     const source = readRepoFile('web/proxy.ts')
 
+    expect(source).toContain("'/api/:path*'")
+    expect(source).not.toContain("'/api/v0/:path*'")
     expectMarkersInOrder(source, [
       'if (shouldSkipProxy(path))',
       'if (isBlockedMexasApiProxyPath(path))',

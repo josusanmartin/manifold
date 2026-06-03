@@ -57,7 +57,7 @@ export async function proxy(req: NextRequest) {
 export const config = {
   matcher: [
     // API proxy
-    '/api/v0/:path*',
+    '/api/:path*',
     // Contract pages - be specific about the format
     // This matches /username/contract-slug but not / or /browse etc
     '/([^/]+)/([^/]+)',

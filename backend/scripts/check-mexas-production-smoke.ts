@@ -140,6 +140,9 @@ const REDIRECTS = [
 
 const BLOCKED_API_PATHS = [
   ...MEXAS_BLOCKED_API_SMOKE_PATHS.map((path) => `/api/${path}`),
+  '/api/og/market',
+  '/api/og/topic',
+  '/api/og/update',
   '/api/v0/deployment-id',
   '/api/v0/search-markets-full',
   '/api/v0/user/by-id/balance',
