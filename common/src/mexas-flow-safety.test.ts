@@ -184,11 +184,25 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expectMarkersInOrder(ordersSource, [
       'async function completePreparedMexasOrderRelease',
-      'await updateMexasUserBalanceCas(db, bet.userId, refundAmount',
+      'await getBackedMexasReleaseCreditAmount(db, bet.userId, refundAmount)',
+      'await updateMexasUserBalanceCas(db, bet.userId, creditAmount',
+      'await updateMexasUserBalanceCas(db, bet.userId, 0',
       'mexasFundsReleased: true',
+      'mexasReleaseCreditAmount',
+      'releaseReason',
       ".eq('is_cancelled', true)",
       ".eq('is_filled', false)",
       ".eq('updated_time', row.updated_time)",
+    ])
+    expectMarkersInOrder(ordersSource, [
+      'async function getBackedMexasReleaseCreditAmount',
+      ".from('users')",
+      ".select('id,balance,data')",
+      'await getUserOnChainMexasAmount(',
+      'const openReservedAmount = await getOpenReservedMexasAmount(db, { userId })',
+      'const backedAvailableAmount = Math.max',
+      'const remainingBackedCredit = Math.max',
+      'return Math.min(refundAmount, remainingBackedCredit)',
     ])
     expectMarkersInOrder(ordersSource, [
       'export async function releaseCancelledMexasOrder',
@@ -268,9 +282,11 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expectMarkersInOrder(source, [
       'async function completePreparedMexasOrderRelease',
-      'await updateMexasUserBalanceCas(db, bet.userId, refundAmount',
+      'await getBackedMexasReleaseCreditAmount(db, bet.userId, refundAmount)',
+      'await updateMexasUserBalanceCas(db, bet.userId, creditAmount',
       'dataPatch: await getOpenReservedMexasDataPatch(db, bet.userId)',
       'mexasFundsReleased: true',
+      'mexasReleaseCreditAmount',
       ".eq('is_cancelled', true)",
       ".eq('is_filled', false)",
       ".eq('updated_time', row.updated_time)",
@@ -315,8 +331,7 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('backend/shared/src/expire-limit-orders.ts')
 
     expectMarkersInOrder(source, [
-      'const releasedMexasOrders = await pg.tx',
-      'releaseExpiredMexasReservedOrders(tx)',
+      'const releasedMexasOrders = await releaseExpiredMexasReservedOrders(pg)',
       'update contract_bets',
       'and expires_at < now()',
       'and not (',
@@ -331,7 +346,13 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('backend/shared/src/expire-limit-orders.ts')
 
     expectMarkersInOrder(source, [
-      'async function releaseExpiredMexasReservedOrders',
+      'async function readMexasWalletAmount',
+      "method: 'eth_call'",
+      'data: encodeBalanceOfCall(walletAddress)',
+      'return hexUnitsToMexasAmount(payload.result)',
+    ])
+    expectMarkersInOrder(source, [
+      'async function loadExpiredMexasReleaseCandidates',
       'from contract_bets b',
       'join contracts c on c.id = b.contract_id',
       'join users u on u.id = b.user_id',
@@ -345,28 +366,49 @@ describe('MEXAS flow safety guardrails', () => {
       'coalesce(b.is_cancelled, false) = true',
       'or b.expires_at < now()',
       'or (c.close_time is not null and c.close_time <= now())',
-      'for update of b, u skip locked',
     ])
     expectMarkersInOrder(source, [
+      'async function prepareBackedMexasReleases',
+      'loadActiveReservedAmountsAfterRelease(',
+      'await readMexasWalletAmount(walletAddress)',
+      'const maxBackedAvailableAmount = roundMexasAmount',
+      'let remainingCreditAmount = roundMexasAmount',
+      'const creditAmount = Math.min',
+      'credit_amount: creditAmount',
+      'max_backed_available_amount: maxBackedAvailableAmount',
+      'unbacked-onchain-balance',
+    ])
+    expectMarkersInOrder(source, [
+      'async function applyPreparedMexasReleases',
       'update contract_bets b',
       'is_cancelled = true',
       "'mexasFundsReleased', true",
       "'mexasReleaseCreditKey', e.credit_key",
+      "'mexasReleaseCreditAmount', e.credit_amount",
       "'mexasReleaseReason', e.release_reason",
       "'mexasReleasedAt', e.released_at",
+      'join users u on u.id = e.user_id',
+      "coalesce((u.data->>'mexasBalanceLock')::boolean, false) = true",
       'returning',
-      'e.refund_amount',
+      'e.credit_amount',
+      'e.max_backed_available_amount',
+      'e.released_at',
     ])
     expectMarkersInOrder(source, [
       'user_credit_events as',
       'mexasBalanceCreditKeys',
       '? e.credit_key',
       'credit_updates as',
-      'round(sum(refund_amount), 8) as credit_amount',
+      'round(sum(credit_amount), 8) as credit_amount',
+      'min(max_backed_available_amount) as max_backed_available_amount',
+      'min(released_at) as released_at',
       'jsonb_agg(credit_key order by credit_key) as credit_keys',
       'update users u',
       'balance = round(u.balance + cu.credit_amount, 8)',
       "'{mexasBalanceCreditKeys}'",
+      "coalesce((u.data->>'mexasBalanceLock')::boolean, false) = true",
+      "coalesce((u.data->>'mexasBalanceLockSince')::bigint, 0) > cu.released_at - 120000",
+      'round(u.balance + cu.credit_amount, 8) <= cu.max_backed_available_amount + 0.00000001',
     ])
     expectMarkersInOrder(source, [
       'open_reserved as',
@@ -375,6 +417,12 @@ describe('MEXAS flow safety guardrails', () => {
       "coalesce((b.data->>'mexasFundsReleased')::boolean, false) = false",
       "'{mexasWalletOpenReservedAmount}'",
       'to_jsonb(open_reserved.amount)',
+    ])
+    expectMarkersInOrder(source, [
+      'async function releaseExpiredMexasReservedOrders',
+      'const candidates = await loadExpiredMexasReleaseCandidates(pg, releasedAt)',
+      'const releases = await prepareBackedMexasReleases(pg, candidates)',
+      'return await pg.tx(async (tx) => applyPreparedMexasReleases(tx, releases))',
     ])
   })
 

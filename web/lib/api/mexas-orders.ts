@@ -22,11 +22,12 @@ const EXPIRED_ORDER_PAGE_SIZE = 1000
 const OPEN_RESERVED_ORDER_PAGE_SIZE = 1000
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
-const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =
-  'mexasWalletOpenReservedAmount'
+const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY = 'mexasWalletOpenReservedAmount'
 const MEXAS_RELEASE_REASON_EXPIRED = 'expired'
 const MEXAS_RELEASE_REASON_MARKET_CLOSED = 'market-closed'
 const MEXAS_RELEASE_REASON_CANCELLED = 'cancelled'
+const MEXAS_RELEASE_REASON_UNBACKED = 'unbacked-onchain-balance'
+const EPSILON = 1e-9
 
 type MexasOrderReleaseOptions = {
   skipUserBalanceLock?: boolean
@@ -94,8 +95,10 @@ async function getOpenReservedMexasDataPatch(
   userId: string
 ) {
   return {
-    [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]:
-      await getOpenReservedMexasAmount(db, { userId }),
+    [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: await getOpenReservedMexasAmount(
+      db,
+      { userId }
+    ),
   }
 }
 
@@ -176,9 +179,7 @@ async function prepareCancelledMexasOrderRelease(
         mexasReleaseCreditKey: refundAmount > 0 ? creditKey : undefined,
         mexasReleaseReason: releaseReason,
         mexasReleasedAt:
-          typeof data.mexasReleasedAt === 'number'
-            ? data.mexasReleasedAt
-            : now,
+          typeof data.mexasReleasedAt === 'number' ? data.mexasReleasedAt : now,
       } as any,
     })
     .eq('bet_id', bet.id)
@@ -270,12 +271,28 @@ async function completePreparedMexasOrderRelease(
     const shouldRefund =
       bet.mexasFundsReserved === true && bet.mexasFundsReleased !== true
     const refundAmount = shouldRefund ? getMexasRemainingReservedAmount(bet) : 0
-    if (refundAmount > 0) {
-      await updateMexasUserBalanceCas(db, bet.userId, refundAmount, {
+    const creditAmount =
+      refundAmount > EPSILON
+        ? await getBackedMexasReleaseCreditAmount(db, bet.userId, refundAmount)
+        : 0
+    if (creditAmount > EPSILON) {
+      await updateMexasUserBalanceCas(db, bet.userId, creditAmount, {
         creditKey,
         dataPatch: await getOpenReservedMexasDataPatch(db, bet.userId),
       })
+    } else {
+      await updateMexasUserBalanceCas(db, bet.userId, 0, {
+        dataPatch: await getOpenReservedMexasDataPatch(db, bet.userId),
+      })
     }
+    const baseReleaseReason =
+      typeof data.mexasReleaseReason === 'string'
+        ? data.mexasReleaseReason
+        : 'release'
+    const releaseReason =
+      creditAmount >= refundAmount - EPSILON
+        ? baseReleaseReason
+        : `${baseReleaseReason}-${MEXAS_RELEASE_REASON_UNBACKED}`
 
     const { data: updatedRow, error } = await db
       .from('contract_bets')
@@ -285,6 +302,8 @@ async function completePreparedMexasOrderRelease(
           isCancelled: true,
           mexasFundsReleased: true,
           mexasReleaseCreditKey: creditKey,
+          mexasReleaseCreditAmount: creditAmount,
+          mexasReleaseReason: releaseReason,
           mexasReleasedAt:
             typeof data.mexasReleasedAt === 'number'
               ? data.mexasReleasedAt
@@ -311,6 +330,41 @@ async function completePreparedMexasOrderRelease(
   } finally {
     await releaseMexasUserBalanceLock(db, bet.userId, balanceLockOwner)
   }
+}
+
+async function getBackedMexasReleaseCreditAmount(
+  db: SupabaseClient,
+  userId: string,
+  refundAmount: number
+) {
+  const { data: userRow, error } = await db
+    .from('users')
+    .select('id,balance,data')
+    .eq('id', userId)
+    .single()
+
+  if (error) throw error
+  if (!userRow) return 0
+
+  const onChainAmount = await getUserOnChainMexasAmount(
+    userRow as Row<'users'>,
+    true
+  )
+  if (onChainAmount === undefined) return 0
+
+  const backedAmount =
+    typeof onChainAmount === 'number' ? onChainAmount : onChainAmount.amount
+  const openReservedAmount = await getOpenReservedMexasAmount(db, { userId })
+  const backedAvailableAmount = Math.max(
+    0,
+    Math.round((backedAmount - openReservedAmount) * 1e8) / 1e8
+  )
+  const remainingBackedCredit = Math.max(
+    0,
+    backedAvailableAmount - userRow.balance
+  )
+
+  return Math.min(refundAmount, remainingBackedCredit)
 }
 
 export async function releaseCancelledMexasOrder(
