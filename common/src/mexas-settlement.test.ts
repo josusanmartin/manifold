@@ -72,10 +72,10 @@ describe('MEXAS settlement audit', () => {
           isCancelled: true,
         })
       )
-    ).toBe(false)
+    ).toBe(true)
   })
 
-  test('ignores cancelled filled bets when auditing settlement exposure', () => {
+  test('keeps cancelled filled bets in settlement exposure', () => {
     const audit = getMexasSettlementAudit([
       bet({
         id: 'cancelled-filled',
@@ -88,17 +88,17 @@ describe('MEXAS settlement audit', () => {
     ])
 
     expect(audit).toEqual({
-      cancelCredit: 0,
-      filledBetCount: 0,
-      filledStake: 0,
+      cancelCredit: 6,
+      filledBetCount: 1,
+      filledStake: 6,
       noCredit: 0,
       openReservationRefund: 0,
-      yesCredit: 0,
-      yesPayout: 0,
+      yesCredit: 20,
+      yesPayout: 20,
       noPayout: 0,
-      cancelPayout: 0,
+      cancelPayout: 6,
     })
-    expect(hasMexasSettlementExposure(audit)).toBe(false)
+    expect(hasMexasSettlementExposure(audit)).toBe(true)
   })
 
   test('audits a fully matched YES/NO pair without creating payout surplus', () => {

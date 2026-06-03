@@ -89,7 +89,7 @@ describe('MEXAS resolution payouts', () => {
     ).toBe(6)
   })
 
-  test('cancelled filled bets receive no resolution payout', () => {
+  test('cancelled filled bets still settle filled exposure', () => {
     const cancelled = filledBet({
       id: 'cancelled-filled',
       userId: 'u1',
@@ -99,11 +99,21 @@ describe('MEXAS resolution payouts', () => {
       isCancelled: true,
     })
 
-    expect(getMexasResolvedBetPayout(cancelled, 'YES')).toBe(0)
+    expect(getMexasResolvedBetPayout(cancelled, 'YES')).toBe(20)
     expect(getMexasResolvedBetPayout(cancelled, 'NO')).toBe(0)
-    expect(getMexasResolvedBetPayout(cancelled, 'CANCEL')).toBe(0)
-    expect(getMexasResolutionPayout(cancelled, 'YES')).toBe(0)
-    expect(getMexasResolutionCreditEvents([cancelled], 'YES')).toEqual([])
+    expect(getMexasResolvedBetPayout(cancelled, 'CANCEL')).toBe(6)
+    expect(getMexasResolutionPayout(cancelled, 'YES')).toBe(20)
+    expect(getMexasResolutionCreditEvents([cancelled], 'YES')).toEqual([
+      {
+        amount: 20,
+        betId: 'cancelled-filled',
+        contractId: 'contract',
+        creditKey: 'mexas-resolution:cancelled-filled:YES',
+        outcome: 'YES',
+        transferType: 'resolution-payout',
+        userId: 'u1',
+      },
+    ])
   })
 
   test('refunds only remaining reserved amount on open orders', () => {
@@ -140,6 +150,35 @@ describe('MEXAS resolution payouts', () => {
         })
       )
     ).toBe(7)
+  })
+
+  test('settles cancelled partial orders without double-refunding released reserve', () => {
+    const partial = limitOrder({
+      id: 'cancelled-partial',
+      userId: 'u1',
+      amount: 2,
+      shares: 4,
+      orderAmount: 5,
+      outcome: 'YES',
+      isCancelled: true,
+      mexasFundsReleased: true,
+    })
+
+    expect(getMexasOpenReservationRefund(partial)).toBe(0)
+    expect(getMexasResolutionPayout(partial, 'YES')).toBe(4)
+    expect(getMexasResolutionPayout(partial, 'NO')).toBe(0)
+    expect(getMexasResolutionPayout(partial, 'CANCEL')).toBe(2)
+    expect(getMexasResolutionCreditEvents([partial], 'YES')).toEqual([
+      {
+        amount: 4,
+        betId: 'cancelled-partial',
+        contractId: 'contract',
+        creditKey: 'mexas-resolution:cancelled-partial:YES',
+        outcome: 'YES',
+        transferType: 'resolution-payout',
+        userId: 'u1',
+      },
+    ])
   })
 
   test('combines open reservation refund and winning payout', () => {

@@ -51,7 +51,6 @@ function roundAmount(value: number) {
 
 export function hasMexasFilledExposure(bet: Bet) {
   return (
-    !bet.isCancelled &&
     (bet.amount ?? 0) > EPSILON &&
     (bet.shares ?? 0) > EPSILON
   )

@@ -16,6 +16,9 @@ y Arbitrum para leer balances ERC-20 y verificar recibos de transferencia.
 - Las ordenes expiradas o cerradas se cancelan y devuelven solo la reserva
   pendiente que siga respaldada por MEX on-chain; el resto queda marcado como
   `unbacked-onchain-balance`.
+- Cancelar una orden parcialmente ejecutada solo cancela el remanente abierto:
+  la posicion ya llenada sigue contando como exposicion y se liquida al resolver
+  el mercado.
 - Las ordenes abiertas sin respaldo on-chain se cancelan sin reembolso interno.
 - Al cancelar una orden, la ruta local rechaza cambios mientras haya lock de
   order book o resolucion en curso, y el reembolso usa clave idempotente y
