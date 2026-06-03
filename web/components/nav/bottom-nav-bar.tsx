@@ -119,7 +119,7 @@ export function BottomNavBar() {
   return (
     <nav
       aria-label="Navegación inferior"
-      className="border-ink-100/30 dark:border-ink-300 text-ink-700 bg-canvas-0 fixed inset-x-0 bottom-0 z-50 flex select-none items-center justify-between border-t text-xs lg:hidden"
+      className="border-ink-100/30 dark:border-ink-300 text-ink-700 bg-canvas-0 fixed inset-x-0 bottom-0 z-50 flex min-h-[58px] select-none items-center justify-between border-t pb-[env(safe-area-inset-bottom)] text-xs lg:hidden"
     >
       <ul
         role="list"

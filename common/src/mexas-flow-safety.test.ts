@@ -1637,6 +1637,34 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('keeps MEXAS mobile order controls above the bottom navigation', () => {
+    const pageSource = readRepoFile('web/components/layout/page.tsx')
+    const navSource = readRepoFile('web/components/nav/bottom-nav-bar.tsx')
+    const contractPageSource = readRepoFile(
+      'web/components/contract/contract-page.tsx'
+    )
+    const betPanelSource = readRepoFile('web/components/bet/bet-panel.tsx')
+
+    expect(pageSource).toContain(
+      'pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0'
+    )
+    expect(navSource).toContain('min-h-[58px]')
+    expect(navSource).toContain('pb-[env(safe-area-inset-bottom)]')
+    expect(contractPageSource).toContain(
+      'min-h-screen md:sticky md:bottom-0 md:self-end'
+    )
+    expect(contractPageSource).toContain(
+      'pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-10 xl:pb-0'
+    )
+    expect(betPanelSource).toContain(
+      'sticky bottom-[calc(58px+env(safe-area-inset-bottom))]'
+    )
+    expect(betPanelSource).toContain('lg:static')
+    expect(contractPageSource).not.toContain(
+      'sticky bottom-0 min-h-screen self-end'
+    )
+  })
+
   test('serves public order book rows only for MEXAS orderbook markets', () => {
     const source = readRepoFile('web/pages/api/mexas-order-book.ts')
 

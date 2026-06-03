@@ -160,7 +160,11 @@ export function BuyPanel(
         <Col>
           <Row className={clsx('mb-2 w-full items-center gap-2')}>
             <YesNoSelector
-              className="flex-1"
+              className={clsx(
+                'flex-1',
+                orderBookOnly &&
+                  'sticky bottom-[calc(58px+env(safe-area-inset-bottom))] z-30 bg-canvas-0 py-2 lg:static lg:z-auto lg:bg-transparent lg:py-0'
+              )}
               btnClassName="flex-1 px-2 sm:px-6"
               selected={outcome}
               highlight

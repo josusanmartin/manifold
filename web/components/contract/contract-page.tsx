@@ -183,9 +183,9 @@ export function ContractPageContent(props: ContractParams) {
           className={clsx(
             'border-ink-200 bg-canvas-0 w-full max-w-4xl border-x xl:w-[72%] ',
             // Keep content in view when scrolling related questions on desktop.
-            'sticky bottom-0 min-h-screen self-end',
+            'min-h-screen md:sticky md:bottom-0 md:self-end',
             // Accommodate scroll to top button at bottom of page.
-            'pb-10 xl:pb-0'
+            'pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-10 xl:pb-0'
           )}
         >
           <div
