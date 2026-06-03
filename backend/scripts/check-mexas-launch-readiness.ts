@@ -102,6 +102,10 @@ type EscrowedOpenMexasLimitOrder = OpenMexasLimitOrder & {
   hasCaptureMetadata: boolean
 }
 
+type WalletReservedOpenMexasLimitOrder = OpenMexasLimitOrder & {
+  userId: string
+}
+
 type MexasMarketLockIssue = {
   ageMs?: number
   contractId: string
@@ -1108,6 +1112,56 @@ async function loadOpenEscrowedMexasLimitOrders(
   return orders
 }
 
+async function loadOpenWalletReservedMexasLimitOrders(
+  db: SupabaseClient,
+  contractIds: string[]
+) {
+  if (!contractIds.length) return []
+
+  const now = new Date().toISOString()
+  const orders: WalletReservedOpenMexasLimitOrder[] = []
+
+  for (let from = 0; ; from += OPEN_ORDER_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('contract_bets')
+      .select('*')
+      .in('contract_id', contractIds)
+      .eq('is_filled', false)
+      .eq('is_cancelled', false)
+      .eq('data->>mexasFundsReserved', 'true')
+      .eq('data->>mexasFundsReleased', 'false')
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
+
+    if (error) throw error
+
+    for (const row of (data ?? []) as Row<'contract_bets'>[]) {
+      const bet = convertBet(row)
+      if (bet.answerId) continue
+      if (bet.outcome !== 'YES' && bet.outcome !== 'NO') continue
+      if (typeof bet.limitProb !== 'number') continue
+
+      const reservedBet = bet as LimitBet & MexasReservedOrderData
+      if (!hasActiveMexasWalletReservation(reservedBet)) continue
+
+      const openAmount = getMexasOpenOrderAmount(reservedBet)
+      if (openAmount <= EPSILON) continue
+
+      orders.push({
+        betId: bet.id,
+        contractId: bet.contractId,
+        limitProb: bet.limitProb,
+        openAmount,
+        outcome: bet.outcome,
+        userId: bet.userId,
+      })
+    }
+    if ((data ?? []).length < OPEN_ORDER_PAGE_SIZE) break
+  }
+
+  return orders
+}
+
 function formatProbability(prob: number) {
   return `${(prob * 100).toFixed(2)}%`
 }
@@ -1298,6 +1352,55 @@ async function checkEscrowedMexasStakeReleaseReadiness(
   } catch (error) {
     const message = formatDiagnosticError(error)
     return fail('escrowed stake release readiness', message)
+  }
+}
+
+async function checkNoWalletReservedOrdersBeforeEscrowLaunch(
+  db: SupabaseClient,
+  escrowCaptureOrders: string | undefined
+): Promise<CheckResult> {
+  try {
+    if (escrowCaptureOrders !== 'true') {
+      return pass(
+        'wallet-reserved order migration',
+        'Escrow capture is not enabled; wallet-reserved orders are still the active runtime.'
+      )
+    }
+
+    const contractIds = await loadOpenMexasOrderbookContractIds(db)
+    const walletReservedOrders = await loadOpenWalletReservedMexasLimitOrders(
+      db,
+      contractIds
+    )
+
+    if (walletReservedOrders.length) {
+      return fail(
+        'wallet-reserved order migration',
+        `${walletReservedOrders
+          .slice(0, 5)
+          .map(
+            (order) =>
+              `${order.contractId}/${order.betId} ${
+                order.outcome
+              } ${formatProbability(order.limitProb)} ${
+                order.openAmount
+              } MEX by ${order.userId}`
+          )
+          .join('; ')}${
+          walletReservedOrders.length > 5
+            ? `; ${walletReservedOrders.length - 5} more`
+            : ''
+        }. Cancel or expire wallet-reserved orders before enabling treasury escrow orders.`
+      )
+    }
+
+    return pass(
+      'wallet-reserved order migration',
+      'No active wallet-reserved MEXAS orders would be hidden by treasury escrow mode.'
+    )
+  } catch (error) {
+    const message = formatDiagnosticError(error)
+    return fail('wallet-reserved order migration', message)
   }
 }
 
@@ -2033,6 +2136,12 @@ async function runChecks() {
   const missingEscrowCapabilities = getMissingMexasEscrowCapabilities()
   if (supabaseDb) {
     checks.push(await checkTreasuryTransferReconciliation(supabaseDb))
+    checks.push(
+      await checkNoWalletReservedOrdersBeforeEscrowLaunch(
+        supabaseDb,
+        escrowCaptureOrders
+      )
+    )
     checks.push(
       await checkMexasSettlementExposure(supabaseDb, { hasOperationalEscrow })
     )

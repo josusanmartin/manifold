@@ -3084,6 +3084,28 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('launch readiness blocks escrow launch with active wallet-reserved orders', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expectMarkersInOrder(source, [
+      'type WalletReservedOpenMexasLimitOrder',
+      'async function loadOpenWalletReservedMexasLimitOrders',
+      ".eq('data->>mexasFundsReserved', 'true')",
+      ".eq('data->>mexasFundsReleased', 'false')",
+      'hasActiveMexasWalletReservation(reservedBet)',
+      'async function checkNoWalletReservedOrdersBeforeEscrowLaunch',
+      "escrowCaptureOrders !== 'true'",
+      "fail(\n        'wallet-reserved order migration'",
+      'Cancel or expire wallet-reserved orders before enabling treasury escrow orders.',
+      'checks.push(\n      await checkNoWalletReservedOrdersBeforeEscrowLaunch',
+    ])
+    expect(source).toContain(
+      'No active wallet-reserved MEXAS orders would be hidden by treasury escrow mode.'
+    )
+  })
+
   test('launch readiness checks treasury MEX backing for active escrow liabilities', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'
