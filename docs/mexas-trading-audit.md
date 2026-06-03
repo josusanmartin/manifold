@@ -99,6 +99,9 @@ Escenarios probados:
 - Price-time priority: un taker `YES` cruzo contra tres asks `NO`; el RPC lleno
   primero el mejor precio (`60%`) y despues las dos ordenes `70%` por antiguedad
   (`created_time`, luego `bet_id`).
+- Filtros de makers invalidos: makers del mismo usuario, expirados,
+  cancelados, ya llenados o con `mexasFundsReleased=true` quedaron intactos y
+  no entraron al match aunque tuvieran mejor precio.
 - Carrera de dos traders: dos takers `YES` concurrentes compitieron por el
   mismo maker `NO` con 5 MEX abiertos. El `FOR UPDATE` del RPC serializo la
   ejecucion: un taker lleno, el maker quedo lleno una sola vez y el segundo
@@ -106,14 +109,17 @@ Escenarios probados:
 - Separacion wallet/escrow: un taker wallet-reserved no cruzo contra una orden
   treasury-escrowed aunque tenia mejor precio; solo cruzo contra el libro
   wallet-reserved.
+- Metadata escrow: una orden marcada `mexasStakeEscrowed=true` pero sin
+  metadata de captura requerida hizo fallar el RPC cerradamente antes de tocar
+  el libro.
 - Guards de mercado: el RPC rechazo takers expirados, mercados cerrados y
   mercados ya resueltos.
 - Produccion smoke: paginas, redirects, endpoints bloqueados, orderbook,
   readiness de ordenes/resolucion y auth fail-closed pasaron.
 - Produccion launch readiness: sigue bloqueado correctamente por SQL no aplicado
   en Supabase produccion, ausencia de `MEXAS_TREASURY_SIGNER_SECRET` en Vercel
-  production y ausencia de un connection string local para aplicar/verificar SQL
-  directamente.
+  production, tesoreria sin gas ETH en Arbitrum y ausencia de un connection
+  string local para aplicar/verificar SQL directamente.
 - La auditoria encontro una posicion de prueba parcialmente ejecutada y no
   respaldada por escrow en `ukrwarend26a/hnPI2tcupSt6`. Se corrigio el auditor
   para contar posiciones canceladas pero ya llenadas, se acredito el unwind

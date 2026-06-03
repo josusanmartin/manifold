@@ -289,6 +289,7 @@ async function seedOrder(
     createdTime: Date
     escrowed?: boolean
     expiresAt?: Date
+    fundsReleased?: boolean
     id: string
     isCancelled?: boolean
     isFilled?: boolean
@@ -314,7 +315,7 @@ async function seedOrder(
     isRedemption: false,
     fills: [],
     mexasFundsReserved: true,
-    mexasFundsReleased: false,
+    mexasFundsReleased: params.fundsReleased ?? false,
     mexasReservedAmount: params.orderAmount,
     mexasStakeEscrowed: params.escrowed ? true : undefined,
     mexasEscrowTxHash: params.escrowed
@@ -456,9 +457,12 @@ async function testPriceTimePriority(client: PgClient) {
   await seedUsers(client, [
     'same-user',
     'maker-cheap',
+    'maker-cancelled',
     'maker-old',
     'maker-new',
     'maker-expired',
+    'maker-filled',
+    'maker-released',
     'taker',
   ])
   await seedContract(client, contractId)
@@ -480,6 +484,38 @@ async function testPriceTimePriority(client: PgClient) {
     outcome: 'NO',
     userId: 'maker-expired',
     expiresAt: new Date(MATCH_TIMESTAMP_MS - 60_000),
+  })
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:02.100Z'),
+    id: 'cancelled-best-ask',
+    isCancelled: true,
+    limitProb: 0.52,
+    orderAmount: 5,
+    outcome: 'NO',
+    userId: 'maker-cancelled',
+  })
+  await seedOrder(client, {
+    amount: 2,
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:02.200Z'),
+    id: 'filled-best-ask',
+    isFilled: true,
+    limitProb: 0.53,
+    orderAmount: 5,
+    outcome: 'NO',
+    shares: 4,
+    userId: 'maker-filled',
+  })
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:02.300Z'),
+    fundsReleased: true,
+    id: 'released-best-ask',
+    limitProb: 0.54,
+    orderAmount: 5,
+    outcome: 'NO',
+    userId: 'maker-released',
   })
   await seedOrder(client, {
     contractId,
@@ -540,6 +576,12 @@ async function testPriceTimePriority(client: PgClient) {
   assertEqual(Number(sameUserAsk.amount), 0, 'same-user ask stays untouched')
   const expiredAsk = await loadOrder(client, 'expired-best-ask')
   assertEqual(Number(expiredAsk.amount), 0, 'expired ask stays untouched')
+  const cancelledAsk = await loadOrder(client, 'cancelled-best-ask')
+  assertEqual(Number(cancelledAsk.amount), 0, 'cancelled ask stays untouched')
+  const filledAsk = await loadOrder(client, 'filled-best-ask')
+  assertEqual(Number(filledAsk.amount), 2, 'filled ask stays untouched')
+  const releasedAsk = await loadOrder(client, 'released-best-ask')
+  assertEqual(Number(releasedAsk.amount), 0, 'released ask stays untouched')
 }
 
 async function testConcurrentTakers(
@@ -611,7 +653,13 @@ async function testConcurrentTakers(
 }
 
 async function testEscrowAndMarketGuards(client: PgClient) {
-  await seedUsers(client, ['wallet-maker', 'escrow-maker', 'guard-taker'])
+  await seedUsers(client, [
+    'wallet-maker',
+    'escrow-maker',
+    'bad-escrow-maker',
+    'bad-escrow-taker',
+    'guard-taker',
+  ])
 
   await seedContract(client, 'wallet-vs-escrow')
   await seedOrder(client, {
@@ -648,6 +696,37 @@ async function testEscrowAndMarketGuards(client: PgClient) {
     result.matches.map((match) => match.makerBetId),
     ['wallet-ask'],
     'wallet taker only matches wallet-reserved asks'
+  )
+
+  await seedContract(client, 'bad-escrow-metadata')
+  await seedOrder(client, {
+    contractId: 'bad-escrow-metadata',
+    createdTime: new Date('2026-06-03T00:02:10Z'),
+    escrowed: true,
+    id: 'bad-escrow-ask',
+    limitProb: 0.7,
+    orderAmount: 3,
+    outcome: 'NO',
+    userId: 'bad-escrow-maker',
+  })
+  await client.query(
+    "update public.contract_bets set data = data - 'mexasEscrowTxHash' where bet_id = $1",
+    ['bad-escrow-ask']
+  )
+  await seedOrder(client, {
+    contractId: 'bad-escrow-metadata',
+    createdTime: new Date('2026-06-03T00:02:11Z'),
+    escrowed: true,
+    id: 'bad-escrow-taker',
+    limitProb: 0.8,
+    orderAmount: 7,
+    outcome: 'YES',
+    userId: 'bad-escrow-taker',
+  })
+  await expectMatchError(
+    client,
+    'bad-escrow-taker',
+    /Escrowed maker is missing capture metadata/
   )
 
   await seedContract(client, 'closed-market', {
