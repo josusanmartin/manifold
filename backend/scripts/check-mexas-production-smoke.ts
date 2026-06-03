@@ -740,6 +740,20 @@ async function runSmoke() {
     )
   )
   results.push(
+    await checkExpectedStatus(
+      'blocked api ignores play param',
+      '/api/v0/comment?play=true',
+      404
+    )
+  )
+  results.push(
+    await checkExpectedStatus(
+      'blocked static ignores play param',
+      '/mana.svg?play=false',
+      404
+    )
+  )
+  results.push(
     await checkExpectedStatus('method bets POST', '/api/v0/bets', 405, {
       method: 'POST',
     })

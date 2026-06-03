@@ -13,20 +13,6 @@ const MEXAS_API_UNAVAILABLE_RESPONSE = {
 export async function proxy(req: NextRequest) {
   const url = req.nextUrl
 
-  // Handle play parameter removal for all requests
-  if (url.searchParams.has('play')) {
-    const playValue = url.searchParams.get('play')
-    url.searchParams.delete('play')
-
-    if (playValue === 'false') {
-      // Redirect to path with --cash suffix and no query parameters
-      const newUrl = new URL(url.pathname + '--cash', url.origin)
-      return NextResponse.redirect(newUrl, 308)
-    } else {
-      return NextResponse.redirect(url, 308)
-    }
-  }
-
   if (isBlockedMexasPublicPath(url.pathname)) {
     return NextResponse.json(MEXAS_API_UNAVAILABLE_RESPONSE, { status: 404 })
   }
@@ -53,6 +39,20 @@ export async function proxy(req: NextRequest) {
         location: getProxiedRequestUrl(req, path),
       },
     })
+  }
+
+  // Handle play parameter removal for non-API page requests after all MEXAS
+  // launch-surface blockers have had a chance to fail closed.
+  if (url.searchParams.has('play')) {
+    const playValue = url.searchParams.get('play')
+    url.searchParams.delete('play')
+
+    if (playValue === 'false') {
+      const newUrl = new URL(url.pathname + '--cash', url.origin)
+      return NextResponse.redirect(newUrl, 308)
+    } else {
+      return NextResponse.redirect(url, 308)
+    }
   }
 
   // For non-API requests, just continue normally

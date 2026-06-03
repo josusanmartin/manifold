@@ -2087,6 +2087,7 @@ describe('MEXAS flow safety guardrails', () => {
       'if (!isAllowedMexasApiProxyPath(path))',
       'return NextResponse.json(MEXAS_API_UNAVAILABLE_RESPONSE, { status: 404 })',
       "return new Response('Permanent Redirect'",
+      "if (url.searchParams.has('play'))",
     ])
   })
 
