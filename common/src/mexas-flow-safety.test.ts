@@ -1047,7 +1047,7 @@ describe('MEXAS flow safety guardrails', () => {
       'mexasEscrowCaptureEnabled()',
       'params.mexasEscrowTxHash && !escrowCaptureRequired',
       'La captura on-chain MEXAS todavía no está habilitada.',
-      'escrowCaptureRequired && !params.mexasEscrowTxHash',
+      'escrowCaptureRequired && !params.mexasEscrowTxHash && !params.dryRun',
       'La orden requiere una transferencia MEXAS on-chain a tesorería.',
       'verifyMexasEscrowCapture',
       'payerAddress: walletAddress',

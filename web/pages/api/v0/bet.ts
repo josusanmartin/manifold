@@ -792,7 +792,7 @@ async function placeBinaryBet(
       'La captura on-chain MEXAS todavía no está habilitada.'
     )
   }
-  if (escrowCaptureRequired && !params.mexasEscrowTxHash) {
+  if (escrowCaptureRequired && !params.mexasEscrowTxHash && !params.dryRun) {
     throw new APIError(
       400,
       'La orden requiere una transferencia MEXAS on-chain a tesorería.'
