@@ -1232,6 +1232,7 @@ describe('MEXAS flow safety guardrails', () => {
       'backend/scripts/check-mexas-production-smoke.ts'
     )
     const nextConfigSource = readRepoFile('web/next.config.js')
+    const appSource = readRepoFile('web/pages/_app.tsx')
 
     expectMarkersInOrder(smokeSource, [
       'async function checkRedirect',
@@ -1275,6 +1276,10 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(nextConfigSource).not.toContain('analytics.umami.is')
     expect(nextConfigSource).not.toContain('Manifold%20Markets')
+    expect(appSource).not.toContain('analytics.umami.is')
+    expect(appSource).not.toContain('googletagmanager.com')
+    expect(appSource).not.toContain('Manifold%20Markets')
+    expect(appSource).not.toContain("from 'next/script'")
   })
 
   test('MEXAS market static props bypass legacy comments and related-market prefetches', () => {
