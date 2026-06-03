@@ -586,7 +586,8 @@ describe('MEXAS flow safety guardrails', () => {
       "await api('market/:contractId/sell'",
     ])
     expect(apiSurfaceSource).toContain('/^v0\\/market\\/[^/]+\\/sell$/')
-    expect(smokeSource).toContain("'/api/v0/market/mexwcwin26a/sell'")
+    expect(apiSurfaceSource).toContain("'v0/market/mexwcwin26a/sell'")
+    expect(smokeSource).toContain('MEXAS_BLOCKED_API_SMOKE_PATHS')
   })
 
   test('does not overstate live MEXAS execution before escrow is implemented', () => {
@@ -917,27 +918,32 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'
     )
+    const apiSurfaceSource = readRepoFile('common/src/mexas-api-surface.ts')
 
+    expect(source).toContain('MEXAS_BLOCKED_API_SMOKE_PATHS')
+    expect(source).toContain(
+      '...MEXAS_BLOCKED_API_SMOKE_PATHS.map((path) => `/api/${path}`)'
+    )
     for (const path of [
-      '/api/v0/comment',
-      '/api/v0/comments',
-      '/api/v0/create-post-comment',
-      '/api/v0/purchase-boost',
-      '/api/v0/get-mana-supply',
-      '/api/v0/get-mana-summary-stats',
-      '/api/v0/manalink',
-      '/api/v0/claimmanalink',
-      '/api/v0/create-idenfy-session',
-      '/api/v0/get-verification-status-gidx',
-      '/api/v0/get-market-loan-max',
-      '/api/v0/market/mexwcwin26a/add-liquidity',
-      '/api/v0/market/mexwcwin26a/add-bounty',
-      '/api/v0/get-predictle-result',
-      '/api/v0/admin-create-sweepstakes',
-      '/api/v0/buy-sweepstakes-tickets',
-      '/api/v0/shop-purchase',
+      'v0/comment',
+      'v0/comments',
+      'v0/create-post-comment',
+      'v0/purchase-boost',
+      'v0/get-mana-supply',
+      'v0/get-mana-summary-stats',
+      'v0/manalink',
+      'v0/claimmanalink',
+      'v0/create-idenfy-session',
+      'v0/get-verification-status-gidx',
+      'v0/get-market-loan-max',
+      'v0/market/mexwcwin26a/add-liquidity',
+      'v0/market/mexwcwin26a/add-bounty',
+      'v0/get-predictle-result',
+      'v0/admin-create-sweepstakes',
+      'v0/buy-sweepstakes-tickets',
+      'v0/shop-purchase',
     ]) {
-      expect(source).toContain(`'${path}'`)
+      expect(apiSurfaceSource).toContain(`'${path}'`)
     }
     expect(source).toContain(
       'Promise.all(BLOCKED_API_PATHS.map(checkBlockedApi))'
