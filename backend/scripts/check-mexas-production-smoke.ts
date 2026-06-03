@@ -440,9 +440,39 @@ async function checkStaticFile(path: string, required: string[]) {
 
 async function checkBlockedStaticFile(path: string) {
   const { response } = await fetchManual(path)
-  return response.status === 404
-    ? pass(`blocked static ${path}`, '404')
-    : fail(`blocked static ${path}`, `${response.status}`)
+  if (response.status === 404) return pass(`blocked static ${path}`, '404')
+
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get('location') ?? ''
+    const decodedLocation = decodeEntities(decodeURIComponentSafe(location))
+    const forbiddenLocation = FORBIDDEN_VISIBLE_COPY.filter((copy) =>
+      decodedLocation.includes(copy)
+    )
+    if (forbiddenLocation.length) {
+      return fail(
+        `blocked static ${path}`,
+        `Forbidden destination copy: ${forbiddenLocation.join(', ')}`
+      )
+    }
+
+    const locationUrl = location ? new URL(location, SITE_URL) : undefined
+    const destination = locationUrl
+      ? `${locationUrl.pathname}${locationUrl.search}`
+      : 'no location'
+    const followed = await smokeFetch(path, { redirect: 'follow' })
+
+    return followed.status === 404
+      ? pass(
+          `blocked static ${path}`,
+          `${response.status} -> ${destination} -> 404`
+        )
+      : fail(
+          `blocked static ${path}`,
+          `${response.status} -> ${destination} -> ${followed.status}`
+        )
+  }
+
+  return fail(`blocked static ${path}`, `${response.status}`)
 }
 
 async function checkOrderBook(contractId: string) {
