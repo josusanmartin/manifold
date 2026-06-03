@@ -1,8 +1,4 @@
-import {
-  getApiUrl,
-  getWebsocketUrl,
-  isMexasBrowserHostname,
-} from './api/utils'
+import { getApiUrl, getWebsocketUrl, isMexasBrowserHostname } from './api/utils'
 
 describe('MEXAS API URL routing', () => {
   const originalWindow = globalThis.window

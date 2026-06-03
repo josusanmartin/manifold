@@ -120,6 +120,16 @@ export default async function handler(
         matchingEngineReady: true,
       })
     }
+    if (settings.enableEscrowCaptureOrders === 'true') {
+      return res.status(200).json({
+        canPlaceOrders: false,
+        escrowCaptureEnabled: false,
+        matchingEngineReady: false,
+        message:
+          escrowRuntime.message ??
+          'Las nuevas órdenes MEXAS están pausadas hasta completar la liquidación on-chain.',
+      })
+    }
 
     return res.status(200).json({
       canPlaceOrders: true,

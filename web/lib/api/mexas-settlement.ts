@@ -75,11 +75,21 @@ export async function assertMexasCanMatchCrossingOrders(
 }
 
 export async function assertMexasCanAcceptLimitOrders(_db: SupabaseClient) {
-  if (canMexasAcceptLimitOrders(getMexasSettlementSettings())) {
-    return
+  const settings = getMexasSettlementSettings()
+  if (!canMexasAcceptLimitOrders(settings)) {
+    throw new APIError(503, 'No se pueden abrir órdenes MEXAS en este momento.')
   }
 
-  throw new APIError(503, 'No se pueden abrir órdenes MEXAS en este momento.')
+  if (settings.enableEscrowCaptureOrders !== 'true') return
+
+  const escrowRuntime = await getMexasEscrowRuntimeStatus(_db)
+  if (escrowRuntime.enabled) return
+
+  throw new APIError(
+    503,
+    escrowRuntime.message ??
+      'Las nuevas órdenes MEXAS están pausadas hasta completar la liquidación on-chain.'
+  )
 }
 
 export async function assertMexasCanResolveFilledPositions(

@@ -1442,7 +1442,9 @@ describe('MEXAS flow safety guardrails', () => {
   })
 
   test('MEXAS market UI does not call the broad bets history endpoint', () => {
-    const contractPage = readRepoFile('web/components/contract/contract-page.tsx')
+    const contractPage = readRepoFile(
+      'web/components/contract/contract-page.tsx'
+    )
     const yourTrades = readRepoFile('web/components/contract/your-trades.tsx')
     const betPanel = readRepoFile('web/components/bet/bet-panel.tsx')
     const chartPositions = readRepoFile('web/hooks/use-chart-positions.ts')
@@ -2028,8 +2030,13 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expectMarkersInOrder(source, [
       'export async function assertMexasCanAcceptLimitOrders',
-      'canMexasAcceptLimitOrders(getMexasSettlementSettings())',
+      'const settings = getMexasSettlementSettings()',
+      'canMexasAcceptLimitOrders(settings)',
       'No se pueden abrir órdenes MEXAS en este momento.',
+      "settings.enableEscrowCaptureOrders !== 'true'",
+      'const escrowRuntime = await getMexasEscrowRuntimeStatus(_db)',
+      'if (escrowRuntime.enabled) return',
+      'Las nuevas órdenes MEXAS están pausadas hasta completar la liquidación on-chain.',
     ])
     expectMarkersInOrder(apiSource, [
       'if (params.dryRun)',
@@ -2054,6 +2061,11 @@ describe('MEXAS flow safety guardrails', () => {
       'canPlaceOrders: true',
       'escrowCaptureEnabled: true',
       'matchingEngineReady: true',
+      "settings.enableEscrowCaptureOrders === 'true'",
+      'canPlaceOrders: false',
+      'escrowCaptureEnabled: false',
+      'matchingEngineReady: false',
+      'Las nuevas órdenes MEXAS están pausadas hasta completar la liquidación on-chain.',
       'canPlaceOrders: true',
       'escrowCaptureEnabled: false',
       'matchingEngineReady: false',
@@ -2844,9 +2856,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain("'mexasBalanceCreditKeys'")
     expect(source).toContain("'mexasTestUnwound', true")
     expect(source).toContain('rollback;')
-    expect(source).not.toContain(
-      'and coalesce(b.is_cancelled, false) = false'
-    )
+    expect(source).not.toContain('and coalesce(b.is_cancelled, false) = false')
     expect(source).not.toContain('and coalesce(b.is_filled, false) = true')
     expect(source).not.toContain('.update(')
     expect(source).not.toContain('.insert(')
