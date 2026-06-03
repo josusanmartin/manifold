@@ -2568,7 +2568,11 @@ describe('MEXAS flow safety guardrails', () => {
       'const audit = getMexasSettlementAudit(rows.map((row) => convertBet(row)))',
       'filledContractAudit',
       'contractExposureDetails',
+      'const filledEntries = rows',
+      'hasMexasFilledExposure',
+      'const unescrowedFilledEntries = filledEntries.filter',
       'if (audit.filledBetCount === 0)',
+      'filled MEXAS position(s) are not escrow-backed',
       'if (!options.hasOperationalEscrow)',
       'filled MEXAS positions require escrow before resolution payouts',
       'Filled-market credit exposure',
@@ -2579,6 +2583,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('YES ${filledContractAudit.yesCredit} MEX')
     expect(source).toContain('NO ${filledContractAudit.noCredit} MEX')
     expect(source).toContain('CANCEL ${filledContractAudit.cancelCredit} MEX')
+    expect(source).toContain('Unwind or manually reconcile these positions')
     expect(compact).toContain(
       'Open reservation refunds across all unresolved MEXAS markets: ${ audit.openReservationRefund } MEX'
     )
@@ -2815,6 +2820,26 @@ describe('MEXAS flow safety guardrails', () => {
       'missing escrow capture metadata',
       'active escrowed MEXAS orders require operational treasury release/payout code',
       'checks.push(\n      await checkEscrowedMexasStakeReleaseReadiness',
+    ])
+  })
+
+  test('launch readiness checks treasury MEX backing for active escrow liabilities', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expectMarkersInOrder(source, [
+      'type MexasBetEntry',
+      'async function loadUnresolvedMexasBetEntries',
+      'async function checkTreasuryMexasLiabilityBacking',
+      'hasMexasEscrowedStake',
+      'const audit = getMexasSettlementAudit(escrowedBets)',
+      'const requiredAmount = Math.max',
+      'readMexasWalletBalanceUnits',
+      "'treasury MEX liability backing'",
+      'Treasury has ${formatMexasUnits',
+      'active escrow liabilities require up to',
+      'checks.push(await checkTreasuryMexasLiabilityBacking(db, vercelEnvValues))',
     ])
   })
 

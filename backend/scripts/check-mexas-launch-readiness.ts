@@ -2,10 +2,11 @@ import { execFileSync } from 'child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
-import { type LimitBet } from 'common/bet'
+import { type Bet, type LimitBet } from 'common/bet'
 import {
   getMissingMexasEscrowCapabilities,
   getMexasSettlementAudit,
+  hasMexasFilledExposure,
   hasOperationalMexasEscrow,
 } from 'common/mexas-settlement'
 import { MEXAS_PUBLIC_RPC_URL, MEXAS_TOKEN } from 'common/crypto/mexas'
@@ -128,6 +129,11 @@ type MexasContractTokenAlignmentRow = {
   id: string
   slug: string | null
   token: string | null
+}
+
+type MexasBetEntry = {
+  bet: Bet
+  row: Row<'contract_bets'>
 }
 
 function parseEnvAssignment(line: string) {
@@ -838,6 +844,33 @@ async function loadOpenMexasOrderbookContractIds(db: SupabaseClient) {
   return ((data ?? []) as Pick<Row<'contracts'>, 'id'>[]).map((row) => row.id)
 }
 
+async function loadUnresolvedMexasBetEntries(db: SupabaseClient) {
+  const contractIds = await loadOpenMexasOrderbookContractIds(db)
+  const entries: MexasBetEntry[] = []
+  if (!contractIds.length) return entries
+
+  for (let from = 0; ; from += OPEN_ORDER_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('contract_bets')
+      .select('*')
+      .in('contract_id', contractIds)
+      .eq('is_cancelled', false)
+      .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
+
+    if (error) throw error
+
+    entries.push(
+      ...((data ?? []) as Row<'contract_bets'>[]).map((row) => ({
+        bet: convertBet(row),
+        row,
+      }))
+    )
+    if ((data ?? []).length < OPEN_ORDER_PAGE_SIZE) break
+  }
+
+  return entries
+}
+
 async function loadOpenReservedMexasOrders(
   db: SupabaseClient,
   contractIds: string[]
@@ -1472,6 +1505,80 @@ async function checkInternalMexasBalanceBacking(
   }
 }
 
+async function checkTreasuryMexasLiabilityBacking(
+  db: SupabaseClient,
+  vercelEnvValues: Map<string, string>
+): Promise<CheckResult> {
+  try {
+    const entries = await loadUnresolvedMexasBetEntries(db)
+    const escrowedBets = entries
+      .map((entry) => entry.bet)
+      .filter((bet) =>
+        hasMexasEscrowedStake(bet as LimitBet & MexasReservedOrderData)
+      )
+
+    if (!escrowedBets.length) {
+      return pass(
+        'treasury MEX liability backing',
+        'No active escrowed MEXAS liabilities require treasury MEX backing.'
+      )
+    }
+
+    const audit = getMexasSettlementAudit(escrowedBets)
+    const requiredAmount = Math.max(
+      audit.yesCredit,
+      audit.noCredit,
+      audit.cancelCredit
+    )
+    if (requiredAmount <= EPSILON) {
+      return pass(
+        'treasury MEX liability backing',
+        `${escrowedBets.length} escrowed MEXAS rows have no remaining treasury MEX liability.`
+      )
+    }
+
+    const treasuryAddress = getEnvOrVercelValue(
+      'MEXAS_TREASURY_WALLET_ADDRESS',
+      vercelEnvValues
+    )
+    if (!treasuryAddress || !EVM_ADDRESS_PATTERN.test(treasuryAddress)) {
+      return fail(
+        'treasury MEX liability backing',
+        'MEXAS_TREASURY_WALLET_ADDRESS must be valid before checking treasury MEX backing.'
+      )
+    }
+
+    const treasuryUnits = await readMexasWalletBalanceUnits(
+      normalizeEvmAddress(treasuryAddress)
+    )
+    const requiredUnits = mexasAmountToUnits(requiredAmount)
+    if (treasuryUnits < requiredUnits) {
+      return fail(
+        'treasury MEX liability backing',
+        `Treasury has ${formatMexasUnits(
+          treasuryUnits
+        )} MEX but active escrow liabilities require up to ${formatMexasUnits(
+          requiredUnits
+        )} MEX (YES ${audit.yesCredit}, NO ${audit.noCredit}, CANCEL ${
+          audit.cancelCredit
+        }).`
+      )
+    }
+
+    return pass(
+      'treasury MEX liability backing',
+      `Treasury has ${formatMexasUnits(
+        treasuryUnits
+      )} MEX for up to ${formatMexasUnits(
+        requiredUnits
+      )} MEX of active escrow liabilities.`
+    )
+  } catch (error) {
+    const message = formatDiagnosticError(error)
+    return fail('treasury MEX liability backing', message)
+  }
+}
+
 async function checkMexasSettlementExposure(
   db: SupabaseClient,
   options: SettlementExposureCheckOptions
@@ -1528,10 +1635,33 @@ async function checkMexasSettlementExposure(
       ({ audit, contractId }) =>
         `${contractId}: ${audit.filledBetCount} filled, open refunds ${audit.openReservationRefund}, total YES ${audit.yesCredit}, total NO ${audit.noCredit}, total CANCEL ${audit.cancelCredit}`
     )
+    const filledEntries = rows
+      .map((row) => ({ bet: convertBet(row), row }))
+      .filter((entry) => hasMexasFilledExposure(entry.bet))
+    const unescrowedFilledEntries = filledEntries.filter(
+      (entry) =>
+        !hasMexasEscrowedStake(entry.bet as LimitBet & MexasReservedOrderData)
+    )
     if (audit.filledBetCount === 0) {
       return pass(
         'settlement exposure',
         'No filled MEXAS positions require resolution payouts yet.'
+      )
+    }
+
+    if (unescrowedFilledEntries.length) {
+      return fail(
+        'settlement exposure',
+        `${
+          unescrowedFilledEntries.length
+        } filled MEXAS position(s) are not escrow-backed and cannot be safely paid by treasury resolution: ${unescrowedFilledEntries
+          .slice(0, 5)
+          .map((entry) => `${entry.row.contract_id}/${entry.bet.id}`)
+          .join('; ')}${
+          unescrowedFilledEntries.length > 5
+            ? `; ${unescrowedFilledEntries.length - 5} more`
+            : ''
+        }. Unwind or manually reconcile these positions before launch.`
       )
     }
 
@@ -1829,6 +1959,7 @@ async function runChecks() {
     checks.push(await checkNoMexasMarketLocks(db))
     checks.push(await checkOpenMexasOrderBacking(db))
     checks.push(await checkInternalMexasBalanceBacking(db))
+    checks.push(await checkTreasuryMexasLiabilityBacking(db, vercelEnvValues))
     checks.push(await checkNoCrossedMexasOrderBooks(db))
   }
 
