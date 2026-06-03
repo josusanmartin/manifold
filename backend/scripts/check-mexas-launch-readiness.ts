@@ -70,6 +70,7 @@ const CONTRACT_PAGE_SIZE = 1000
 const OPEN_ORDER_PAGE_SIZE = 1000
 const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000
 const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
+const TRANSFER_PROCESSING_TIMEOUT_MS = 2 * 60 * 1000
 const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
 const TREASURY_SIGNER_SECRET_PATTERN = /^0x[0-9a-fA-F]{64}$/
 const ZERO_EVM_ADDRESS = '0x0000000000000000000000000000000000000000'
@@ -1470,6 +1471,56 @@ async function checkMexasSettlementExposure(
   }
 }
 
+async function checkTreasuryTransferReconciliation(db: SupabaseClient) {
+  const staleBefore = new Date(
+    Date.now() - TRANSFER_PROCESSING_TIMEOUT_MS
+  ).toISOString()
+
+  try {
+    const { data, error } = await db
+      .from('mexas_treasury_transfers')
+      .select('id,idempotency_key,transfer_type,updated_time,tx_hash')
+      .eq('status', 'processing')
+      .lt('updated_time', staleBefore)
+      .order('updated_time', { ascending: true })
+      .limit(20)
+
+    if (error) {
+      return fail(
+        'treasury transfer reconciliation',
+        `Could not read treasury transfer ledger: ${formatDiagnosticError(
+          error
+        )}`
+      )
+    }
+
+    const staleTransfers = (data ?? []) as Row<'mexas_treasury_transfers'>[]
+    if (staleTransfers.length) {
+      return fail(
+        'treasury transfer reconciliation',
+        `${
+          staleTransfers.length
+        } stale processing treasury transfer(s) require manual reconciliation before launch: ${staleTransfers
+          .map(
+            (row) =>
+              `${row.idempotency_key} ${row.transfer_type} updated ${row.updated_time}`
+          )
+          .join('; ')}`
+      )
+    }
+
+    return pass(
+      'treasury transfer reconciliation',
+      'No stale processing MEXAS treasury transfers require manual reconciliation.'
+    )
+  } catch (error) {
+    return fail(
+      'treasury transfer reconciliation',
+      formatDiagnosticError(error)
+    )
+  }
+}
+
 async function checkUrl(url: string) {
   const response = await fetch(url, { redirect: 'follow' })
   return response.status
@@ -1730,6 +1781,7 @@ async function runChecks() {
   })
   const missingEscrowCapabilities = getMissingMexasEscrowCapabilities()
   if (supabaseDb) {
+    checks.push(await checkTreasuryTransferReconciliation(supabaseDb))
     checks.push(
       await checkMexasSettlementExposure(supabaseDb, { hasOperationalEscrow })
     )

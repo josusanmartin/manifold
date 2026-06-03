@@ -226,21 +226,10 @@ async function claimExistingPendingTransfer(
   }
 
   if (row.status === 'processing') {
-    const now = millisToTs(Date.now())
-    const { data, error } = await db
-      .from('mexas_treasury_transfers')
-      .update({
-        updated_time: now,
-      })
-      .eq('id', row.id)
-      .eq('status', 'processing')
-      .eq('updated_time', row.updated_time)
-      .is('tx_hash', null)
-      .select()
-      .maybeSingle()
-
-    if (error) throw error
-    return data as Row<'mexas_treasury_transfers'> | undefined
+    throw new APIError(
+      503,
+      'MEXAS treasury transfer requires manual reconciliation before retry.'
+    )
   }
 
   return undefined

@@ -2172,6 +2172,7 @@ describe('MEXAS flow safety guardrails', () => {
       "row.status === 'pending'",
       'MEXAS treasury transfer is already processing.',
       "row.status === 'processing'",
+      'MEXAS treasury transfer requires manual reconciliation before retry.',
       'markTreasuryTransferSubmitted',
       "status: 'submitted'",
       'latest?.tx_hash === txHash',
@@ -2208,6 +2209,29 @@ describe('MEXAS flow safety guardrails', () => {
     )
     expect(schemaSource).toContain('mexas_treasury_transfers')
     expect(schemaSource).toContain('recipient_address: string')
+  })
+
+  test('launch readiness blocks stale treasury transfers that need manual reconciliation', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('TRANSFER_PROCESSING_TIMEOUT_MS')
+    expect(source).toContain('checkTreasuryTransferReconciliation')
+    expectMarkersInOrder(source, [
+      'async function checkTreasuryTransferReconciliation',
+      ".from('mexas_treasury_transfers')",
+      ".eq('status', 'processing')",
+      ".lt('updated_time', staleBefore)",
+      "'treasury transfer reconciliation'",
+      'require manual reconciliation before launch',
+      'No stale processing MEXAS treasury transfers require manual reconciliation.',
+    ])
+    expectMarkersInOrder(source, [
+      'if (supabaseDb) {',
+      'checks.push(await checkTreasuryTransferReconciliation(supabaseDb))',
+      'await checkMexasSettlementExposure',
+    ])
   })
 
   test('launch readiness fails any MEXAS contract token mismatch', () => {
