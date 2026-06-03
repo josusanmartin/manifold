@@ -45,7 +45,9 @@ function getSingleQueryValue(value: string | string[] | undefined) {
 
 function getMexasSettlementSettings(): MexasSettlementSettings {
   return {
+    escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION,
     matchingEngineMode: process.env.MEXAS_MATCHING_ENGINE_MODE,
+    settlementMode: process.env.MEXAS_SETTLEMENT_MODE,
   }
 }
 
@@ -101,7 +103,7 @@ export default async function handler(
         canPlaceOrders: false,
         matchingEngineReady: false,
         message:
-          'Las ordenes MEXAS requieren el motor transaccional de libro de ordenes antes de reservar MEX.',
+          'Las ordenes MEXAS requieren escrow on-chain y el motor transaccional de libro de ordenes antes de reservar MEX.',
       })
     }
 

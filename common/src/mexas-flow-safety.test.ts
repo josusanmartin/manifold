@@ -1248,7 +1248,7 @@ describe('MEXAS flow safety guardrails', () => {
       'export async function assertMexasCanAcceptLimitOrders',
       'canMexasAcceptLimitOrders(getMexasSettlementSettings())',
       'await assertMexasOrderbookMatchingEngineReady(db)',
-      'Las ordenes MEXAS requieren el motor transaccional',
+      'Las ordenes MEXAS requieren escrow on-chain y el motor transaccional',
     ])
     expectMarkersInOrder(source, [
       'export async function assertMexasCanMatchCrossingOrders',
@@ -1266,8 +1266,12 @@ describe('MEXAS flow safety guardrails', () => {
       'type MexasOrderReadinessResponse',
       'canPlaceOrders: boolean',
       'matchingEngineReady: boolean',
+      'escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION',
+      'matchingEngineMode: process.env.MEXAS_MATCHING_ENGINE_MODE',
+      'settlementMode: process.env.MEXAS_SETTLEMENT_MODE',
       'if (!isMexasOrderBookOnlyContract(contract))',
       'canMexasAcceptLimitOrders(getMexasSettlementSettings())',
+      'Las ordenes MEXAS requieren escrow on-chain y el motor transaccional',
       'await assertMexasOrderbookMatchingEngineReady(db)',
       'canPlaceOrders: true',
       'matchingEngineReady: true',

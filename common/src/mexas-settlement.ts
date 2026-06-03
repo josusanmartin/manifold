@@ -116,7 +116,10 @@ export function hasOperationalMexasEscrow(settings: MexasSettlementSettings) {
 }
 
 export function canMexasAcceptLimitOrders(settings: MexasSettlementSettings) {
-  return hasTransactionalMexasMatchingEngine(settings)
+  return (
+    hasTransactionalMexasMatchingEngine(settings) &&
+    hasOperationalMexasEscrow(settings)
+  )
 }
 
 export function getMissingMexasEscrowCapabilities() {

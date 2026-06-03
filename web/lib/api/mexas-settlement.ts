@@ -43,7 +43,7 @@ export async function assertMexasCanAcceptLimitOrders(db: SupabaseClient) {
 
   throw new APIError(
     503,
-    'Las ordenes MEXAS requieren el motor transaccional de libro de ordenes antes de reservar MEX.'
+    'Las ordenes MEXAS requieren escrow on-chain y el motor transaccional de libro de ordenes antes de reservar MEX.'
   )
 }
 
