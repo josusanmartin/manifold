@@ -375,15 +375,38 @@ async function checkResolutionReadiness(contractId: string) {
       typeof data.canResolve === 'boolean' &&
       typeof data.requiresEscrow === 'boolean' &&
       Number.isFinite(data.filledBetCount)
-    return valid
-      ? pass(
-          `resolution readiness ${contractId}`,
-          `canResolve=${data.canResolve}, requiresEscrow=${data.requiresEscrow}, filled=${data.filledBetCount}`
-        )
-      : fail(
-          `resolution readiness ${contractId}`,
-          'Response does not include readiness booleans.'
-        )
+    if (!valid) {
+      return fail(
+        `resolution readiness ${contractId}`,
+        'Response does not include readiness booleans.'
+      )
+    }
+
+    const hasMessage =
+      typeof data.message === 'string' && data.message.trim().length > 0
+    if (data.requiresEscrow && data.canResolve) {
+      return fail(
+        `resolution readiness ${contractId}`,
+        'requiresEscrow=true cannot be canResolve=true.'
+      )
+    }
+    if (data.requiresEscrow && !hasMessage) {
+      return fail(
+        `resolution readiness ${contractId}`,
+        'Escrow-blocked resolution is missing an operator message.'
+      )
+    }
+    if (data.filledBetCount <= 0 && data.requiresEscrow) {
+      return fail(
+        `resolution readiness ${contractId}`,
+        'Empty filled exposure cannot require escrow.'
+      )
+    }
+
+    return pass(
+      `resolution readiness ${contractId}`,
+      `canResolve=${data.canResolve}, requiresEscrow=${data.requiresEscrow}, filled=${data.filledBetCount}`
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return fail(`resolution readiness ${contractId}`, message)
@@ -406,15 +429,49 @@ async function checkOrderReadiness(contractId: string) {
       typeof data.canPlaceOrders === 'boolean' &&
       typeof data.escrowCaptureEnabled === 'boolean' &&
       typeof data.matchingEngineReady === 'boolean'
-    return valid
-      ? pass(
-          `order readiness ${contractId}`,
-          `canPlaceOrders=${data.canPlaceOrders}, escrowCaptureEnabled=${data.escrowCaptureEnabled}, matchingEngineReady=${data.matchingEngineReady}`
-        )
-      : fail(
-          `order readiness ${contractId}`,
-          'Response does not include readiness booleans.'
-        )
+    if (!valid) {
+      return fail(
+        `order readiness ${contractId}`,
+        'Response does not include readiness booleans.'
+      )
+    }
+
+    const hasMessage =
+      typeof data.message === 'string' && data.message.trim().length > 0
+    if (data.escrowCaptureEnabled && !data.matchingEngineReady) {
+      return fail(
+        `order readiness ${contractId}`,
+        'Escrow capture cannot be enabled while matching is not ready.'
+      )
+    }
+    if (data.matchingEngineReady && !data.escrowCaptureEnabled) {
+      return fail(
+        `order readiness ${contractId}`,
+        'Matching cannot be ready while escrow capture is disabled.'
+      )
+    }
+    if (!data.canPlaceOrders && !hasMessage) {
+      return fail(
+        `order readiness ${contractId}`,
+        'Paused order placement is missing an operator message.'
+      )
+    }
+    if (
+      data.canPlaceOrders &&
+      !data.escrowCaptureEnabled &&
+      !data.matchingEngineReady &&
+      !hasMessage
+    ) {
+      return fail(
+        `order readiness ${contractId}`,
+        'Resting-only order mode is missing an operator message.'
+      )
+    }
+
+    return pass(
+      `order readiness ${contractId}`,
+      `canPlaceOrders=${data.canPlaceOrders}, escrowCaptureEnabled=${data.escrowCaptureEnabled}, matchingEngineReady=${data.matchingEngineReady}`
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return fail(`order readiness ${contractId}`, message)
