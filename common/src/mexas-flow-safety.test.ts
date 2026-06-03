@@ -1038,6 +1038,8 @@ describe('MEXAS flow safety guardrails', () => {
   test('only captures MEXAS order stake on-chain when backend readiness enables it', () => {
     const panelSource = readRepoFile('web/components/bet/limit-order-panel.tsx')
     const apiSource = readRepoFile('web/pages/api/v0/bet.ts')
+    const settlementSource = readRepoFile('web/lib/api/mexas-settlement.ts')
+    const orderBookApiSource = readRepoFile('web/pages/api/mexas-order-book.ts')
     const schemaSource = readRepoFile('common/src/api/schema.ts')
 
     expectMarkersInOrder(panelSource, [
@@ -1053,9 +1055,10 @@ describe('MEXAS flow safety guardrails', () => {
       'mexasEscrowTxHash,',
     ])
     expectMarkersInOrder(apiSource, [
-      'mexasEscrowCaptureEnabled()',
+      'const escrowRuntime = await getMexasEscrowRuntimeStatus(db)',
+      'const escrowCaptureRequired = escrowRuntime.enabled',
       'params.mexasEscrowTxHash && !escrowCaptureRequired',
-      'La captura on-chain MEXAS todavía no está habilitada.',
+      'escrowRuntime.message',
       'escrowCaptureRequired && !params.mexasEscrowTxHash && !params.dryRun',
       'La orden requiere una transferencia MEXAS on-chain a tesorería.',
       'verifyMexasEscrowCapture',
@@ -1074,6 +1077,24 @@ describe('MEXAS flow safety guardrails', () => {
       'mexasEscrowAmount: params.escrowCapture?.capturedAmount',
     ])
     expect(apiSource).toContain('escrowCapture,')
+    expectMarkersInOrder(settlementSource, [
+      'export async function getMexasEscrowRuntimeStatus',
+      'await assertMexasOrderbookMatchingEngineReady(db)',
+      'await assertMexasEscrowCaptureReady(db)',
+      'await assertMexasTreasuryTransferRuntimeReady(db)',
+      'return { enabled: true }',
+    ])
+    expectMarkersInOrder(settlementSource, [
+      'export async function assertMexasCanMatchCrossingOrders',
+      'const escrowRuntime = await getMexasEscrowRuntimeStatus(db)',
+      'if (escrowRuntime.enabled) return',
+      'escrowRuntime.message',
+    ])
+    expectMarkersInOrder(orderBookApiSource, [
+      'async function getMexasOrderExecutionMode',
+      'const escrowRuntime = await getMexasEscrowRuntimeStatus(db)',
+      "return escrowRuntime.enabled ? 'treasury-escrowed' : 'wallet-reserved'",
+    ])
     expect(schemaSource).toContain('mexasEscrowTxHash')
   })
 
@@ -1481,7 +1502,7 @@ describe('MEXAS flow safety guardrails', () => {
       'function getBestOpenMexasOrders',
       "orders.filter((order) => order.outcome === 'YES')",
       "orders.filter((order) => order.outcome === 'NO')",
-      'const executionMode = getMexasOrderExecutionMode()',
+      'const executionMode = await getMexasOrderExecutionMode(db)',
       'rows',
       '.map((row) => convertBet(row))',
       'isVisibleMexasLimitOrder(bet, executionMode)',
@@ -1758,14 +1779,20 @@ describe('MEXAS flow safety guardrails', () => {
     )
 
     expectMarkersInOrder(source, [
+      'export async function getMexasEscrowRuntimeStatus',
+      'await assertMexasOrderbookMatchingEngineReady(db)',
+      'await assertMexasEscrowCaptureReady(db)',
+      'await assertMexasTreasuryTransferRuntimeReady(db)',
+      'return { enabled: true }',
+      'export async function assertMexasCanMatchCrossingOrders',
+      'const escrowRuntime = await getMexasEscrowRuntimeStatus(db)',
+      'if (escrowRuntime.enabled) return',
+      'escrowRuntime.message',
+    ])
+    expectMarkersInOrder(source, [
       'export async function assertMexasCanAcceptLimitOrders',
       'canMexasAcceptLimitOrders(getMexasSettlementSettings())',
       'No se pueden abrir órdenes MEXAS en este momento.',
-    ])
-    expectMarkersInOrder(source, [
-      'export async function assertMexasCanMatchCrossingOrders',
-      'canMexasMatchCrossingOrders(getMexasSettlementSettings())',
-      'await assertMexasOrderbookMatchingEngineReady(db)',
     ])
     expectMarkersInOrder(apiSource, [
       'if (params.dryRun)',
@@ -1785,18 +1812,15 @@ describe('MEXAS flow safety guardrails', () => {
       'if (!isMexasOrderBookOnlyContract(contract))',
       'const settings = getMexasSettlementSettings()',
       'canMexasAcceptLimitOrders(settings)',
-      'const escrowCaptureEnabled =',
-      'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS',
-      'hasOperationalMexasEscrow(settings)',
-      'canMexasMatchCrossingOrders(settings)',
-      'await assertMexasOrderbookMatchingEngineReady(db)',
+      'const escrowRuntime = await getMexasEscrowRuntimeStatus(db)',
+      'if (escrowRuntime.enabled)',
       'canPlaceOrders: true',
-      'escrowCaptureEnabled,',
+      'escrowCaptureEnabled: true',
       'matchingEngineReady: true',
       'canPlaceOrders: true',
-      'escrowCaptureEnabled,',
+      'escrowCaptureEnabled: false',
       'matchingEngineReady: false',
-      'Puedes abrir órdenes límite que agreguen liquidez.',
+      'escrowRuntime.message',
     ])
     expectMarkersInOrder(panelSource, [
       'const mexasOrderReadiness = useMexasOrderReadiness(',

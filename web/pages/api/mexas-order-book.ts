@@ -7,10 +7,6 @@ import {
   isMexasExecutableLimitOrder,
   type MexasOrderExecutionMode,
 } from 'common/mexas-order-book'
-import {
-  hasOperationalMexasEscrow,
-  type MexasSettlementSettings,
-} from 'common/mexas-settlement'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import { createClient, type Row } from 'common/supabase/utils'
@@ -20,6 +16,7 @@ import {
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
 } from 'web/lib/api/mexas-orders'
+import { getMexasEscrowRuntimeStatus } from 'web/lib/api/mexas-settlement'
 
 type ErrorResponse = { message: string }
 const ORDER_BOOK_PAGE_SIZE = 1000
@@ -48,19 +45,11 @@ function getSingleQueryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
 
-function getMexasSettlementSettings(): MexasSettlementSettings {
-  return {
-    escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION,
-    matchingEngineMode: process.env.MEXAS_MATCHING_ENGINE_MODE,
-    settlementMode: process.env.MEXAS_SETTLEMENT_MODE,
-  }
-}
-
-function getMexasOrderExecutionMode(): MexasOrderExecutionMode {
-  return process.env.MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS === 'true' &&
-    hasOperationalMexasEscrow(getMexasSettlementSettings())
-    ? 'treasury-escrowed'
-    : 'wallet-reserved'
+async function getMexasOrderExecutionMode(
+  db: ReturnType<typeof getSupabaseAdminClient>
+): Promise<MexasOrderExecutionMode> {
+  const escrowRuntime = await getMexasEscrowRuntimeStatus(db)
+  return escrowRuntime.enabled ? 'treasury-escrowed' : 'wallet-reserved'
 }
 
 function isVisibleMexasLimitOrder(
@@ -169,7 +158,7 @@ export default async function handler(
     }
 
     await runOrderBookMaintenance(db, contractId)
-    const executionMode = getMexasOrderExecutionMode()
+    const executionMode = await getMexasOrderExecutionMode(db)
 
     const rows: Row<'contract_bets'>[] = []
     for (

@@ -93,6 +93,30 @@ function getTreasurySignerAccount(treasuryAddress: Address) {
   return account
 }
 
+export function assertMexasTreasurySignerReady() {
+  getTreasurySignerAccount(getMexasEscrowTreasuryAddress())
+}
+
+export async function assertMexasTreasurySettlementLedgerReady(
+  db: SupabaseClient
+) {
+  const { data, error } = await db.rpc('mexas_treasury_settlement_ledger_ready')
+
+  if (error || data !== true) {
+    throw new APIError(
+      503,
+      'El ledger de tesorería MEXAS no está listo en Supabase.'
+    )
+  }
+}
+
+export async function assertMexasTreasuryTransferRuntimeReady(
+  db: SupabaseClient
+) {
+  assertMexasTreasurySignerReady()
+  await assertMexasTreasurySettlementLedgerReady(db)
+}
+
 function getTreasuryWalletClient() {
   return createWalletClient({
     chain: arbitrum,

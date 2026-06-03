@@ -21,7 +21,6 @@ import {
   type MexasOrderExecutionMode,
   type MexasOutcome,
 } from 'common/mexas-order-book'
-import { hasOperationalMexasEscrow } from 'common/mexas-settlement'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import {
@@ -49,6 +48,7 @@ import {
 import {
   assertMexasCanAcceptLimitOrders,
   assertMexasCanMatchCrossingOrders,
+  getMexasEscrowRuntimeStatus,
 } from 'web/lib/api/mexas-settlement'
 import { verifyMexasEscrowCapture } from 'web/lib/api/mexas-escrow-capture'
 import { matchMexasOrderbookLimitOrderRpc } from 'web/lib/api/mexas-rpc-matching'
@@ -382,15 +382,6 @@ function createMexasOpenLimitBet(
     expiresAt,
     silent: params.silent,
   }) as LimitBet
-}
-
-function mexasEscrowCaptureEnabled() {
-  return process.env.MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS === 'true'
-    ? hasOperationalMexasEscrow({
-        escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION,
-        settlementMode: process.env.MEXAS_SETTLEMENT_MODE,
-      })
-    : false
 }
 
 async function refundMexasReservation(
@@ -785,11 +776,13 @@ async function placeBinaryBet(
   if (params.limitProb === undefined) {
     throw new APIError(400, 'Los mercados MEXAS solo aceptan órdenes límite.')
   }
-  const escrowCaptureRequired = mexasEscrowCaptureEnabled()
+  const escrowRuntime = await getMexasEscrowRuntimeStatus(db)
+  const escrowCaptureRequired = escrowRuntime.enabled
   if (params.mexasEscrowTxHash && !escrowCaptureRequired) {
     throw new APIError(
       503,
-      'La captura on-chain MEXAS todavía no está habilitada.'
+      escrowRuntime.message ??
+        'La captura on-chain MEXAS todavía no está habilitada.'
     )
   }
   if (escrowCaptureRequired && !params.mexasEscrowTxHash && !params.dryRun) {

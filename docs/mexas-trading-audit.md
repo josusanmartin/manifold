@@ -46,11 +46,11 @@ y Arbitrum para leer balances ERC-20 y verificar recibos de transferencia.
 
 ## Barrera de settlement
 
-El flujo activo de produccion todavia no debe habilitar escrow on-chain. La
-captura wallet -> tesoreria, el matching separado de stake escrowed y el pago
-tesoreria -> usuario existen como codigo, pero
-`MEXAS_ONCHAIN_ESCROW_CAPABILITIES` sigue en `false` hasta que produccion tenga
-SQL/env/signer/scheduler verificados end-to-end.
+El flujo activo de produccion no debe tratar escrow on-chain como listo solo
+por env vars. La captura wallet -> tesoreria, el matching separado de stake
+escrowed y el pago tesoreria -> usuario existen como codigo, pero el runtime
+solo habilita captura/cruces si pasan juntos el RPC de matching, el guard de
+captura, el ledger de tesoreria y el signer de treasury.
 
 Cuando dos ordenes sin escrow hacen match, el codigo cambia saldos internos,
 pero no transfiere MEX desde la wallet del perdedor a una cuenta custodiada ni
@@ -114,8 +114,9 @@ Los blockers de launch real siguen siendo estructurales:
   `mexas_escrow_capture_ready`;
 - configurar y proteger `MEXAS_TREASURY_SIGNER_SECRET` en produccion antes de
   cualquier pago on-chain saliente;
-- mantener `MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS` apagado hasta que el SQL de
-  produccion, signer y scheduler runtime esten verificados;
+- aunque `MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS` este configurado, el runtime debe
+  mantener `escrowCaptureEnabled=false` hasta que el SQL de produccion, signer y
+  scheduler runtime esten verificados;
 - subir `MEXAS_ONCHAIN_ESCROW_CAPABILITIES` solo cuando captura, release y
   payout esten cubiertos end-to-end en el matcher y las rutas runtime;
 - desplegar/confirmar el scheduler runtime despues de aplicar el SQL.

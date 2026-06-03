@@ -3,11 +3,14 @@ import {
   canMexasAcceptLimitOrders,
   canMexasMatchCrossingOrders,
   canMexasResolveFilledPositions,
+  hasOperationalMexasEscrow,
   type MexasSettlementAudit,
   type MexasSettlementSettings,
 } from 'common/mexas-settlement'
 import type { SupabaseClient } from 'common/supabase/utils'
 import { assertMexasOrderbookMatchingEngineReady } from './mexas-rpc-matching'
+import { assertMexasEscrowCaptureReady } from './mexas-escrow-capture'
+import { assertMexasTreasuryTransferRuntimeReady } from './mexas-treasury-transfer'
 
 function getMexasSettlementSettings(): MexasSettlementSettings {
   return {
@@ -20,19 +23,54 @@ function getMexasSettlementSettings(): MexasSettlementSettings {
   }
 }
 
+function formatReadinessMessage(error: unknown) {
+  if (error instanceof APIError) return error.message
+  if (error instanceof Error) return error.message
+  return 'La liquidación on-chain MEXAS no está lista.'
+}
+
+export async function getMexasEscrowRuntimeStatus(db: SupabaseClient): Promise<{
+  enabled: boolean
+  message?: string
+}> {
+  const settings = getMexasSettlementSettings()
+  if (
+    process.env.MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS !== 'true' ||
+    !hasOperationalMexasEscrow(settings) ||
+    !canMexasMatchCrossingOrders(settings)
+  ) {
+    return {
+      enabled: false,
+      message:
+        'Puedes abrir órdenes límite que agreguen liquidez. Las órdenes que cruzan el libro están pausadas hasta completar la liquidación MEXAS.',
+    }
+  }
+
+  try {
+    await assertMexasOrderbookMatchingEngineReady(db)
+    await assertMexasEscrowCaptureReady(db)
+    await assertMexasTreasuryTransferRuntimeReady(db)
+    return { enabled: true }
+  } catch (error) {
+    return {
+      enabled: false,
+      message: formatReadinessMessage(error),
+    }
+  }
+}
+
 export async function assertMexasCanMatchCrossingOrders(
   db: SupabaseClient,
   hasCrossingOrders: boolean
 ) {
   if (!hasCrossingOrders) return
-  if (canMexasMatchCrossingOrders(getMexasSettlementSettings())) {
-    await assertMexasOrderbookMatchingEngineReady(db)
-    return
-  }
+  const escrowRuntime = await getMexasEscrowRuntimeStatus(db)
+  if (escrowRuntime.enabled) return
 
   throw new APIError(
     503,
-    'Las órdenes que cruzan el libro están pausadas mientras se completa la liquidación MEXAS. No se ejecutará ni reservará MEX nuevo.'
+    escrowRuntime.message ??
+      'Las órdenes que cruzan el libro están pausadas mientras se completa la liquidación MEXAS. No se ejecutará ni reservará MEX nuevo.'
   )
 }
 

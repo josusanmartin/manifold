@@ -138,3 +138,14 @@ export async function verifyMexasEscrowCapture(params: {
     txHash,
   }
 }
+
+export async function assertMexasEscrowCaptureReady(db: SupabaseClient) {
+  const { data, error } = await db.rpc('mexas_escrow_capture_ready')
+
+  if (error || data !== true) {
+    throw new APIError(
+      503,
+      'La captura on-chain MEXAS no está lista en Supabase.'
+    )
+  }
+}

@@ -2,8 +2,6 @@ import { APIError } from 'common/api/utils'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import {
   canMexasAcceptLimitOrders,
-  canMexasMatchCrossingOrders,
-  hasOperationalMexasEscrow,
   type MexasSettlementSettings,
 } from 'common/mexas-settlement'
 import { convertContract } from 'common/supabase/contracts'
@@ -13,7 +11,7 @@ import {
   type SupabaseClient,
 } from 'common/supabase/utils'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { assertMexasOrderbookMatchingEngineReady } from 'web/lib/api/mexas-rpc-matching'
+import { getMexasEscrowRuntimeStatus } from 'web/lib/api/mexas-settlement'
 
 type ErrorResponse = { message: string; details?: unknown }
 
@@ -114,37 +112,21 @@ export default async function handler(
       })
     }
 
-    const escrowCaptureEnabled =
-      process.env.MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS === 'true' &&
-      hasOperationalMexasEscrow(settings)
-
-    if (canMexasMatchCrossingOrders(settings)) {
-      try {
-        await assertMexasOrderbookMatchingEngineReady(db)
-      } catch (error) {
-        return res.status(200).json({
-          canPlaceOrders: true,
-          escrowCaptureEnabled,
-          matchingEngineReady: false,
-          message:
-            error instanceof Error
-              ? error.message
-              : 'No se pudo verificar el motor de ordenes MEXAS.',
-        })
-      }
-
+    const escrowRuntime = await getMexasEscrowRuntimeStatus(db)
+    if (escrowRuntime.enabled) {
       return res.status(200).json({
         canPlaceOrders: true,
-        escrowCaptureEnabled,
+        escrowCaptureEnabled: true,
         matchingEngineReady: true,
       })
     }
 
     return res.status(200).json({
       canPlaceOrders: true,
-      escrowCaptureEnabled,
+      escrowCaptureEnabled: false,
       matchingEngineReady: false,
       message:
+        escrowRuntime.message ??
         'Puedes abrir órdenes límite que agreguen liquidez. Las órdenes que cruzan el libro están pausadas hasta completar la liquidación MEXAS.',
     })
   } catch (error) {
