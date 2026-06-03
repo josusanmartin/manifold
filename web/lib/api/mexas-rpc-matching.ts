@@ -61,10 +61,9 @@ export async function matchMexasOrderbookLimitOrderRpc(
     }
   }
 
-  throw new APIError(
-    503,
-    'MEXAS matching engine reached the maximum matching passes for one order.'
-  )
+  if (latestTaker) return latestTaker
+
+  throw new APIError(503, 'MEXAS matching engine returned no order state.')
 }
 
 export async function assertMexasOrderbookMatchingEngineReady(

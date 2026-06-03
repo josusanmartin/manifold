@@ -110,6 +110,13 @@ type MexasWalletUser = {
   walletAddress: string
 }
 
+type MexasContractTokenAlignmentRow = {
+  dataToken: string | undefined
+  id: string
+  slug: string | null
+  token: string | null
+}
+
 function parseEnvAssignment(line: string) {
   const trimmed = line.trim()
   if (!trimmed || trimmed.startsWith('#')) return
@@ -521,6 +528,102 @@ async function loadMexasOrderbookContractIds(db: SupabaseClient) {
   return [...ids]
 }
 
+async function loadMexasContractTokenAlignmentRows(db: SupabaseClient) {
+  const rowsById = new Map<string, MexasContractTokenAlignmentRow>()
+  const addRows = (rows: Row<'contracts'>[]) => {
+    for (const row of rows) {
+      const dataToken = getRowData(row).token
+      rowsById.set(row.id, {
+        dataToken: typeof dataToken === 'string' ? dataToken : undefined,
+        id: row.id,
+        slug: row.slug,
+        token: row.token,
+      })
+    }
+  }
+
+  for (let from = 0; ; from += CONTRACT_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('contracts')
+      .select('id,slug,token,data')
+      .contains('data', { token: 'MEX' } as any)
+      .range(from, from + CONTRACT_PAGE_SIZE - 1)
+
+    if (error) throw error
+    addRows((data ?? []) as Row<'contracts'>[])
+    if ((data ?? []).length < CONTRACT_PAGE_SIZE) break
+  }
+
+  for (let from = 0; ; from += CONTRACT_PAGE_SIZE) {
+    const { data, error } = await db
+      .from('contracts')
+      .select('id,slug,token,data')
+      .eq('token', 'MEX')
+      .range(from, from + CONTRACT_PAGE_SIZE - 1)
+
+    if (error) throw error
+    addRows((data ?? []) as Row<'contracts'>[])
+    if ((data ?? []).length < CONTRACT_PAGE_SIZE) break
+  }
+
+  return [...rowsById.values()]
+}
+
+async function checkMexasContractTokenAlignment(
+  db: SupabaseClient
+): Promise<{ needsLaunchSql: boolean; result: CheckResult }> {
+  try {
+    const rows = await loadMexasContractTokenAlignmentRows(db)
+    const mismatches = rows.filter(
+      (row) => row.token !== 'MEX' || row.dataToken !== 'MEX'
+    )
+
+    if (mismatches.length) {
+      return {
+        needsLaunchSql: true,
+        result: fail(
+          'MEXAS contract token alignment',
+          `${mismatches
+            .slice(0, 5)
+            .map(
+              (row) =>
+                `${row.id} token=${row.token ?? 'null'} dataToken=${
+                  row.dataToken ?? 'null'
+                }`
+            )
+            .join('; ')}${
+            mismatches.length > 5 ? `; ${mismatches.length - 5} more` : ''
+          }. Run apply:mexas-launch-sql so every data-tokened MEX contract has contracts.token=MEX.`
+        ),
+      }
+    }
+
+    if (!rows.length) {
+      return {
+        needsLaunchSql: false,
+        result: fail(
+          'MEXAS contract token alignment',
+          'No contracts with token=MEX or data.token=MEX were found.'
+        ),
+      }
+    }
+
+    return {
+      needsLaunchSql: false,
+      result: pass(
+        'MEXAS contract token alignment',
+        `${rows.length} MEXAS contract rows have aligned SQL and data tokens.`
+      ),
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return {
+      needsLaunchSql: false,
+      result: fail('MEXAS contract token alignment', message),
+    }
+  }
+}
+
 async function loadOpenMexasOrderbookContractIds(db: SupabaseClient) {
   const contractIds = await loadMexasOrderbookContractIds(db)
   if (!contractIds.length) return []
@@ -562,7 +665,9 @@ async function loadOpenReservedMexasOrders(
       const bet = convertBet(row)
       if ((bet as any).mexasFundsReleased === true) continue
 
-      const remainingReservedAmount = getMexasRemainingReservedAmount(bet as any)
+      const remainingReservedAmount = getMexasRemainingReservedAmount(
+        bet as any
+      )
       const remainingReservedUnits = mexasAmountToUnits(remainingReservedAmount)
       if (remainingReservedUnits <= 0n) continue
 
@@ -806,9 +911,7 @@ async function checkNoMexasMarketLocks(
                 issue
               )}: ${issue.detail}`
           )
-          .join('; ')}${
-          issues.length > 5 ? `; ${issues.length - 5} more` : ''
-        }`
+          .join('; ')}${issues.length > 5 ? `; ${issues.length - 5} more` : ''}`
       )
     }
 
@@ -836,14 +939,14 @@ async function checkNoUnsafeOpenMexasOrders(
           .slice(0, 5)
           .map(
             (order) =>
-              `${order.contractId}/${order.betId} ${order.outcome} ${formatProbability(
-                order.limitProb
-              )} ${order.openAmount} MEX: ${order.reasons.join(', ')}`
+              `${order.contractId}/${order.betId} ${
+                order.outcome
+              } ${formatProbability(order.limitProb)} ${
+                order.openAmount
+              } MEX: ${order.reasons.join(', ')}`
           )
           .join('; ')}${
-          unsafeOrders.length > 5
-            ? `; ${unsafeOrders.length - 5} more`
-            : ''
+          unsafeOrders.length > 5 ? `; ${unsafeOrders.length - 5} more` : ''
         }`
       )
     }
@@ -888,11 +991,9 @@ async function checkNoCrossedMexasOrderBooks(
       if (yesBid.limitProb + EPSILON < noAsk.limitProb) continue
 
       failures.push(
-        `${contractId} crossed: YES ${formatProbability(
-          yesBid.limitProb
-        )} (${yesBid.betId}) >= NO ${formatProbability(noAsk.limitProb)} (${
-          noAsk.betId
-        })`
+        `${contractId} crossed: YES ${formatProbability(yesBid.limitProb)} (${
+          yesBid.betId
+        }) >= NO ${formatProbability(noAsk.limitProb)} (${noAsk.betId})`
       )
     }
 
@@ -956,7 +1057,9 @@ async function checkOpenMexasOrderBacking(
       const walletAddress = getRowData(userRow ?? null).privyWalletAddress
 
       if (typeof walletAddress !== 'string') {
-        failures.push(`${userId} has no Privy wallet for ${backing.orderIds[0]}`)
+        failures.push(
+          `${userId} has no Privy wallet for ${backing.orderIds[0]}`
+        )
         continue
       }
       if (!EVM_ADDRESS_PATTERN.test(walletAddress)) {
@@ -1114,11 +1217,10 @@ async function checkMexasSettlementExposure(
         rows.map((row) => convertBet(row))
       )
     )
-    const contractExposureDetails = filledContractExposures
-      .map(
-        ({ audit, contractId }) =>
-          `${contractId}: ${audit.filledBetCount} filled, open refunds ${audit.openReservationRefund}, total YES ${audit.yesCredit}, total NO ${audit.noCredit}, total CANCEL ${audit.cancelCredit}`
-      )
+    const contractExposureDetails = filledContractExposures.map(
+      ({ audit, contractId }) =>
+        `${contractId}: ${audit.filledBetCount} filled, open refunds ${audit.openReservationRefund}, total YES ${audit.yesCredit}, total NO ${audit.noCredit}, total CANCEL ${audit.cancelCredit}`
+    )
     if (audit.filledBetCount === 0) {
       return pass(
         'settlement exposure',
@@ -1129,9 +1231,15 @@ async function checkMexasSettlementExposure(
     if (!options.hasOperationalEscrow) {
       return fail(
         'settlement exposure',
-        `${audit.filledBetCount} filled MEXAS positions require escrow before resolution payouts. Filled-market credit exposure: YES ${filledContractAudit.yesCredit} MEX, NO ${filledContractAudit.noCredit} MEX, CANCEL ${filledContractAudit.cancelCredit} MEX. Open reservation refunds across all unresolved MEXAS markets: ${audit.openReservationRefund} MEX. Markets: ${contractExposureDetails
-          .slice(0, 5)
-          .join('; ')}${
+        `${
+          audit.filledBetCount
+        } filled MEXAS positions require escrow before resolution payouts. Filled-market credit exposure: YES ${
+          filledContractAudit.yesCredit
+        } MEX, NO ${filledContractAudit.noCredit} MEX, CANCEL ${
+          filledContractAudit.cancelCredit
+        } MEX. Open reservation refunds across all unresolved MEXAS markets: ${
+          audit.openReservationRefund
+        } MEX. Markets: ${contractExposureDetails.slice(0, 5).join('; ')}${
           contractExposureDetails.length > 5
             ? `; ${contractExposureDetails.length - 5} more`
             : ''
@@ -1302,6 +1410,10 @@ async function runChecks() {
         : fail('matching RPC health', 'Matching health RPC returned false.')
     )
 
+    const tokenAlignment = await checkMexasContractTokenAlignment(db)
+    if (tokenAlignment.needsLaunchSql) needsLaunchSql = true
+    checks.push(tokenAlignment.result)
+
     checks.push(await checkNoUnsafeOpenMexasOrders(db))
     checks.push(await checkNoMexasMarketLocks(db))
     checks.push(await checkOpenMexasOrderBacking(db))
@@ -1325,7 +1437,9 @@ async function runChecks() {
           )
     )
   } else {
-    checks.push(pass('launch SQL apply access', 'Launch SQL is already applied.'))
+    checks.push(
+      pass('launch SQL apply access', 'Launch SQL is already applied.')
+    )
   }
 
   const matchingMode = getEnvOrVercelValue(

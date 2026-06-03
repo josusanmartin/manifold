@@ -1008,7 +1008,7 @@ describe('MEXAS flow safety guardrails', () => {
   test('MEXAS market static props bypass legacy comments and related-market prefetches', () => {
     const source = readRepoFile('common/src/contract-params.ts')
 
-    expect(source).toContain("import { isMexasOrderBookOnlyContract }")
+    expect(source).toContain('import { isMexasOrderBookOnlyContract }')
     expectMarkersInOrder(source, [
       'function getMexasContractParams',
       'comments: []',
@@ -1137,7 +1137,7 @@ describe('MEXAS flow safety guardrails', () => {
     ]) {
       expect(existsSync(join(__dirname, '..', '..', path))).toBe(false)
     }
-    expect(serverSitemap).toContain("import { MEXAS_SITE_URL }")
+    expect(serverSitemap).toContain('import { MEXAS_SITE_URL }')
     expect(serverSitemap).toContain('loc: `${MEXAS_SITE_URL}/')
     expect(serverSitemap).not.toContain('https://manifold.markets/')
   })
@@ -1228,7 +1228,9 @@ describe('MEXAS flow safety guardrails', () => {
       'token={displayToken}',
     ])
     expect(orderBookSource).toContain('const getOpenAmount = (bet: LimitBet)')
-    expect(orderBookSource).toContain('const total = sumBy(bets, getOpenAmount)')
+    expect(orderBookSource).toContain(
+      'const total = sumBy(bets, getOpenAmount)'
+    )
     expect(orderBookSource).toContain('amount={getOpenAmount(b)}')
     expectMarkersInOrder(depthChartSource, [
       "import { isMexasOrderBookOnlyContract } from 'common/mexas-market'",
@@ -1258,7 +1260,9 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(source).toContain('const ORDER_BOOK_MAINTENANCE_TIMEOUT_MS = 750')
     expect(source).toContain('Promise.race')
-    expect(source).toContain('releaseClosedMexasMarketOrders(db, { contractId })')
+    expect(source).toContain(
+      'releaseClosedMexasMarketOrders(db, { contractId })'
+    )
     expect(source).toContain('releaseExpiredMexasOrders(db, { contractId })')
     expect(source).toContain('releaseUnbackedMexasOrders(db, { contractId })')
   })
@@ -1648,7 +1652,11 @@ describe('MEXAS flow safety guardrails', () => {
       'const matchCount = getMatchCount(data)',
       'if (latestTaker.isFilled || matchCount < MAX_MATCHES_PER_RPC)',
       'return latestTaker',
+      'if (latestTaker) return latestTaker',
     ])
+    expect(helper).not.toContain(
+      'MEXAS matching engine reached the maximum matching passes for one order.'
+    )
   })
 
   test('prints self-verifying launch SQL for manual Supabase SQL Editor runs', () => {
@@ -1673,6 +1681,18 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain(
       "raise exception 'MEXAS launch SQL verification failed: %'"
     )
+    expect(source).toContain("where token = 'MEX'")
+    expect(source).toContain("or data ->> 'token' = 'MEX'")
+    expect(source).toContain("'contract token mismatch '")
+    expect(source).toContain(
+      '-- MEX. Keep every data-tokened MEX row and normalized SQL column aligned.'
+    )
+    expectMarkersInOrder(source, [
+      'update public.contracts',
+      "set token = 'MEX'",
+      "where data ->> 'token' = 'MEX'",
+      "and token <> 'MEX'",
+    ])
     expect(source).toContain(
       "raise notice 'PASS MEXAS launch SQL applied and verified.'"
     )
@@ -1697,9 +1717,7 @@ describe('MEXAS flow safety guardrails', () => {
   test('fails closed before proxying unknown Manifold API endpoints', () => {
     const source = readRepoFile('web/proxy.ts')
 
-    expect(source).toContain(
-      "'/((?!_next/static|_next/image|favicon.ico).*)'"
-    )
+    expect(source).toContain("'/((?!_next/static|_next/image|favicon.ico).*)'")
     expect(source).not.toContain("'/api/v0/:path*'")
     expectMarkersInOrder(source, [
       'if (isBlockedMexasPublicPath(url.pathname))',
@@ -1766,6 +1784,32 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(source).toContain('contracts_token_check still needs the launch SQL')
     expect(source).toContain('RPC/index DDL require Postgres SQL access')
+  })
+
+  test('launch readiness fails any MEXAS contract token mismatch', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(source).toContain('type MexasContractTokenAlignmentRow')
+    expect(source).toContain(
+      'async function loadMexasContractTokenAlignmentRows'
+    )
+    expect(source).toContain('async function checkMexasContractTokenAlignment')
+    expectMarkersInOrder(source, [
+      'async function loadMexasContractTokenAlignmentRows',
+      ".contains('data', { token: 'MEX' } as any)",
+      ".eq('token', 'MEX')",
+      'const mismatches = rows.filter',
+      "fail(\n          'MEXAS contract token alignment'",
+      'Run apply:mexas-launch-sql so every data-tokened MEX contract has contracts.token=MEX.',
+    ])
+    expectMarkersInOrder(source, [
+      'const tokenAlignment = await checkMexasContractTokenAlignment(db)',
+      'if (tokenAlignment.needsLaunchSql) needsLaunchSql = true',
+      'checks.push(tokenAlignment.result)',
+      'checks.push(await checkNoUnsafeOpenMexasOrders(db))',
+    ])
   })
 
   test('launch readiness validates the MEXAS treasury wallet env pair', () => {
@@ -1939,6 +1983,7 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'
     )
+    const compact = compactWhitespace(source)
 
     expect(source).toContain('async function checkMexasSettlementExposure')
     expectMarkersInOrder(source, [
@@ -1961,8 +2006,8 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('YES ${filledContractAudit.yesCredit} MEX')
     expect(source).toContain('NO ${filledContractAudit.noCredit} MEX')
     expect(source).toContain('CANCEL ${filledContractAudit.cancelCredit} MEX')
-    expect(source).toContain(
-      'Open reservation refunds across all unresolved MEXAS markets: ${audit.openReservationRefund} MEX'
+    expect(compact).toContain(
+      'Open reservation refunds across all unresolved MEXAS markets: ${ audit.openReservationRefund } MEX'
     )
     expect(source).toContain(
       'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-settlement'

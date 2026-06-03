@@ -113,6 +113,20 @@ begin
     v_failures := array_append(v_failures, 'required MEXAS contract row missing');
   end if;
 
+  for v_row in
+    select id, token, data ->> 'token' as data_token
+    from public.contracts
+    where token = 'MEX'
+      or data ->> 'token' = 'MEX'
+  loop
+    if v_row.token is distinct from 'MEX' or v_row.data_token is distinct from 'MEX' then
+      v_failures := array_append(
+        v_failures,
+        'contract token mismatch ' || v_row.id || ' token=' || coalesce(v_row.token, 'null') || ' dataToken=' || coalesce(v_row.data_token, 'null')
+      );
+    end if;
+  end loop;
+
   if to_regprocedure('public.mexas_match_orderbook_limit_order(text,bigint,integer)') is null then
     v_failures := array_append(v_failures, 'matching RPC missing');
   end if;
@@ -183,11 +197,10 @@ $$;
   return `${migrationSql}
 
 -- Existing seed markets were created before the SQL token constraint allowed
--- MEX. Keep the data token and normalized SQL column aligned.
+-- MEX. Keep every data-tokened MEX row and normalized SQL column aligned.
 update public.contracts
 set token = 'MEX'
-where id in (${contractIds})
-  and data ->> 'token' = 'MEX'
+where data ->> 'token' = 'MEX'
   and token <> 'MEX';
 
 -- Make the new RPCs visible to Supabase/PostgREST as soon as the transaction
@@ -241,6 +254,25 @@ async function verify(client: any) {
   }
   if (health.rows[0]?.ready !== true) {
     failures.push('matching health RPC returned false')
+  }
+
+  const mismatches = await client.query(
+    `
+      select id, token, data ->> 'token' as data_token
+      from public.contracts
+      where token = 'MEX'
+        or data ->> 'token' = 'MEX'
+      order by id
+    `
+  )
+  for (const row of mismatches.rows) {
+    if (row.token !== 'MEX' || row.data_token !== 'MEX') {
+      failures.push(
+        `${row.id} token=${row.token ?? 'null'} dataToken=${
+          row.data_token ?? 'null'
+        }`
+      )
+    }
   }
 
   if (failures.length) {
