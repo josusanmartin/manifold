@@ -315,6 +315,8 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('backend/shared/src/expire-limit-orders.ts')
 
     expectMarkersInOrder(source, [
+      'const releasedMexasOrders = await pg.tx',
+      'releaseExpiredMexasReservedOrders(tx)',
       'update contract_bets',
       'and expires_at < now()',
       'and not (',
@@ -323,7 +325,57 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(source).not.toContain('mexasRefunds')
     expect(source).not.toContain('getMexasRemainingReservedAmount')
-    expect(source).not.toContain('mexasReleaseCreditKey')
+  })
+
+  test('scheduler releases expired or closed MEXAS reserved orders without user traffic', () => {
+    const source = readRepoFile('backend/shared/src/expire-limit-orders.ts')
+
+    expectMarkersInOrder(source, [
+      'async function releaseExpiredMexasReservedOrders',
+      'from contract_bets b',
+      'join contracts c on c.id = b.contract_id',
+      'join users u on u.id = b.user_id',
+      "coalesce((b.data->>'mexasFundsReserved')::boolean, false) = true",
+      "coalesce((b.data->>'mexasFundsReleased')::boolean, false) = false",
+      "coalesce((u.data->>'mexasBalanceLock')::boolean, false) = true",
+      "coalesce((u.data->>'mexasBalanceLockSince')::bigint, 0) > $1::bigint - 120000",
+      "and (c.token = 'MEX' or c.data->>'token' = 'MEX')",
+      "and c.data->>'mechanism' = 'cpmm-1'",
+      "and c.data->>'outcomeType' = 'BINARY'",
+      'coalesce(b.is_cancelled, false) = true',
+      'or b.expires_at < now()',
+      'or (c.close_time is not null and c.close_time <= now())',
+      'for update of b, u skip locked',
+    ])
+    expectMarkersInOrder(source, [
+      'update contract_bets b',
+      'is_cancelled = true',
+      "'mexasFundsReleased', true",
+      "'mexasReleaseCreditKey', e.credit_key",
+      "'mexasReleaseReason', e.release_reason",
+      "'mexasReleasedAt', e.released_at",
+      'returning',
+      'e.refund_amount',
+    ])
+    expectMarkersInOrder(source, [
+      'user_credit_events as',
+      'mexasBalanceCreditKeys',
+      '? e.credit_key',
+      'credit_updates as',
+      'round(sum(refund_amount), 8) as credit_amount',
+      'jsonb_agg(credit_key order by credit_key) as credit_keys',
+      'update users u',
+      'balance = round(u.balance + cu.credit_amount, 8)',
+      "'{mexasBalanceCreditKeys}'",
+    ])
+    expectMarkersInOrder(source, [
+      'open_reserved as',
+      'left join contract_bets b',
+      "coalesce((b.data->>'mexasFundsReserved')::boolean, false) = true",
+      "coalesce((b.data->>'mexasFundsReleased')::boolean, false) = false",
+      "'{mexasWalletOpenReservedAmount}'",
+      'to_jsonb(open_reserved.amount)',
+    ])
   })
 
   test('treats market close time as an inclusive trading cutoff', () => {
