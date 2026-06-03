@@ -15,6 +15,16 @@ import {
 } from 'common/contract'
 import { TRADE_TERM } from 'common/envs/constants'
 import { MEXAS_TOKEN } from 'common/crypto/mexas'
+import {
+  findReusableMexasEscrowPendingOrderTx,
+  getMexasEscrowPendingOrderIntent,
+  makeMexasEscrowPendingOrderTx,
+  pruneMexasEscrowPendingOrderTxs,
+  removeMexasEscrowPendingOrderTx,
+  upsertMexasEscrowPendingOrderTx,
+  type MexasEscrowPendingOrderIntent,
+  type MexasEscrowPendingOrderTx,
+} from 'common/mexas-escrow-pending'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import {
   getMexasCrossingOrders,
@@ -61,11 +71,90 @@ const expirationOptions = [
 ]
 
 const WAIT_TO_DISMISS = 3000
+const MEXAS_ESCROW_PENDING_TX_STORAGE_KEY = 'mexas-pending-escrow-order-txs'
 
 function mexasAmountToUnits(amount: number) {
   return parseUnits(
     Math.max(0, amount).toFixed(MEXAS_TOKEN.decimals),
     MEXAS_TOKEN.decimals
+  )
+}
+
+function shortenTxHash(txHash: string) {
+  return `${txHash.slice(0, 8)}...${txHash.slice(-6)}`
+}
+
+function readStoredMexasPendingEscrowOrderTxs() {
+  if (typeof window === 'undefined') return []
+
+  try {
+    const raw = window.localStorage.getItem(MEXAS_ESCROW_PENDING_TX_STORAGE_KEY)
+    if (!raw) return []
+
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+
+    return pruneMexasEscrowPendingOrderTxs(
+      parsed.filter(
+        (entry): entry is MexasEscrowPendingOrderTx =>
+          typeof entry === 'object' &&
+          entry !== null &&
+          typeof entry.txHash === 'string' &&
+          typeof entry.contractId === 'string' &&
+          (entry.outcome === 'YES' || entry.outcome === 'NO') &&
+          typeof entry.amount === 'number' &&
+          typeof entry.limitProb === 'number' &&
+          typeof entry.treasuryAddress === 'string' &&
+          typeof entry.walletAddress === 'string' &&
+          typeof entry.createdTime === 'number'
+      )
+    )
+  } catch {
+    return []
+  }
+}
+
+function writeStoredMexasPendingEscrowOrderTxs(
+  pendingTxs: MexasEscrowPendingOrderTx[]
+) {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.localStorage.setItem(
+      MEXAS_ESCROW_PENDING_TX_STORAGE_KEY,
+      JSON.stringify(pendingTxs)
+    )
+  } catch {
+    // Storage is best-effort; the server still enforces tx uniqueness.
+  }
+}
+
+function findStoredMexasPendingEscrowOrderTx(
+  intent: MexasEscrowPendingOrderIntent
+) {
+  const pendingTxs = readStoredMexasPendingEscrowOrderTxs()
+  const reusable = findReusableMexasEscrowPendingOrderTx(pendingTxs, intent)
+  writeStoredMexasPendingEscrowOrderTxs(pendingTxs)
+  return reusable
+}
+
+function upsertStoredMexasPendingEscrowOrderTx(
+  pendingTx: MexasEscrowPendingOrderTx
+) {
+  writeStoredMexasPendingEscrowOrderTxs(
+    upsertMexasEscrowPendingOrderTx(
+      readStoredMexasPendingEscrowOrderTxs(),
+      pendingTx
+    )
+  )
+}
+
+function clearStoredMexasPendingEscrowOrderTx(txHash: string) {
+  writeStoredMexasPendingEscrowOrderTxs(
+    removeMexasEscrowPendingOrderTx(
+      readStoredMexasPendingEscrowOrderTxs(),
+      txHash
+    )
   )
 }
 
@@ -366,6 +455,26 @@ export default function LimitOrderPanel(props: {
       throw new APIError(403, 'Conecta una Wallet Privy para operar MEX.')
     }
 
+    const intent = getMexasEscrowPendingOrderIntent({
+      amount,
+      contractId: contract.id,
+      limitProb,
+      outcome,
+      treasuryAddress,
+      walletAddress,
+    })
+    if (!intent) {
+      throw new APIError(
+        400,
+        'Completa lado, cantidad y probabilidad antes de abrir la orden.'
+      )
+    }
+
+    const pendingTx = findStoredMexasPendingEscrowOrderTx(intent)
+    if (pendingTx) {
+      return pendingTx.txHash as Hex
+    }
+
     const wallet = wallets.find(
       (candidate) =>
         candidate.walletClientType === 'privy' &&
@@ -377,7 +486,7 @@ export default function LimitOrderPanel(props: {
 
     await wallet.switchChain(MEXAS_TOKEN.chainId)
     const provider = await wallet.getEthereumProvider()
-    return (await provider.request({
+    const txHash = (await provider.request({
       method: 'eth_sendTransaction',
       params: [
         {
@@ -392,6 +501,13 @@ export default function LimitOrderPanel(props: {
         },
       ],
     })) as Hex
+    upsertStoredMexasPendingEscrowOrderTx(
+      makeMexasEscrowPendingOrderTx(intent, {
+        createdTime: Date.now(),
+        txHash,
+      })
+    )
+    return txHash
   }
 
   async function submitBet() {
@@ -401,9 +517,10 @@ export default function LimitOrderPanel(props: {
     setIsSubmitting(true)
 
     const answerId = multiProps?.answerToBuy.id
+    let mexasEscrowTxHash: Hex | undefined
 
     try {
-      const mexasEscrowTxHash = await captureMexasEscrowStake()
+      mexasEscrowTxHash = await captureMexasEscrowStake()
       const bet = await api(
         'bet',
         removeUndefinedProps({
@@ -419,6 +536,9 @@ export default function LimitOrderPanel(props: {
           mexasEscrowTxHash,
         } as APIParams<'bet'>)
       )
+      if (mexasEscrowTxHash) {
+        clearStoredMexasPendingEscrowOrderTx(mexasEscrowTxHash)
+      }
       console.log(`placed ${TRADE_TERM}. Result:`, bet)
       if (expiresMillisAfter === 1) {
         toast.success('La orden expirará inmediatamente después de enviarse.')
@@ -447,10 +567,35 @@ export default function LimitOrderPanel(props: {
     } catch (e) {
       setLastBetDetails(null)
       if (e instanceof APIError) {
-        setError(e.message.toString())
+        const message = e.message.toString()
+        if (
+          mexasEscrowTxHash &&
+          message.includes('already attached to an order')
+        ) {
+          clearStoredMexasPendingEscrowOrderTx(mexasEscrowTxHash)
+          setError(
+            'La transferencia MEX ya está asociada a una orden. Actualiza el mercado para verla.'
+          )
+        } else if (mexasEscrowTxHash) {
+          setError(
+            `Transferencia MEX enviada (${shortenTxHash(
+              mexasEscrowTxHash
+            )}). Reintenta la misma orden para registrarla sin otra transferencia. ${message}`
+          )
+        } else {
+          setError(message)
+        }
       } else {
         console.error(e)
-        setError(`Error al enviar la orden`)
+        if (mexasEscrowTxHash) {
+          setError(
+            `Transferencia MEX enviada (${shortenTxHash(
+              mexasEscrowTxHash
+            )}). Reintenta la misma orden para registrarla sin otra transferencia.`
+          )
+        } else {
+          setError(`Error al enviar la orden`)
+        }
       }
     } finally {
       setIsSubmitting(false)

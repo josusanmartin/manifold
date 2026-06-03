@@ -126,6 +126,12 @@ export async function verifyMexasEscrowCapture(params: {
       `MEXAS escrow transfer captured ${capture.capturedAmount} MEX, below required ${capture.requiredAmount} MEX.`
     )
   }
+  if (!capture.exact) {
+    throw new APIError(
+      403,
+      `MEXAS escrow transfer captured ${capture.capturedAmount} MEX, expected exactly ${capture.requiredAmount} MEX.`
+    )
+  }
 
   await assertMexasEscrowTxUnused(params.db, txHash)
 

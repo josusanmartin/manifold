@@ -946,7 +946,7 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'const withdraw = async () =>',
       'if (!wallet || !walletAddress) return',
-      'if (withdrawing) return',
+      'if (withdrawDisabledReason) return',
       'setWithdrawError(null)',
     ])
     expectMarkersInOrder(source, [
@@ -1085,7 +1085,7 @@ describe('MEXAS flow safety guardrails', () => {
       'eth_sendTransaction',
       "functionName: 'transfer'",
       'args: [treasuryAddress, mexasAmountToUnits(amount)]',
-      'const mexasEscrowTxHash = await captureMexasEscrowStake()',
+      'mexasEscrowTxHash = await captureMexasEscrowStake()',
       'mexasEscrowTxHash,',
     ])
     expectMarkersInOrder(apiSource, [
@@ -1141,6 +1141,38 @@ describe('MEXAS flow safety guardrails', () => {
       "return escrowRuntime.enabled ? 'treasury-escrowed' : 'wallet-reserved'",
     ])
     expect(schemaSource).toContain('mexasEscrowTxHash')
+  })
+
+  test('persists pending MEXAS escrow transactions before submitting the order', () => {
+    const panelSource = readRepoFile('web/components/bet/limit-order-panel.tsx')
+    const pendingSource = readRepoFile('common/src/mexas-escrow-pending.ts')
+
+    expectMarkersInOrder(pendingSource, [
+      'export const MEXAS_ESCROW_PENDING_ORDER_TX_TTL_MS',
+      'export function getMexasEscrowPendingOrderIntent',
+      'export function findReusableMexasEscrowPendingOrderTx',
+      'export function upsertMexasEscrowPendingOrderTx',
+      'export function removeMexasEscrowPendingOrderTx',
+    ])
+    expectMarkersInOrder(panelSource, [
+      'const intent = getMexasEscrowPendingOrderIntent',
+      'const pendingTx = findStoredMexasPendingEscrowOrderTx(intent)',
+      'if (pendingTx) {',
+      'return pendingTx.txHash as Hex',
+      'const txHash = (await provider.request',
+      'upsertStoredMexasPendingEscrowOrderTx',
+      'makeMexasEscrowPendingOrderTx(intent',
+      'return txHash',
+    ])
+    expectMarkersInOrder(panelSource, [
+      'let mexasEscrowTxHash: Hex | undefined',
+      'mexasEscrowTxHash = await captureMexasEscrowStake()',
+      'mexasEscrowTxHash,',
+      'clearStoredMexasPendingEscrowOrderTx(mexasEscrowTxHash)',
+    ])
+    expect(panelSource).toContain(
+      'Reintenta la misma orden para registrarla sin otra transferencia.'
+    )
   })
 
   test('preflights MEXAS resolution exposure before the creator can resolve', () => {
@@ -2420,6 +2452,7 @@ describe('MEXAS flow safety guardrails', () => {
       'getMexasEscrowCaptureCheck',
       "receipt.status === 'success' ? '0x1' : '0x0'",
       'capture.sufficient',
+      'capture.exact',
       'await assertMexasEscrowTxUnused(params.db, txHash)',
     ])
     expectMarkersInOrder(migrationSource, [

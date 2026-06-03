@@ -8,6 +8,7 @@ import {
 export type MexasEscrowCaptureCheck = {
   capturedAmount: number
   capturedUnits: bigint
+  exact: boolean
   requiredAmount: number
   requiredUnits: bigint
   sufficient: boolean
@@ -37,6 +38,7 @@ export function getMexasEscrowCaptureCheck(params: {
   return {
     capturedAmount: mexasUnitsToTokenAmount(capturedUnits),
     capturedUnits,
+    exact: capturedUnits === requiredUnits,
     requiredAmount: mexasUnitsToTokenAmount(requiredUnits),
     requiredUnits,
     sufficient: capturedUnits >= requiredUnits,

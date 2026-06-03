@@ -38,6 +38,7 @@ describe('MEXAS escrow capture checks', () => {
     expect(check).toEqual({
       capturedAmount: 5,
       capturedUnits: 5_000_000n,
+      exact: true,
       requiredAmount: 5,
       requiredUnits: 5_000_000n,
       sufficient: true,
@@ -55,6 +56,18 @@ describe('MEXAS escrow capture checks', () => {
         requiredAmount: 5,
         treasuryAddress: treasury,
       }).sufficient
+    ).toBe(false)
+
+    expect(
+      getMexasEscrowCaptureCheck({
+        payerAddress: payer,
+        receipt: {
+          status: '0x1',
+          logs: [transferLog(5_000_001n)],
+        },
+        requiredAmount: 5,
+        treasuryAddress: treasury,
+      }).exact
     ).toBe(false)
 
     expect(
