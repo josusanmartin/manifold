@@ -172,6 +172,39 @@ function fail(name: string, details: string): CheckResult {
   return { details, name, status: 'fail' }
 }
 
+function compactDiagnosticText(text: string) {
+  const compacted = text
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return compacted.length > 600 ? `${compacted.slice(0, 600)}...` : compacted
+}
+
+function formatDiagnosticError(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return compactDiagnosticText(String(error))
+  }
+  const fields = error as {
+    code?: string
+    details?: string
+    hint?: string
+    message?: string
+  }
+  const message = [
+    fields.message,
+    fields.details ? `details=${fields.details}` : undefined,
+    fields.hint ? `hint=${fields.hint}` : undefined,
+    fields.code ? `code=${fields.code}` : undefined,
+  ]
+    .filter(Boolean)
+    .join('; ')
+
+  return compactDiagnosticText(message || JSON.stringify(error))
+}
+
 function hasEnv(name: string) {
   return !!process.env[name]?.trim()
 }
@@ -617,7 +650,7 @@ async function checkMexasContractTokenAlignment(
       ),
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = formatDiagnosticError(error)
     return {
       needsLaunchSql: false,
       result: fail('MEXAS contract token alignment', message),
@@ -922,7 +955,7 @@ async function checkNoMexasMarketLocks(
       `No active order or resolution locks found across ${rows.length} unresolved MEXAS markets.`
     )
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = formatDiagnosticError(error)
     return fail('market lock residue', message)
   }
 }
@@ -958,7 +991,7 @@ async function checkNoUnsafeOpenMexasOrders(
       `All ${contractIds.length} unresolved MEXAS markets have only actively reserved visible orders.`
     )
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = formatDiagnosticError(error)
     return fail('open order reservation flags', message)
   }
 }
@@ -1013,7 +1046,7 @@ async function checkNoCrossedMexasOrderBooks(
       `No crossed open MEXAS order books found across ${contractIds.length} unresolved markets.`
     )
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = formatDiagnosticError(error)
     return fail('crossed order books', message)
   }
 }
@@ -1095,7 +1128,7 @@ async function checkOpenMexasOrderBacking(
       `${orders.length} open reserved MEXAS orders are covered by users' on-chain MEX.`
     )
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = formatDiagnosticError(error)
     return fail('open order backing', message)
   }
 }
@@ -1162,7 +1195,7 @@ async function checkInternalMexasBalanceBacking(
       `${users.length} positive internal MEX balances are covered by on-chain wallet balances after open reservations.`
     )
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = formatDiagnosticError(error)
     return fail('internal balance backing', message)
   }
 }
@@ -1254,7 +1287,7 @@ async function checkMexasSettlementExposure(
       `${audit.filledBetCount} filled MEXAS positions have operational escrow for resolution payouts. Filled-market credit exposure: YES ${filledContractAudit.yesCredit} MEX, NO ${filledContractAudit.noCredit} MEX, CANCEL ${filledContractAudit.cancelCredit} MEX.`
     )
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = formatDiagnosticError(error)
     return fail('settlement exposure', message)
   }
 }
@@ -1322,7 +1355,9 @@ async function runChecks() {
       mexContractsError
         ? fail(
             'supabase MEX contracts',
-            `Could not read MEX contracts: ${mexContractsError.message}`
+            `Could not read MEX contracts: ${formatDiagnosticError(
+              mexContractsError
+            )}. This usually means the launch SQL has not been applied yet.`
           )
         : pass(
             'supabase MEX contracts',
@@ -1405,7 +1440,9 @@ async function runChecks() {
       matchingReadyError
         ? fail(
             'matching RPC health',
-            `Health RPC is not callable: ${matchingReadyError.message}`
+            `Health RPC is not callable: ${formatDiagnosticError(
+              matchingReadyError
+            )}`
           )
         : matchingReady === true
         ? pass('matching RPC health', 'Matching health RPC reports ready.')
@@ -1570,7 +1607,7 @@ async function runChecks() {
           : fail(`site ${path}`, `${status}`)
       )
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = formatDiagnosticError(error)
       checks.push(fail(`site ${path}`, message))
     }
   }
@@ -1599,7 +1636,7 @@ async function main() {
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error(error instanceof Error ? error.message : error)
+    console.error(formatDiagnosticError(error))
     process.exitCode = 1
   })
 }
