@@ -17,7 +17,8 @@
   "dependencies": {
     "json2csv": "6.0.0-alpha.2",
     "lodash": "4.17.21",
-    "pg": "8.13.0"
+    "pg": "8.13.0",
+    "viem": "^2.40.1"
   },
   "devDependencies": {
     "@types/json2csv": "5.0.3",

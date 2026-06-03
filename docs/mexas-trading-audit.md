@@ -84,6 +84,28 @@ La auditoria automatica actual pasa estos checks de seguridad:
 - ausencia de exposicion de settlement llenada;
 - despliegue de produccion fresco contra el HEAD auditado.
 
+## Auditoria 2026-06-03
+
+Se ejecuto una prueba local aislada en Postgres temporal con el SQL de launch
+generado por `apply:mexas-launch-sql --print-sql`. El bloque de verificacion
+del propio SQL paso despues de crear roles/tablas minimas y mercados MEXAS de
+fixture.
+
+Escenarios probados:
+
+- Price-time priority: un taker `YES` cruzo contra tres asks `NO`; el RPC lleno
+  primero el mejor precio (`60%`) y despues las dos ordenes `70%` por antiguedad
+  (`created_time`, luego `bet_id`).
+- Carrera de dos traders: dos takers `YES` concurrentes compitieron por el
+  mismo maker `NO` con 5 MEX abiertos. El `FOR UPDATE` del RPC serializo la
+  ejecucion: un taker lleno, el maker quedo lleno una sola vez y el segundo
+  taker quedo abierto sin fills.
+- Produccion smoke: paginas, redirects, endpoints bloqueados, orderbook,
+  readiness de ordenes/resolucion y auth fail-closed pasaron.
+- Produccion launch readiness: sigue bloqueado correctamente por SQL no aplicado
+  en Supabase produccion, ausencia de `MEXAS_TREASURY_SIGNER_SECRET` en Vercel
+  production y `MEXAS_ESCROW_IMPLEMENTATION` distinto de `onchain-transfer`.
+
 Los blockers de launch real siguen siendo estructurales:
 
 - aplicar el SQL de launch en Supabase produccion para `contracts.token = 'MEX'`,

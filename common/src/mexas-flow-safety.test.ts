@@ -2221,7 +2221,12 @@ describe('MEXAS flow safety guardrails', () => {
       'backend/scripts/check-mexas-launch-readiness.ts'
     )
 
+    expect(source).toContain('MEXAS_TREASURY_SIGNER_SECRET')
+    expect(source).toContain(
+      "import { privateKeyToAccount } from 'viem/accounts'"
+    )
     expect(source).toContain('function checkTreasuryWalletEnv')
+    expect(source).toContain('function checkTreasurySignerEnv')
     expect(source).toContain('ZERO_EVM_ADDRESS')
     expect(source).toContain('MEXAS_TOKEN.address')
     expectMarkersInOrder(source, [
@@ -2236,6 +2241,16 @@ describe('MEXAS flow safety guardrails', () => {
       "fail('treasury wallet env'",
       "pass(\n        'treasury wallet env'",
       'checks.push(checkTreasuryWalletEnv(vercelEnvValues))',
+    ])
+    expectMarkersInOrder(source, [
+      'function checkTreasurySignerEnv',
+      "'MEXAS_TREASURY_SIGNER_SECRET'",
+      'TREASURY_SIGNER_SECRET_PATTERN.test(signerSecret)',
+      'privateKeyToAccount',
+      'Derived signer',
+      'does not match configured treasury',
+      "pass(\n    'treasury signer env'",
+      'checks.push(checkTreasurySignerEnv(vercelEnvNames, vercelEnvValues))',
     ])
   })
 

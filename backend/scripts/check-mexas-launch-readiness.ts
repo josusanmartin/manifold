@@ -22,6 +22,7 @@ import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import { createClient } from 'common/supabase/utils'
 import type { Row, SupabaseClient } from 'common/supabase/utils'
+import { privateKeyToAccount } from 'viem/accounts'
 
 type CheckStatus = 'pass' | 'warn' | 'fail'
 
@@ -36,6 +37,7 @@ const REQUIRED_SERVER_ENVS = [
   'PRIVY_APP_ID',
   'PRIVY_APP_SECRET',
   'MEXAS_TREASURY_WALLET_ADDRESS',
+  'MEXAS_TREASURY_SIGNER_SECRET',
 ]
 
 const REQUIRED_PUBLIC_ENVS = [
@@ -69,6 +71,7 @@ const OPEN_ORDER_PAGE_SIZE = 1000
 const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000
 const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
 const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
+const TREASURY_SIGNER_SECRET_PATTERN = /^0x[0-9a-fA-F]{64}$/
 const ZERO_EVM_ADDRESS = '0x0000000000000000000000000000000000000000'
 const ERC20_BALANCE_OF_SELECTOR = '0x70a08231'
 const EPSILON = 1e-9
@@ -457,6 +460,68 @@ function checkTreasuryWalletEnv(
         'treasury wallet env',
         'Server and public treasury wallet addresses are valid and match.'
       )
+}
+
+function checkTreasurySignerEnv(
+  vercelEnvNames: Set<string>,
+  vercelEnvValues: Map<string, string>
+): CheckResult {
+  const treasuryAddress = getEnvOrVercelValue(
+    'MEXAS_TREASURY_WALLET_ADDRESS',
+    vercelEnvValues
+  )
+  const signerSecret = getEnvOrVercelValue(
+    'MEXAS_TREASURY_SIGNER_SECRET',
+    vercelEnvValues
+  )
+
+  if (!vercelEnvNames.has('MEXAS_TREASURY_SIGNER_SECRET') && !signerSecret) {
+    return fail(
+      'treasury signer env',
+      'MEXAS_TREASURY_SIGNER_SECRET is missing from Vercel production.'
+    )
+  }
+  if (!signerSecret) {
+    return fail(
+      'treasury signer env',
+      'MEXAS_TREASURY_SIGNER_SECRET exists in Vercel production but is not readable locally; set the same secret locally before launch so the derived signer can be verified.'
+    )
+  }
+  if (!TREASURY_SIGNER_SECRET_PATTERN.test(signerSecret)) {
+    return fail(
+      'treasury signer env',
+      'MEXAS_TREASURY_SIGNER_SECRET must be a 0x-prefixed 32-byte private key.'
+    )
+  }
+  if (!treasuryAddress || !EVM_ADDRESS_PATTERN.test(treasuryAddress)) {
+    return fail(
+      'treasury signer env',
+      'MEXAS_TREASURY_WALLET_ADDRESS must be valid before checking the treasury signer.'
+    )
+  }
+
+  const signerAddress = privateKeyToAccount(
+    signerSecret as `0x${string}`
+  ).address
+  if (
+    normalizeEvmAddress(signerAddress) !== normalizeEvmAddress(treasuryAddress)
+  ) {
+    return fail(
+      'treasury signer env',
+      `Derived signer ${formatAddressForDiagnostics(
+        signerAddress
+      )} does not match configured treasury ${formatAddressForDiagnostics(
+        treasuryAddress
+      )}.`
+    )
+  }
+
+  return pass(
+    'treasury signer env',
+    `Treasury signer derives the configured treasury address ${formatAddressForDiagnostics(
+      treasuryAddress
+    )}.`
+  )
 }
 
 function getSupabaseUrlOrInstanceId() {
@@ -1446,6 +1511,7 @@ async function runChecks() {
         )
   )
   checks.push(checkTreasuryWalletEnv(vercelEnvValues))
+  checks.push(checkTreasurySignerEnv(vercelEnvNames, vercelEnvValues))
 
   const supabaseUrlOrInstanceId = getSupabaseUrlOrInstanceId()
   const supabaseAdminKey = getSupabaseAdminKey()
