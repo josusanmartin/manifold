@@ -2249,6 +2249,9 @@ describe('MEXAS flow safety guardrails', () => {
       'backend/scripts/check-mexas-launch-readiness.ts'
     )
     const schemaSource = readRepoFile('common/src/supabase/schema.ts')
+    const sqlTestSource = readRepoFile(
+      'backend/scripts/test-mexas-orderbook-sql.ts'
+    )
 
     expectMarkersInOrder(migration, [
       'create table if not exists',
@@ -2305,6 +2308,17 @@ describe('MEXAS flow safety guardrails', () => {
       "db.rpc('mexas_treasury_settlement_ledger_ready')",
       "fail(\n            'treasury settlement ledger'",
       'Treasury settlement ledger health RPC reports ready.',
+    ])
+    expectMarkersInOrder(sqlTestSource, [
+      'async function testTreasuryLedgerIdempotencyAndRls',
+      "status: 'processing'",
+      'treasury processing status is accepted',
+      'duplicate treasury idempotency key',
+      'duplicate treasury tx hash',
+      'failed treasury transfer requires an error',
+      'anonymous treasury ledger read',
+      'anonymous treasury ledger insert',
+      "'verify treasury ledger idempotency and RLS'",
     ])
     expect(schemaSource).toContain('mexas_treasury_settlement_ledger_ready')
   })

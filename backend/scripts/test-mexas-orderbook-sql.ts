@@ -55,6 +55,36 @@ function assertDeepEqual<T>(actual: T, expected: T, message: string) {
   }
 }
 
+let savepointCounter = 0
+
+async function expectSqlError(
+  client: PgClient,
+  sql: string,
+  params: unknown[],
+  pattern: RegExp,
+  message: string
+) {
+  const savepoint = `expect_sql_error_${++savepointCounter}`
+  await client.query(`savepoint ${savepoint}`)
+
+  try {
+    await client.query(sql, params)
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    await client.query(`rollback to savepoint ${savepoint}`)
+    await client.query(`release savepoint ${savepoint}`)
+    assert(
+      pattern.test(errorMessage),
+      `${message}: unexpected error ${errorMessage}`
+    )
+    return
+  }
+
+  await client.query(`rollback to savepoint ${savepoint}`)
+  await client.query(`release savepoint ${savepoint}`)
+  throw new Error(`${message}: expected query to fail.`)
+}
+
 function readLaunchMigrationSql() {
   return MIGRATION_FILES.map((path) =>
     readFileSync(resolve(ROOT, path), 'utf8')
@@ -174,6 +204,8 @@ async function createMinimalSchema(client: PgClient) {
     exception when duplicate_object then null;
     end
     $$;
+
+    alter role service_role bypassrls;
 
     grant usage on schema public to anon, authenticated, service_role;
 
@@ -449,6 +481,263 @@ async function testReadinessAndPermissions(client: PgClient) {
     )
   } finally {
     await client.query('rollback').catch(() => undefined)
+  }
+}
+
+async function insertTreasuryTransfer(
+  client: PgClient,
+  params: {
+    error?: string
+    id: string
+    idempotencyKey: string
+    status: string
+    txHash?: string
+  }
+) {
+  await client.query(
+    `
+      insert into public.mexas_treasury_transfers (
+        id,
+        idempotency_key,
+        transfer_type,
+        status,
+        user_id,
+        amount,
+        token_address,
+        chain_id,
+        treasury_address,
+        recipient_address,
+        tx_hash,
+        error,
+        metadata,
+        updated_time,
+        submitted_time,
+        confirmed_time
+      )
+      values (
+        $1,
+        $2,
+        'order-release',
+        $3,
+        'treasury-user',
+        1,
+        '0xc4c2ede4f6fd623acc86c492bdf099b3ba2b8303',
+        42161,
+        '0x1111111111111111111111111111111111111111',
+        '0x2222222222222222222222222222222222222222',
+        $4,
+        $5,
+        '{}'::jsonb,
+        now(),
+        case when $3 in ('submitted', 'confirmed') then now() else null end,
+        case when $3 = 'confirmed' then now() else null end
+      )
+    `,
+    [
+      params.id,
+      params.idempotencyKey,
+      params.status,
+      params.txHash ?? null,
+      params.error ?? null,
+    ]
+  )
+}
+
+async function testTreasuryLedgerIdempotencyAndRls(client: PgClient) {
+  await seedUsers(client, ['treasury-user'])
+
+  await withServiceRole(client, async () => {
+    await insertTreasuryTransfer(client, {
+      id: 'treasury-processing',
+      idempotencyKey: 'treasury-key-1',
+      status: 'processing',
+    })
+
+    const { rows } = await client.query(
+      `
+        select status
+        from public.mexas_treasury_transfers
+        where idempotency_key = 'treasury-key-1'
+      `
+    )
+    assertEqual(
+      rows[0]?.status,
+      'processing',
+      'treasury processing status is accepted'
+    )
+
+    await expectSqlError(
+      client,
+      `
+        insert into public.mexas_treasury_transfers (
+          id,
+          idempotency_key,
+          transfer_type,
+          status,
+          user_id,
+          amount,
+          token_address,
+          chain_id,
+          treasury_address,
+          recipient_address,
+          metadata,
+          updated_time
+        )
+        values (
+          'treasury-duplicate-key',
+          'treasury-key-1',
+          'order-release',
+          'processing',
+          'treasury-user',
+          1,
+          '0xc4c2ede4f6fd623acc86c492bdf099b3ba2b8303',
+          42161,
+          '0x1111111111111111111111111111111111111111',
+          '0x2222222222222222222222222222222222222222',
+          '{}'::jsonb,
+          now()
+        )
+      `,
+      [],
+      /duplicate key|unique/i,
+      'duplicate treasury idempotency key'
+    )
+
+    await insertTreasuryTransfer(client, {
+      id: 'treasury-submitted',
+      idempotencyKey: 'treasury-key-2',
+      status: 'submitted',
+      txHash: `0x${'a'.repeat(64)}`,
+    })
+    await expectSqlError(
+      client,
+      `
+        insert into public.mexas_treasury_transfers (
+          id,
+          idempotency_key,
+          transfer_type,
+          status,
+          user_id,
+          amount,
+          token_address,
+          chain_id,
+          treasury_address,
+          recipient_address,
+          tx_hash,
+          metadata,
+          updated_time,
+          submitted_time
+        )
+        values (
+          'treasury-duplicate-tx',
+          'treasury-key-3',
+          'order-release',
+          'submitted',
+          'treasury-user',
+          1,
+          '0xc4c2ede4f6fd623acc86c492bdf099b3ba2b8303',
+          42161,
+          '0x1111111111111111111111111111111111111111',
+          '0x2222222222222222222222222222222222222222',
+          $1,
+          '{}'::jsonb,
+          now(),
+          now()
+        )
+      `,
+      [`0x${'a'.repeat(64)}`],
+      /duplicate key|unique/i,
+      'duplicate treasury tx hash'
+    )
+
+    await expectSqlError(
+      client,
+      `
+        insert into public.mexas_treasury_transfers (
+          id,
+          idempotency_key,
+          transfer_type,
+          status,
+          user_id,
+          amount,
+          token_address,
+          chain_id,
+          treasury_address,
+          recipient_address,
+          metadata,
+          updated_time
+        )
+        values (
+          'treasury-failed-without-error',
+          'treasury-key-4',
+          'order-release',
+          'failed',
+          'treasury-user',
+          1,
+          '0xc4c2ede4f6fd623acc86c492bdf099b3ba2b8303',
+          42161,
+          '0x1111111111111111111111111111111111111111',
+          '0x2222222222222222222222222222222222222222',
+          '{}'::jsonb,
+          now()
+        )
+      `,
+      [],
+      /check constraint/i,
+      'failed treasury transfer requires an error'
+    )
+  })
+
+  await client.query('begin')
+  try {
+    await client.query('set local role anon')
+    await expectSqlError(
+      client,
+      'select * from public.mexas_treasury_transfers',
+      [],
+      /permission denied/i,
+      'anonymous treasury ledger read'
+    )
+    await expectSqlError(
+      client,
+      `
+        insert into public.mexas_treasury_transfers (
+          id,
+          idempotency_key,
+          transfer_type,
+          status,
+          user_id,
+          amount,
+          token_address,
+          chain_id,
+          treasury_address,
+          recipient_address,
+          metadata,
+          updated_time
+        )
+        values (
+          'anon-treasury-transfer',
+          'anon-key',
+          'order-release',
+          'pending',
+          'treasury-user',
+          1,
+          '0xc4c2ede4f6fd623acc86c492bdf099b3ba2b8303',
+          42161,
+          '0x1111111111111111111111111111111111111111',
+          '0x2222222222222222222222222222222222222222',
+          '{}'::jsonb,
+          now()
+        )
+      `,
+      [],
+      /permission denied/i,
+      'anonymous treasury ledger insert'
+    )
+    await client.query('commit')
+  } catch (error) {
+    await client.query('rollback').catch(() => undefined)
+    throw error
   }
 }
 
@@ -805,6 +1094,9 @@ async function main() {
     await runStep('apply MEXAS launch SQL', () => applyMexasLaunchSql(client))
     await runStep('verify readiness RPCs and grants', () =>
       testReadinessAndPermissions(client)
+    )
+    await runStep('verify treasury ledger idempotency and RLS', () =>
+      testTreasuryLedgerIdempotencyAndRls(client)
     )
     await runStep('verify SQL price-time priority', () =>
       testPriceTimePriority(client)
