@@ -64,7 +64,7 @@ const REQUIRED_MEXAS_CONTRACTS = [
   },
   {
     id: 'ukrwarend26a',
-    slug: 'will-the-russia-ukraine-war-end-by-december-31-2026',
+    slug: 'terminara-la-guerra-entre-rusia-y-ucrania-antes-del-31-de-diciembre-de-2026',
   },
 ]
 
@@ -1636,8 +1636,7 @@ async function checkMexasSettlementExposure(
       .map((row) => ({ bet: convertBet(row), row }))
       .filter((entry) => hasMexasFilledExposure(entry.bet))
     const unescrowedFilledEntries = filledEntries.filter(
-      (entry) =>
-        !wasMexasStakeEscrowed(entry.bet as MexasReservedOrderData)
+      (entry) => !wasMexasStakeEscrowed(entry.bet as MexasReservedOrderData)
     )
     const escrowedFilledWithoutMetadata = filledEntries.filter(
       (entry) =>
@@ -2152,6 +2151,7 @@ async function runChecks() {
     '/wallet',
     '/checkout',
     '/mexas-test/ganara-mexico-la-copa-mundial-2026',
+    '/mexas-test/terminara-la-guerra-entre-rusia-y-ucrania-antes-del-31-de-diciembre-de-2026',
   ]) {
     try {
       const response = await checkUrl(`${siteUrl}${path}`)

@@ -162,6 +162,13 @@ module.exports = {
       ...MEXAS_WALLET_REDIRECTS,
       ...MEXAS_ONLY_REDIRECTS,
       {
+        source:
+          '/mexas-test/will-the-russia-ukraine-war-end-by-december-31-2026',
+        destination:
+          '/mexas-test/terminara-la-guerra-entre-rusia-y-ucrania-antes-del-31-de-diciembre-de-2026',
+        permanent: false,
+      },
+      {
         source: '/:username',
         has: [
           {

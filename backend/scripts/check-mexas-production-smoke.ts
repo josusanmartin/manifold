@@ -94,8 +94,10 @@ const PAGES = [
     ],
   },
   {
-    path: '/mexas-test/will-the-russia-ukraine-war-end-by-december-31-2026',
+    path: '/mexas-test/terminara-la-guerra-entre-rusia-y-ucrania-antes-del-31-de-diciembre-de-2026',
     required: [
+      '¿Terminará la guerra entre Rusia y Ucrania antes del 31 de diciembre de 2026?',
+      'Resuelve SÍ si Rusia y Ucrania acuerdan formalmente',
       'Libro de órdenes',
       'Compras SÍ',
       'Ventas SÍ',
@@ -199,6 +201,11 @@ const REDIRECTS = [
   { destination: '/checkout', path: '/prize' },
   { destination: '/checkout', path: '/shop' },
   { destination: '/checkout', path: '/sitemap' },
+  {
+    destination:
+      '/mexas-test/terminara-la-guerra-entre-rusia-y-ucrania-antes-del-31-de-diciembre-de-2026',
+    path: '/mexas-test/will-the-russia-ukraine-war-end-by-december-31-2026',
+  },
   { destination: '/about', path: '/api' },
   { destination: '/about', path: '/api/v0' },
   { destination: '/about', path: '/mana-only-terms' },

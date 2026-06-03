@@ -17,7 +17,7 @@ import {
 const FEATURED_MARKET_URL = '/mexas-test/ganara-mexico-la-copa-mundial-2026'
 const FEATURED_MARKET_ID = 'mexwcwin26a'
 const UKRAINE_MARKET_URL =
-  '/mexas-test/will-the-russia-ukraine-war-end-by-december-31-2026'
+  '/mexas-test/terminara-la-guerra-entre-rusia-y-ucrania-antes-del-31-de-diciembre-de-2026'
 const UKRAINE_MARKET_ID = 'ukrwarend26a'
 
 function MarketHeader() {
