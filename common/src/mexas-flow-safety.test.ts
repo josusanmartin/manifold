@@ -260,6 +260,13 @@ describe('MEXAS flow safety guardrails', () => {
       'return releasedRow ? 1 : 0',
     ])
     expectMarkersInOrder(source, [
+      'async function syncAvailableBalanceFromBacking',
+      ".from('users')",
+      ".select('balance')",
+      'getMexasSyncedAvailableBalance({',
+      'currentBalance: userRow.balance',
+    ])
+    expectMarkersInOrder(source, [
       'async function completePreparedMexasOrderRelease',
       'await updateMexasUserBalanceCas(db, bet.userId, refundAmount',
       'dataPatch: await getOpenReservedMexasDataPatch(db, bet.userId)',
@@ -720,9 +727,11 @@ describe('MEXAS flow safety guardrails', () => {
       'const matchedBet = hasCrossingOrders',
     ])
     expect(ordersSource).toContain(".select('id,balance,data')")
-    expect(ordersSource).toContain(
-      'currentBalance: userRowById.get(userId)?.balance ?? 0'
-    )
+    expectMarkersInOrder(ordersSource, [
+      'async function syncAvailableBalanceFromBacking',
+      ".select('balance')",
+      'currentBalance: userRow.balance',
+    ])
     expect(ordersSource).toContain('onChainDeltaAmount: 0')
   })
 
