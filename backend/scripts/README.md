@@ -52,6 +52,26 @@ $ yarn --cwd backend/scripts check:mexas-launch
 
 This script loads local `.env` files, checks production Vercel env names, verifies the Supabase matching health RPC, checks required settlement flags, and smoke-tests the main public MEXAS pages. A failing result means production is not ready to launch with live matching.
 
+Current launch blockers should be resolved in this order:
+
+1. Add `MEXAS_TREASURY_SIGNER_SECRET` to Vercel production. The private key
+   must derive exactly to `MEXAS_TREASURY_WALLET_ADDRESS`.
+
+   ```shell
+   $ vercel env add MEXAS_TREASURY_SIGNER_SECRET production
+   ```
+
+2. Fund the treasury wallet with enough Arbitrum ETH for outgoing ERC-20
+   transfers. The readiness script enforces `MEXAS_TREASURY_MIN_GAS_WEI`,
+   defaulting to `0.0001 ETH`.
+
+3. Apply the MEXAS launch SQL in Supabase so `contracts.token` can become
+   `MEX`, the matching RPC is installed, escrow capture is guarded, and the
+   backend-only treasury ledger exists.
+
+4. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
+   markets until every launch-readiness line is `PASS`.
+
 To apply the required MEXAS SQL migrations and normalize every contract row
 whose JSON data marks it as a MEX market, run:
 
@@ -92,6 +112,6 @@ $ yarn --cwd backend/scripts test:mexas-orderbook-sql
 ```
 
 This starts a temporary Docker Postgres, applies the MEXAS launch migrations,
-and verifies backend-only RPC grants, price-time priority, two concurrent
-takers racing for the same maker, wallet-vs-escrow separation, closed/resolved
-market rejection, and expired taker rejection.
+and verifies backend-only RPC grants, treasury ledger idempotency/RLS, price-time
+priority, two concurrent takers racing for the same maker, wallet-vs-escrow
+separation, closed/resolved market rejection, and expired taker rejection.
