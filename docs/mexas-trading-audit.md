@@ -13,10 +13,16 @@ y Arbitrum solo para leer el balance ERC-20 del usuario.
 - Cada orden abierta descuenta saldo interno y guarda `mexasFundsReserved`.
 - El saldo disponible se sincroniza como MEX on-chain menos reservas abiertas;
   no se calcula por delta bruto cuando hay ordenes pendientes.
-- Las ordenes expiradas se cancelan y devuelven solo la reserva pendiente.
+- Las ordenes expiradas o cerradas se cancelan y devuelven solo la reserva
+  pendiente que siga respaldada por MEX on-chain; el resto queda marcado como
+  `unbacked-onchain-balance`.
 - Las ordenes abiertas sin respaldo on-chain se cancelan sin reembolso interno.
 - Al cancelar una orden, la ruta local rechaza cambios mientras haya lock de
-  order book o resolucion en curso, y el reembolso usa clave idempotente.
+  order book o resolucion en curso, y el reembolso usa clave idempotente y
+  credito respaldado.
+- El scheduler de expiracion tambien lee Arbitrum antes de liberar reservas
+  MEXAS, revalida locks de balance frescos y no acredita saldo interno por
+  encima de `walletBalance - reservasAbiertas`.
 - El matching usa price-time priority: mejor precio primero, luego orden mas vieja,
   luego `bet_id` como desempate determinista.
 - La colocacion de ordenes toma un lock por mercado y usa CAS por fila de orden,
@@ -45,6 +51,26 @@ Para no crear saldos internos no respaldados, el API bloquea:
 
 Abrir ordenes limite que no cruzan sigue permitido, porque esas ordenes pueden
 cancelarse si el balance on-chain deja de respaldarlas.
+
+## Estado de readiness
+
+La auditoria automatica actual pasa estos checks de seguridad:
+
+- reservas abiertas activas;
+- ausencia de locks persistentes en mercados MEXAS;
+- respaldo on-chain de ordenes abiertas;
+- respaldo on-chain de saldos internos positivos;
+- ausencia de libros cruzados persistentes;
+- ausencia de exposicion de settlement llenada;
+- despliegue de produccion fresco contra el HEAD auditado.
+
+Los blockers de launch real siguen siendo estructurales:
+
+- aplicar el SQL de launch en Supabase para `contracts.token = 'MEX'`, indices
+  de libro y RPC `mexas_orderbook_matching_engine_ready`;
+- implementar escrow on-chain real con `captureOrderStake`,
+  `releaseOpenOrderStake` y `payoutResolvedPositions`;
+- desplegar/confirmar el scheduler runtime despues de aplicar el SQL.
 
 ## Superficie publica MEXAS
 
