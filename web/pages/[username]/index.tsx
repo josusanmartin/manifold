@@ -8,8 +8,6 @@ import {
 import clsx from 'clsx'
 import { DIVISION_NAMES, getLeaguePath } from 'common/leagues'
 import { getUserForStaticProps } from 'common/supabase/users'
-import { isUserLikelySpammer } from 'common/user'
-import { unauthedApi } from 'common/util/api'
 import { buildArray } from 'common/util/array'
 import { removeUndefinedProps } from 'common/util/object'
 import Head from 'next/head'
@@ -57,7 +55,6 @@ import { buildPersonProfile } from 'web/lib/json-ld'
 import TrophyIcon from 'web/lib/icons/trophy-icon.svg'
 import { db } from 'web/lib/supabase/db'
 import { api } from 'web/lib/api/api'
-import { getAverageUserRating, getUserRating } from 'web/lib/supabase/reviews'
 import Custom404 from 'web/pages/404'
 import { UserPayments } from 'web/pages/payments'
 
@@ -77,20 +74,12 @@ export const getStaticProps = async (props: {
       ])
     : []
   const hasCreatedQuestion = contracts?.data?.length || posts?.data?.length
-  const { count, rating } = (user ? await getUserRating(user.id) : null) ?? {}
-  const averageRating = user ? await getAverageUserRating(user.id) : undefined
-  const shouldIgnoreUser = user
-    ? await shouldIgnoreUserPage(user, !!hasCreatedQuestion)
-    : false
 
   return {
     props: removeUndefinedProps({
       user,
       username,
-      rating: rating,
-      reviewCount: count,
-      averageRating: averageRating,
-      shouldIgnoreUser,
+      shouldIgnoreUser: false,
       hasCreatedQuestion,
     }),
     revalidate: 60,
@@ -122,18 +111,6 @@ export default function UserPage(props: {
     <BlockedUser user={user} privateUser={privateUser} />
   ) : (
     <UserProfile user={user} {...profileProps} />
-  )
-}
-
-const shouldIgnoreUserPage = async (
-  user: User,
-  hasCreatedQuestion: boolean
-) => {
-  // lastBetTime isn't always reliable, so use the contract_bets table to be sure
-  const bet = await unauthedApi('bets', { userId: user.id, limit: 1 })
-  return (
-    user.userDeleted ||
-    isUserLikelySpammer(user, bet.length > 0, hasCreatedQuestion)
   )
 }
 

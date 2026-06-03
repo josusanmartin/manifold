@@ -507,6 +507,11 @@ describe('MEXAS flow safety guardrails', () => {
       "tab !== 'achievements' && tab !== 'comments'"
     )
     expect(profileSource).toContain("tab: 'summary'")
+    expect(profileSource).toContain('shouldIgnoreUser: false')
+    expect(profileSource).not.toContain("unauthedApi('bets'")
+    expect(profileSource).not.toContain('getUserRating')
+    expect(profileSource).not.toContain('getAverageUserRating')
+    expect(profileSource).not.toContain('isUserLikelySpammer')
     expectMarkersInOrder(smokeSource, [
       "path: '/josusanmartin?tab=comments'",
       "destination: '/josusanmartin?tab=summary'",
