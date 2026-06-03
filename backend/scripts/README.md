@@ -84,3 +84,14 @@ $ yarn --cwd backend/scripts check:mexas-smoke
 This checks public page status codes, required Spanish MEXAS copy, absence of
 visible legacy Manifold/Mana/comment/verification UI strings, and the public
 MEXAS orderbook endpoint.
+
+For an isolated SQL integration audit of the MEXAS orderbook matcher, run:
+
+```shell
+$ yarn --cwd backend/scripts test:mexas-orderbook-sql
+```
+
+This starts a temporary Docker Postgres, applies the MEXAS launch migrations,
+and verifies backend-only RPC grants, price-time priority, two concurrent
+takers racing for the same maker, wallet-vs-escrow separation, closed/resolved
+market rejection, and expired taker rejection.

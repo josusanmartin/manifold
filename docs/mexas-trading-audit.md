@@ -86,10 +86,10 @@ La auditoria automatica actual pasa estos checks de seguridad:
 
 ## Auditoria 2026-06-03
 
-Se ejecuto una prueba local aislada en Postgres temporal con el SQL de launch
-generado por `apply:mexas-launch-sql --print-sql`. El bloque de verificacion
-del propio SQL paso despues de crear roles/tablas minimas y mercados MEXAS de
-fixture.
+Se agrego y ejecuto una prueba local aislada en Postgres temporal:
+`yarn --cwd backend/scripts test:mexas-orderbook-sql`. El script levanta Docker,
+crea roles/tablas minimas tipo Supabase, aplica las migraciones MEXAS de launch
+y prueba el RPC real `public.mexas_match_orderbook_limit_order`.
 
 Escenarios probados:
 
@@ -100,11 +100,17 @@ Escenarios probados:
   mismo maker `NO` con 5 MEX abiertos. El `FOR UPDATE` del RPC serializo la
   ejecucion: un taker lleno, el maker quedo lleno una sola vez y el segundo
   taker quedo abierto sin fills.
+- Separacion wallet/escrow: un taker wallet-reserved no cruzo contra una orden
+  treasury-escrowed aunque tenia mejor precio; solo cruzo contra el libro
+  wallet-reserved.
+- Guards de mercado: el RPC rechazo takers expirados, mercados cerrados y
+  mercados ya resueltos.
 - Produccion smoke: paginas, redirects, endpoints bloqueados, orderbook,
   readiness de ordenes/resolucion y auth fail-closed pasaron.
 - Produccion launch readiness: sigue bloqueado correctamente por SQL no aplicado
   en Supabase produccion, ausencia de `MEXAS_TREASURY_SIGNER_SECRET` en Vercel
-  production y `MEXAS_ESCROW_IMPLEMENTATION` distinto de `onchain-transfer`.
+  production y ausencia de un connection string local para aplicar/verificar SQL
+  directamente.
 
 Los blockers de launch real siguen siendo estructurales:
 
@@ -117,8 +123,6 @@ Los blockers de launch real siguen siendo estructurales:
 - aunque `MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS` este configurado, el runtime debe
   mantener `escrowCaptureEnabled=false` hasta que el SQL de produccion, signer y
   scheduler runtime esten verificados;
-- subir `MEXAS_ONCHAIN_ESCROW_CAPABILITIES` solo cuando captura, release y
-  payout esten cubiertos end-to-end en el matcher y las rutas runtime;
 - desplegar/confirmar el scheduler runtime despues de aplicar el SQL.
 
 ## Superficie publica MEXAS

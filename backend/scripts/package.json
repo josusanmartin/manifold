@@ -11,6 +11,7 @@
     "apply:mexas-test-unwind": "ts-node unwind-mexas-test-exposure.ts --apply --confirm-test-unwind",
     "check:mexas-launch": "ts-node check-mexas-launch-readiness.ts",
     "check:mexas-smoke": "ts-node check-mexas-production-smoke.ts",
+    "test:mexas-orderbook-sql": "ts-node test-mexas-orderbook-sql.ts",
     "print:mexas-test-unwind-sql": "ts-node audit-mexas-settlement.ts --print-test-unwind-sql",
     "code": "ts-node manicode.ts"
   },
