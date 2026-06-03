@@ -420,9 +420,16 @@ describe('MEXAS flow safety guardrails', () => {
       'left join contract_bets b',
       "coalesce((b.data->>'mexasFundsReserved')::boolean, false) = true",
       "coalesce((b.data->>'mexasFundsReleased')::boolean, false) = false",
+      "coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = false",
       "'{mexasWalletOpenReservedAmount}'",
       'to_jsonb(open_reserved.amount)',
     ])
+    expect(
+      countOccurrences(
+        source,
+        "coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = false"
+      )
+    ).toBeGreaterThanOrEqual(3)
     expectMarkersInOrder(source, [
       'async function releaseExpiredMexasReservedOrders',
       'const candidates = await loadExpiredMexasReleaseCandidates(pg, releasedAt)',
@@ -1481,13 +1488,19 @@ describe('MEXAS flow safety guardrails', () => {
 
     expectMarkersInOrder(source, [
       'async function cancelInsertedMexasOrderAndRefund',
-      'const currentBet = convertBet(currentRow as Row',
+      'const typedCurrentRow = currentRow as Row',
+      'const currentBet = convertBet(typedCurrentRow) as LimitBet',
       'const refundAmount = getMexasRemainingReservedAmount(currentBet)',
+      'const escrowedStake = hasMexasEscrowedStake(currentBet)',
+      'mexasFundsReleased: escrowedStake ? false : true',
       ".eq('bet_id', bet.id)",
       ".eq('user_id', userId)",
       ".eq('is_cancelled', false)",
       ".eq('is_filled', false)",
       ".eq('updated_time', currentRow.updated_time)",
+      'if (escrowedStake)',
+      'await releaseCancelledMexasOrder(',
+      'skipUserBalanceLock: true',
       'await refundMexasReservation(',
       'refundAmount',
     ])
@@ -1496,7 +1509,7 @@ describe('MEXAS flow safety guardrails', () => {
       '? await matchMexasOrderbookLimitOrderRpc(db, bet.id)',
       '} catch (error) {',
       'if (debited && !inserted && bet)',
-      'if (debited && inserted && bet)',
+      'if ((debited || escrowCapture) && inserted && bet)',
       'await cancelInsertedMexasOrderAndRefund(',
     ])
   })
@@ -2629,6 +2642,12 @@ describe('MEXAS flow safety guardrails', () => {
     expect(schedulerSource).toContain(
       "coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = false"
     )
+    expect(
+      countOccurrences(
+        schedulerSource,
+        "coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = false"
+      )
+    ).toBeGreaterThanOrEqual(3)
   })
 
   test('launch readiness reports active escrowed stake that cannot be released safely', () => {

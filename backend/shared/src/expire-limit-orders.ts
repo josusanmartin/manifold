@@ -251,6 +251,7 @@ async function loadActiveReservedAmountsAfterRelease(
       and (b.expires_at is null or b.expires_at > now())
       and coalesce((b.data->>'mexasFundsReserved')::boolean, false) = true
       and coalesce((b.data->>'mexasFundsReleased')::boolean, false) = false
+      and coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = false
     group by au.user_id
     `,
     [userIds, releasedBetIds]
@@ -486,6 +487,7 @@ async function applyPreparedMexasReleases(
         and (b.expires_at is null or b.expires_at > now())
         and coalesce((b.data->>'mexasFundsReserved')::boolean, false) = true
         and coalesce((b.data->>'mexasFundsReleased')::boolean, false) = false
+        and coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = false
       group by au.user_id
     )
     update users u

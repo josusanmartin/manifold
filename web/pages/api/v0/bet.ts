@@ -40,6 +40,7 @@ import {
   updateMexasUserBalanceCas,
 } from 'web/lib/api/mexas-balance'
 import {
+  releaseCancelledMexasOrder,
   releaseClosedMexasMarketOrders,
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
@@ -448,9 +449,12 @@ async function cancelInsertedMexasOrderAndRefund(
   if (readError) throw readError
   if (!currentRow) return
 
-  const currentBet = convertBet(currentRow as Row<'contract_bets'>) as LimitBet
+  const typedCurrentRow = currentRow as Row<'contract_bets'>
+  const currentBet = convertBet(typedCurrentRow) as LimitBet &
+    MexasReservedOrderData
   const refundAmount = getMexasRemainingReservedAmount(currentBet)
   if (refundAmount <= 0) return
+  const escrowedStake = hasMexasEscrowedStake(currentBet)
 
   const currentData =
     currentRow.data &&
@@ -466,7 +470,7 @@ async function cancelInsertedMexasOrderAndRefund(
       data: {
         ...currentData,
         isCancelled: true,
-        mexasFundsReleased: true,
+        mexasFundsReleased: escrowedStake ? false : true,
         mexasReleaseCreditKey: `mexas-placement-refund:${bet.id}`,
         mexasReleaseReason: 'placement-error',
         mexasReleasedAt: now,
@@ -482,6 +486,13 @@ async function cancelInsertedMexasOrderAndRefund(
 
   if (error) throw error
   if (!cancelledRow) return
+
+  if (escrowedStake) {
+    await releaseCancelledMexasOrder(db, cancelledRow as Row<'contract_bets'>, {
+      skipUserBalanceLock: true,
+    })
+    return
+  }
 
   await refundMexasReservation(
     db,
@@ -962,7 +973,7 @@ async function placeBinaryBet(
             `mexas-insert-refund:${bet.id}`
           )
         }
-        if (debited && inserted && bet) {
+        if ((debited || escrowCapture) && inserted && bet) {
           await cancelInsertedMexasOrderAndRefund(
             db,
             bet,
