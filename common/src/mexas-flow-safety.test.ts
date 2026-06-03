@@ -2628,7 +2628,6 @@ describe('MEXAS flow safety guardrails', () => {
       ".contains('data', { token: 'MEX' } as any)",
       ".is('resolution_time', null)",
       'async function loadContractBets',
-      ".eq('is_cancelled', false)",
       'const filledBets = bets.filter(hasMexasFilledExposure)',
       'printTextReport(exposures)',
       'if (exposures.length) process.exitCode = 1',
@@ -2653,9 +2652,15 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain(
       "when jsonb_typeof(v_user_data -> 'mexasBalanceCreditKeys') = 'array'"
     )
+    expect(source).toContain('and coalesce(b.amount, 0) > 0')
+    expect(source).toContain('and coalesce(b.shares, 0) > 0')
     expect(source).toContain("'mexasBalanceCreditKeys'")
     expect(source).toContain("'mexasTestUnwound', true")
     expect(source).toContain('rollback;')
+    expect(source).not.toContain(
+      'and coalesce(b.is_cancelled, false) = false'
+    )
+    expect(source).not.toContain('and coalesce(b.is_filled, false) = true')
     expect(source).not.toContain('.update(')
     expect(source).not.toContain('.insert(')
     expect(source).not.toContain('.delete(')
@@ -2678,6 +2683,9 @@ describe('MEXAS flow safety guardrails', () => {
       "throw new Error('Refusing to apply without --confirm-test-unwind.')",
     ])
     expectMarkersInOrder(unwindSource, [
+      'if (!hasMexasFilledExposure(currentBet))',
+      'roundAmount(currentBet.amount ?? 0)',
+      'return { alreadyCancelled: currentBet.isCancelled === true',
       'await updateMexasUserBalanceCas(db, exposure.userId, exposure.cancelCredit',
       'creditKey',
       ".from('contract_bets')",
@@ -2738,9 +2746,12 @@ describe('MEXAS flow safety guardrails', () => {
       'export function hasActiveMexasWalletReservation',
       'hasActiveMexasReservation(order)',
       'order.mexasStakeEscrowed !== true',
-      'export function hasMexasEscrowedStake',
+      'export function wasMexasStakeEscrowed',
       'order.mexasStakeEscrowed === true',
+      'export function hasMexasEscrowedStake',
+      'hasActiveMexasReservation(order) && wasMexasStakeEscrowed(order)',
       'export function hasMexasEscrowCaptureMetadata',
+      'wasMexasStakeEscrowed(order)',
       'typeof order.mexasEscrowTxHash',
     ])
     expectMarkersInOrder(readinessSource, [
@@ -2759,11 +2770,11 @@ describe('MEXAS flow safety guardrails', () => {
       'mexasTreasuryReleaseTxHash: transfer?.tx_hash',
     ])
     expectMarkersInOrder(resolveSource, [
-      'hasMexasEscrowedStake',
+      'wasMexasStakeEscrowed',
       'async function releaseOpenOrder',
       'const entryByBetId = new Map',
       'const escrowedCreditKeys = new Set<string>()',
-      'if (!bet || !hasMexasEscrowedStake(bet)) continue',
+      'if (!bet || !wasMexasStakeEscrowed(bet)) continue',
       'await submitMexasTreasuryTransfer',
       'recipientAddress: await getUserPrivyWalletAddress',
       'transferType: event.transferType',
@@ -2843,7 +2854,7 @@ describe('MEXAS flow safety guardrails', () => {
       'type MexasBetEntry',
       'async function loadUnresolvedMexasBetEntries',
       'async function checkTreasuryMexasLiabilityBacking',
-      'hasMexasEscrowedStake',
+      'wasMexasStakeEscrowed',
       'const audit = getMexasSettlementAudit(escrowedBets)',
       'const requiredAmount = Math.max',
       'readMexasWalletBalanceUnits',
@@ -2851,6 +2862,12 @@ describe('MEXAS flow safety guardrails', () => {
       'Treasury has ${formatMexasUnits',
       'active escrow liabilities require up to',
       'checks.push(await checkTreasuryMexasLiabilityBacking(db, vercelEnvValues))',
+    ])
+    expectMarkersInOrder(source, [
+      'const unescrowedFilledEntries = filledEntries.filter',
+      '!wasMexasStakeEscrowed(entry.bet as MexasReservedOrderData)',
+      'const escrowedFilledWithoutMetadata = filledEntries.filter',
+      'hasMexasEscrowCaptureMetadata(entry.bet as MexasReservedOrderData)',
     ])
   })
 

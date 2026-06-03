@@ -160,7 +160,6 @@ async function loadFilledTestExposures(db: SupabaseClient) {
 
     const rows = await loadContractBets(db, contractId)
     for (const row of rows) {
-      if (row.is_cancelled) continue
       const bet = convertBet(row)
       if (!hasMexasFilledExposure(bet)) continue
       exposures.push({
@@ -194,10 +193,7 @@ async function assertCurrentFilledBet(
 
   const typedRow = row as Row<'contract_bets'>
   const currentBet = convertBet(typedRow)
-  if (currentBet.isCancelled) {
-    return { alreadyCancelled: true, row: typedRow }
-  }
-  if (!currentBet.isFilled || !hasMexasFilledExposure(currentBet)) {
+  if (!hasMexasFilledExposure(currentBet)) {
     throw new Error(`Bet ${exposure.bet.id} is no longer filled exposure.`)
   }
   if (
@@ -207,7 +203,7 @@ async function assertCurrentFilledBet(
     throw new Error(`Bet ${exposure.bet.id} amount/shares changed.`)
   }
 
-  return { alreadyCancelled: false, row: typedRow }
+  return { alreadyCancelled: currentBet.isCancelled === true, row: typedRow }
 }
 
 async function applyUnwind(db: SupabaseClient, exposure: FilledExposure) {
@@ -222,9 +218,11 @@ async function applyUnwind(db: SupabaseClient, exposure: FilledExposure) {
     creditKey,
   })
 
-  if (current.alreadyCancelled) return 'already-cancelled'
-
   const data = getRowData(current.row)
+  if (data.mexasTestUnwound === true) {
+    return 'already-unwound'
+  }
+
   const { data: updatedRow, error: updateError } = await db
     .from('contract_bets')
     .update({
@@ -239,8 +237,6 @@ async function applyUnwind(db: SupabaseClient, exposure: FilledExposure) {
       } as any,
     })
     .eq('bet_id', exposure.bet.id)
-    .eq('is_cancelled', false)
-    .eq('is_filled', true)
     .eq('updated_time', current.row.updated_time)
     .select('bet_id')
     .maybeSingle()
@@ -250,7 +246,7 @@ async function applyUnwind(db: SupabaseClient, exposure: FilledExposure) {
     throw new Error(`Bet ${exposure.bet.id} changed during unwind.`)
   }
 
-  return 'cancelled'
+  return current.alreadyCancelled ? 'marked-already-cancelled' : 'cancelled'
 }
 
 function printPlan(exposures: FilledExposure[]) {

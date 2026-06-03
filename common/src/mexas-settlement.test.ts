@@ -1,4 +1,5 @@
 import { Bet, LimitBet } from './bet'
+import { type MexasReservedOrderData } from './mexas-market'
 import {
   canMexasMatchCrossingOrders,
   canMexasAcceptLimitOrders,
@@ -12,7 +13,9 @@ import {
   MEXAS_ONCHAIN_ESCROW_IMPLEMENTED,
 } from './mexas-settlement'
 
-function bet(props: Partial<Bet> & Pick<Bet, 'id' | 'userId'>): Bet {
+function bet(
+  props: Partial<Bet & MexasReservedOrderData> & Pick<Bet, 'id' | 'userId'>
+): Bet {
   return {
     id: props.id,
     userId: props.userId,
@@ -29,6 +32,7 @@ function bet(props: Partial<Bet> & Pick<Bet, 'id' | 'userId'>): Bet {
     isRedemption: false,
     isFilled: props.isFilled ?? true,
     isCancelled: props.isCancelled ?? false,
+    mexasTestUnwound: props.mexasTestUnwound,
   } as Bet
 }
 
@@ -99,6 +103,33 @@ describe('MEXAS settlement audit', () => {
       cancelPayout: 6,
     })
     expect(hasMexasSettlementExposure(audit)).toBe(true)
+  })
+
+  test('ignores manually unwound test exposure in settlement exposure', () => {
+    const audit = getMexasSettlementAudit([
+      bet({
+        id: 'test-unwound',
+        userId: 'u1',
+        amount: 6,
+        outcome: 'YES',
+        shares: 20,
+        isCancelled: true,
+        mexasTestUnwound: true,
+      }),
+    ])
+
+    expect(audit).toEqual({
+      cancelCredit: 0,
+      filledBetCount: 0,
+      filledStake: 0,
+      noCredit: 0,
+      openReservationRefund: 0,
+      yesCredit: 0,
+      yesPayout: 0,
+      noPayout: 0,
+      cancelPayout: 0,
+    })
+    expect(hasMexasSettlementExposure(audit)).toBe(false)
   })
 
   test('audits a fully matched YES/NO pair without creating payout surplus', () => {

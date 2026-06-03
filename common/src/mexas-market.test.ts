@@ -5,9 +5,11 @@ import {
   hasActiveMexasWalletReservation,
   hasMexasEscrowCaptureMetadata,
   hasMexasEscrowedStake,
+  isMexasTestUnwound,
   isMexasOrderBookOnlyContract,
   getTotalMexasRemainingReservedAmount,
   getUnbackedMexasOrderIds,
+  wasMexasStakeEscrowed,
   type MexasReservedOrderData,
 } from './mexas-market'
 
@@ -114,6 +116,7 @@ describe('MEXAS reserved order backing', () => {
     expect(hasActiveMexasReservation(escrowed)).toBe(true)
     expect(hasActiveMexasWalletReservation(walletReserved)).toBe(true)
     expect(hasActiveMexasWalletReservation(escrowed)).toBe(false)
+    expect(wasMexasStakeEscrowed(escrowed)).toBe(true)
     expect(hasMexasEscrowedStake(escrowed)).toBe(true)
     expect(hasMexasEscrowCaptureMetadata(escrowed)).toBe(true)
     expect(
@@ -128,6 +131,39 @@ describe('MEXAS reserved order backing', () => {
         mexasEscrowTxHash: undefined,
       })
     ).toBe(false)
+  })
+
+  test('keeps escrow capture metadata after the open reservation is released', () => {
+    const releasedEscrowed = order({
+      id: 'released-escrowed',
+      orderAmount: 10,
+      amount: 3,
+      mexasFundsReleased: true,
+      mexasStakeEscrowed: true,
+      mexasEscrowTxHash:
+        '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      mexasEscrowPayerAddress: '0x1111111111111111111111111111111111111111',
+      mexasEscrowTreasuryAddress: '0x2222222222222222222222222222222222222222',
+      mexasEscrowAmount: 10,
+    })
+
+    expect(hasActiveMexasReservation(releasedEscrowed)).toBe(false)
+    expect(hasMexasEscrowedStake(releasedEscrowed)).toBe(false)
+    expect(wasMexasStakeEscrowed(releasedEscrowed)).toBe(true)
+    expect(hasMexasEscrowCaptureMetadata(releasedEscrowed)).toBe(true)
+    expect(isMexasTestUnwound(releasedEscrowed)).toBe(false)
+  })
+
+  test('marks manually unwound test exposure separately from cancellation', () => {
+    expect(
+      isMexasTestUnwound(
+        order({
+          id: 'test-unwound',
+          amount: 1,
+          mexasTestUnwound: true,
+        })
+      )
+    ).toBe(true)
   })
 
   test('does not cancel orders when on-chain backing covers reserves', () => {

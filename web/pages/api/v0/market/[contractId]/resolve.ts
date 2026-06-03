@@ -4,8 +4,8 @@ import { APIError } from 'common/api/utils'
 import { LimitBet, type Bet } from 'common/bet'
 import { type resolution } from 'common/contract'
 import {
-  hasMexasEscrowedStake,
   isMexasOrderBookOnlyContract,
+  wasMexasStakeEscrowed,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
 import {
@@ -370,7 +370,7 @@ async function applyMexasResolutionCreditsAndReleases(
       const bet = entryByBetId.get(event.betId)?.bet as
         | (LimitBet & MexasReservedOrderData)
         | undefined
-      if (!bet || !hasMexasEscrowedStake(bet)) continue
+      if (!bet || !wasMexasStakeEscrowed(bet)) continue
 
       escrowedCreditKeys.add(event.creditKey)
       const treasuryOutcome = getMexasTreasuryResolutionOutcome(event.outcome)

@@ -2,15 +2,18 @@ import { Bet, LimitBet } from './bet'
 import { resolution } from './contract'
 import {
   getMexasRemainingReservedAmount,
+  isMexasTestUnwound,
   type MexasReservedOrderData,
 } from './mexas-market'
 
 export function getMexasResolvedBetPayout(bet: Bet, outcome: resolution) {
+  if (isMexasTestUnwound(bet as MexasReservedOrderData)) return 0
   if (outcome === 'CANCEL') return Math.max(0, bet.amount ?? 0)
   return bet.outcome === outcome ? Math.max(0, bet.shares ?? 0) : 0
 }
 
 export function getMexasOpenReservationRefund(bet: Bet) {
+  if (isMexasTestUnwound(bet as MexasReservedOrderData)) return 0
   if (bet.limitProb === undefined || bet.orderAmount === undefined) return 0
 
   const order = bet as LimitBet & MexasReservedOrderData

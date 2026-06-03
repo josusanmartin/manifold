@@ -114,6 +114,11 @@ Escenarios probados:
   en Supabase produccion, ausencia de `MEXAS_TREASURY_SIGNER_SECRET` en Vercel
   production y ausencia de un connection string local para aplicar/verificar SQL
   directamente.
+- La auditoria encontro una posicion de prueba parcialmente ejecutada y no
+  respaldada por escrow en `ukrwarend26a/hnPI2tcupSt6`. Se corrigio el auditor
+  para contar posiciones canceladas pero ya llenadas, se acredito el unwind
+  idempotente de prueba por 1 MEX y se marco el bet con `mexasTestUnwound=true`
+  para que no pueda recibir payout de resolucion adicional.
 
 Los blockers de launch real siguen siendo estructurales:
 

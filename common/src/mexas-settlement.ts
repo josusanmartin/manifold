@@ -1,4 +1,5 @@
 import { Bet } from './bet'
+import { isMexasTestUnwound, type MexasReservedOrderData } from './mexas-market'
 import {
   getMexasOpenReservationRefund,
   getMexasResolvedBetPayout,
@@ -51,6 +52,7 @@ function roundAmount(value: number) {
 
 export function hasMexasFilledExposure(bet: Bet) {
   return (
+    !isMexasTestUnwound(bet as MexasReservedOrderData) &&
     (bet.amount ?? 0) > EPSILON &&
     (bet.shares ?? 0) > EPSILON
   )

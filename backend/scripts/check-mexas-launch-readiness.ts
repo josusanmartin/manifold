@@ -16,6 +16,7 @@ import {
   hasMexasEscrowedStake,
   getMexasRemainingReservedAmount,
   isMexasOrderBookOnlyContract,
+  wasMexasStakeEscrowed,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
 import { getMexasOpenOrderAmount } from 'common/mexas-order-book'
@@ -854,7 +855,6 @@ async function loadUnresolvedMexasBetEntries(db: SupabaseClient) {
       .from('contract_bets')
       .select('*')
       .in('contract_id', contractIds)
-      .eq('is_cancelled', false)
       .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
 
     if (error) throw error
@@ -1513,9 +1513,7 @@ async function checkTreasuryMexasLiabilityBacking(
     const entries = await loadUnresolvedMexasBetEntries(db)
     const escrowedBets = entries
       .map((entry) => entry.bet)
-      .filter((bet) =>
-        hasMexasEscrowedStake(bet as LimitBet & MexasReservedOrderData)
-      )
+      .filter((bet) => wasMexasStakeEscrowed(bet as MexasReservedOrderData))
 
     if (!escrowedBets.length) {
       return pass(
@@ -1598,7 +1596,6 @@ async function checkMexasSettlementExposure(
         .from('contract_bets')
         .select('*')
         .in('contract_id', contractIds)
-        .eq('is_cancelled', false)
         .range(from, from + OPEN_ORDER_PAGE_SIZE - 1)
 
       if (error) throw error
@@ -1640,7 +1637,12 @@ async function checkMexasSettlementExposure(
       .filter((entry) => hasMexasFilledExposure(entry.bet))
     const unescrowedFilledEntries = filledEntries.filter(
       (entry) =>
-        !hasMexasEscrowedStake(entry.bet as LimitBet & MexasReservedOrderData)
+        !wasMexasStakeEscrowed(entry.bet as MexasReservedOrderData)
+    )
+    const escrowedFilledWithoutMetadata = filledEntries.filter(
+      (entry) =>
+        wasMexasStakeEscrowed(entry.bet as MexasReservedOrderData) &&
+        !hasMexasEscrowCaptureMetadata(entry.bet as MexasReservedOrderData)
     )
     if (audit.filledBetCount === 0) {
       return pass(
@@ -1662,6 +1664,22 @@ async function checkMexasSettlementExposure(
             ? `; ${unescrowedFilledEntries.length - 5} more`
             : ''
         }. Unwind or manually reconcile these positions before launch.`
+      )
+    }
+
+    if (escrowedFilledWithoutMetadata.length) {
+      return fail(
+        'settlement exposure',
+        `${
+          escrowedFilledWithoutMetadata.length
+        } escrow-backed filled MEXAS position(s) are missing capture metadata needed for treasury reconciliation: ${escrowedFilledWithoutMetadata
+          .slice(0, 5)
+          .map((entry) => `${entry.row.contract_id}/${entry.bet.id}`)
+          .join('; ')}${
+          escrowedFilledWithoutMetadata.length > 5
+            ? `; ${escrowedFilledWithoutMetadata.length - 5} more`
+            : ''
+        }.`
       )
     }
 

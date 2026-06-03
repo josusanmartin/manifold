@@ -48,6 +48,7 @@ function limitOrder(
     mexasFundsReserved: props.mexasFundsReserved ?? true,
     mexasFundsReleased: props.mexasFundsReleased ?? false,
     mexasReservedAmount: props.mexasReservedAmount,
+    mexasTestUnwound: props.mexasTestUnwound,
   } as LimitBet
 }
 
@@ -179,6 +180,25 @@ describe('MEXAS resolution payouts', () => {
         userId: 'u1',
       },
     ])
+  })
+
+  test('does not pay manually unwound test exposure again', () => {
+    const unwound = limitOrder({
+      id: 'test-unwound',
+      userId: 'u1',
+      amount: 2,
+      shares: 4,
+      orderAmount: 5,
+      outcome: 'YES',
+      isCancelled: true,
+      mexasFundsReleased: true,
+      mexasTestUnwound: true,
+    })
+
+    expect(getMexasOpenReservationRefund(unwound)).toBe(0)
+    expect(getMexasResolutionPayout(unwound, 'YES')).toBe(0)
+    expect(getMexasResolutionPayout(unwound, 'CANCEL')).toBe(0)
+    expect(getMexasResolutionCreditEvents([unwound], 'YES')).toEqual([])
   })
 
   test('combines open reservation refund and winning payout', () => {

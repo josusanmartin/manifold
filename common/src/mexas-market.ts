@@ -28,6 +28,7 @@ export type MexasReservedOrderData = {
   mexasEscrowPayerAddress?: string
   mexasEscrowTreasuryAddress?: string
   mexasEscrowAmount?: number
+  mexasTestUnwound?: boolean
 }
 
 export function hasActiveMexasReservation(order: MexasReservedOrderData) {
@@ -38,13 +39,21 @@ export function hasActiveMexasWalletReservation(order: MexasReservedOrderData) {
   return hasActiveMexasReservation(order) && order.mexasStakeEscrowed !== true
 }
 
+export function wasMexasStakeEscrowed(order: MexasReservedOrderData) {
+  return order.mexasStakeEscrowed === true
+}
+
+export function isMexasTestUnwound(order: MexasReservedOrderData) {
+  return order.mexasTestUnwound === true
+}
+
 export function hasMexasEscrowedStake(order: MexasReservedOrderData) {
-  return hasActiveMexasReservation(order) && order.mexasStakeEscrowed === true
+  return hasActiveMexasReservation(order) && wasMexasStakeEscrowed(order)
 }
 
 export function hasMexasEscrowCaptureMetadata(order: MexasReservedOrderData) {
   return (
-    hasMexasEscrowedStake(order) &&
+    wasMexasStakeEscrowed(order) &&
     typeof order.mexasEscrowTxHash === 'string' &&
     typeof order.mexasEscrowPayerAddress === 'string' &&
     typeof order.mexasEscrowTreasuryAddress === 'string'
