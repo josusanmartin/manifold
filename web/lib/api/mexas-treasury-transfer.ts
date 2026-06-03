@@ -149,6 +149,17 @@ async function loadTransferByIdempotencyKey(
   return data as Row<'mexas_treasury_transfers'> | null
 }
 
+async function loadTransferById(db: SupabaseClient, transferId: string) {
+  const { data, error } = await db
+    .from('mexas_treasury_transfers')
+    .select('*')
+    .eq('id', transferId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data as Row<'mexas_treasury_transfers'> | null
+}
+
 async function insertProcessingTransfer(
   params: MexasTreasuryTransferParams,
   treasuryAddress: Address,
@@ -276,14 +287,15 @@ async function markTreasuryTransferSubmitted(
   txHash: Hex
 ) {
   const now = millisToTs(Date.now())
+  const submittedPatch = {
+    status: 'submitted',
+    tx_hash: txHash,
+    submitted_time: now,
+    updated_time: now,
+  }
   const { data, error } = await db
     .from('mexas_treasury_transfers')
-    .update({
-      status: 'submitted',
-      tx_hash: txHash,
-      submitted_time: now,
-      updated_time: now,
-    })
+    .update(submittedPatch)
     .eq('id', row.id)
     .eq('status', 'processing')
     .eq('updated_time', row.updated_time)
@@ -292,10 +304,32 @@ async function markTreasuryTransferSubmitted(
     .maybeSingle()
 
   if (error) throw error
-  if (!data) {
+  if (data) return data as Row<'mexas_treasury_transfers'>
+
+  const latest = await loadTransferById(db, row.id)
+  if (latest?.tx_hash === txHash) return latest
+  if (latest?.tx_hash) {
     throw new APIError(503, 'MEXAS treasury transfer changed after signing.')
   }
-  return data as Row<'mexas_treasury_transfers'>
+
+  const { data: recovered, error: recoveryError } = await db
+    .from('mexas_treasury_transfers')
+    .update(submittedPatch)
+    .eq('id', row.id)
+    .eq('status', 'processing')
+    .is('tx_hash', null)
+    .select()
+    .maybeSingle()
+
+  if (recoveryError) throw recoveryError
+  if (recovered) return recovered as Row<'mexas_treasury_transfers'>
+
+  const final = await loadTransferById(db, row.id)
+  if (final?.tx_hash === txHash) return final
+  throw new APIError(
+    503,
+    'MEXAS treasury transfer could not record submitted transaction hash.'
+  )
 }
 
 async function markTreasuryTransferFailed(
@@ -399,8 +433,9 @@ export async function submitMexasTreasuryTransfer(
     throw new APIError(503, 'MEXAS treasury balance is insufficient.')
   }
 
+  let hash: Hex
   try {
-    const hash = await getTreasuryWalletClient().sendTransaction({
+    hash = await getTreasuryWalletClient().sendTransaction({
       account,
       chain: arbitrum,
       to: MEXAS_TOKEN.address as Address,
@@ -411,12 +446,6 @@ export async function submitMexasTreasuryTransfer(
       }),
       value: 0n,
     })
-    const submitted = await markTreasuryTransferSubmitted(
-      params.db,
-      claimed.row,
-      hash
-    )
-    return await confirmSubmittedTransfer(params.db, submitted)
   } catch (error) {
     const message =
       error instanceof Error
@@ -425,4 +454,11 @@ export async function submitMexasTreasuryTransfer(
     await markTreasuryTransferFailed(params.db, claimed.row, message)
     throw error
   }
+
+  const submitted = await markTreasuryTransferSubmitted(
+    params.db,
+    claimed.row,
+    hash
+  )
+  return await confirmSubmittedTransfer(params.db, submitted)
 }
