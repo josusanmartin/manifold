@@ -466,7 +466,8 @@ async function resolveMexasMarket(
     requireBalanceRead: true,
   })
   const preflightBets = await loadContractBets(db, contractId)
-  assertMexasCanResolveFilledPositions(
+  await assertMexasCanResolveFilledPositions(
+    db,
     getMexasSettlementAudit(preflightBets.map((entry) => entry.bet))
   )
 
@@ -482,7 +483,8 @@ async function resolveMexasMarket(
     requireBalanceRead: true,
   })
   const bets = await loadContractBets(db, contractId)
-  assertMexasCanResolveFilledPositions(
+  await assertMexasCanResolveFilledPositions(
+    db,
     getMexasSettlementAudit(bets.map((entry) => entry.bet))
   )
   const creditEvents = getMexasResolutionCreditEvents(

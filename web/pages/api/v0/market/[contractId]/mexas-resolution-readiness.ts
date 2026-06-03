@@ -1,11 +1,7 @@
 import { APIError } from 'common/api/utils'
 import { Bet } from 'common/bet'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
-import {
-  canMexasResolveFilledPositions,
-  getMexasSettlementAudit,
-  type MexasSettlementSettings,
-} from 'common/mexas-settlement'
+import { getMexasSettlementAudit } from 'common/mexas-settlement'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import {
@@ -19,6 +15,7 @@ import {
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
 } from 'web/lib/api/mexas-orders'
+import { getMexasEscrowRuntimeStatus } from 'web/lib/api/mexas-settlement'
 
 type ErrorResponse = { message: string; details?: unknown }
 
@@ -56,14 +53,6 @@ function getSupabaseAdminClient() {
 
 function getSingleQueryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
-}
-
-function getMexasSettlementSettings(): MexasSettlementSettings {
-  return {
-    allowUnescrowedResolution: process.env.MEXAS_ALLOW_UNESCROWED_RESOLUTION,
-    escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION,
-    settlementMode: process.env.MEXAS_SETTLEMENT_MODE,
-  }
 }
 
 async function loadContractRow(db: SupabaseClient, contractId: string) {
@@ -126,9 +115,11 @@ export default async function handler(
     const audit = getMexasSettlementAudit(
       await loadContractBets(db, contractId)
     )
-    const canResolve =
-      audit.filledBetCount === 0 ||
-      canMexasResolveFilledPositions(getMexasSettlementSettings())
+    const escrowRuntime =
+      audit.filledBetCount > 0
+        ? await getMexasEscrowRuntimeStatus(db)
+        : undefined
+    const canResolve = audit.filledBetCount === 0 || !!escrowRuntime?.enabled
     const requiresEscrow = !canResolve && audit.filledBetCount > 0
 
     return res.status(200).json({
@@ -141,7 +132,8 @@ export default async function handler(
       noPayout: audit.noPayout,
       cancelPayout: audit.cancelPayout,
       message: requiresEscrow
-        ? `La resolución MEXAS tiene ${audit.filledBetCount} posiciones llenadas y queda pausada hasta completar la liquidación segura.`
+        ? escrowRuntime?.message ??
+          `La resolución MEXAS tiene ${audit.filledBetCount} posiciones llenadas y queda pausada hasta completar la liquidación segura.`
         : undefined,
     })
   } catch (error) {

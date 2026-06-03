@@ -82,11 +82,15 @@ export async function assertMexasCanAcceptLimitOrders(_db: SupabaseClient) {
   throw new APIError(503, 'No se pueden abrir órdenes MEXAS en este momento.')
 }
 
-export function assertMexasCanResolveFilledPositions(
+export async function assertMexasCanResolveFilledPositions(
+  db: SupabaseClient,
   audit: MexasSettlementAudit
 ) {
   if (audit.filledBetCount === 0) return
-  if (canMexasResolveFilledPositions(getMexasSettlementSettings())) return
+  if (canMexasResolveFilledPositions(getMexasSettlementSettings())) {
+    const escrowRuntime = await getMexasEscrowRuntimeStatus(db)
+    if (escrowRuntime.enabled) return
+  }
 
   throw new APIError(
     503,

@@ -1121,8 +1121,10 @@ describe('MEXAS flow safety guardrails', () => {
       'requireBalanceRead: true',
       'getMexasSettlementAudit(',
       'await loadContractBets(db, contractId)',
-      'audit.filledBetCount === 0',
-      'canMexasResolveFilledPositions(getMexasSettlementSettings())',
+      'const escrowRuntime =',
+      'audit.filledBetCount > 0',
+      'await getMexasEscrowRuntimeStatus(db)',
+      'const canResolve = audit.filledBetCount === 0 || !!escrowRuntime?.enabled',
       'const requiresEscrow = !canResolve && audit.filledBetCount > 0',
       'requiresEscrow,',
       'filledBetCount: audit.filledBetCount',
@@ -1172,10 +1174,12 @@ describe('MEXAS flow safety guardrails', () => {
     ).toBe(2)
     expectMarkersInOrder(source, [
       'const preflightBets = await loadContractBets(db, contractId)',
-      'assertMexasCanResolveFilledPositions(',
+      'await assertMexasCanResolveFilledPositions(',
+      'db,',
       'const closedContractRow = await closeContractForResolution(',
       'const bets = await loadContractBets(db, contractId)',
-      'assertMexasCanResolveFilledPositions(',
+      'await assertMexasCanResolveFilledPositions(',
+      'db,',
       'const creditEvents = getMexasResolutionCreditEvents(',
     ])
   })
