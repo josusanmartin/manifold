@@ -109,6 +109,14 @@ const REDIRECTS = [
   { destination: '/wallet', path: '/payments' },
   { destination: '/wallet', path: '/add-funds' },
   { destination: '/wallet', path: '/links' },
+  {
+    path: '/josusanmartin?tab=comments',
+    destination: '/josusanmartin?tab=summary',
+  },
+  {
+    path: '/josusanmartin?tab=achievements',
+    destination: '/josusanmartin?tab=summary',
+  },
   { destination: '/checkout', path: '/comments' },
   { destination: '/checkout', path: '/leaderboards' },
   { destination: '/checkout', path: '/mana-auction' },
@@ -247,13 +255,18 @@ async function fetchManual(path: string, init?: RequestInit) {
 async function checkRedirect(path: string, destination: string) {
   const response = await fetch(`${SITE_URL}${path}`, { redirect: 'manual' })
   const location = response.headers.get('location') ?? ''
-  const locationPath = location.startsWith('http')
-    ? new URL(location).pathname
-    : location.split('?')[0]
+  const locationUrl = location
+    ? new URL(location, SITE_URL)
+    : undefined
+  const actualDestination = locationUrl
+    ? destination.includes('?')
+      ? `${locationUrl.pathname}${locationUrl.search}`
+      : locationUrl.pathname
+    : ''
 
   return response.status >= 300 &&
     response.status < 400 &&
-    locationPath === destination
+    actualDestination === destination
     ? pass(`redirect ${path}`, `${response.status} -> ${destination}`)
     : fail(
         `redirect ${path}`,

@@ -412,6 +412,9 @@ describe('MEXAS flow safety guardrails', () => {
   test('keeps profile tabs and wallet payments on the Spanish MEXAS surface', () => {
     const profileSource = readRepoFile('web/pages/[username]/index.tsx')
     const paymentsSource = readRepoFile('web/pages/payments.tsx')
+    const smokeSource = readRepoFile(
+      'backend/scripts/check-mexas-production-smoke.ts'
+    )
     const dropdownSource = readRepoFile(
       'web/components/widgets/dropdown-menu.tsx'
     )
@@ -434,6 +437,16 @@ describe('MEXAS flow safety guardrails', () => {
     expect(profileSource).not.toContain('Rank {leagueInfo.rank}')
     expect(profileSource).not.toContain("title: 'Comments'")
     expect(profileSource).not.toContain("title: 'Achievements'")
+    expect(profileSource).toContain("tab !== 'achievements' && tab !== 'comments'")
+    expect(profileSource).toContain("tab: 'summary'")
+    expectMarkersInOrder(smokeSource, [
+      "path: '/josusanmartin?tab=comments'",
+      "destination: '/josusanmartin?tab=summary'",
+      "path: '/josusanmartin?tab=achievements'",
+      "destination: '/josusanmartin?tab=summary'",
+      "destination.includes('?')",
+      '`${locationUrl.pathname}${locationUrl.search}`',
+    ])
 
     expectMarkersInOrder(paymentsSource, [
       'Los controles de la Wallet son privados',
@@ -811,6 +824,16 @@ describe('MEXAS flow safety guardrails', () => {
     expect(dangerSource).toContain('Resolver')
     expect(confirmSource).toContain('Resolver a ${label}')
     expect(panelSource).not.toContain('comments section')
+  })
+
+  test('disables market comments at the shared user permission helper', () => {
+    const source = readRepoFile('common/src/user.ts')
+
+    expect(source).toContain('MEXAS disables market comments entirely.')
+    expect(source).toContain('export const canCommentOnMarket = (_user: User) => false')
+    expect(source).not.toContain(
+      'MEXAS markets do not require identity verification or a prior purchase to comment.'
+    )
   })
 
   test('rechecks MEXAS settlement exposure after closing but before credits', () => {

@@ -214,8 +214,8 @@ export const canReceiveBonuses = (user: User) =>
   user.bonusEligibility === 'verified' ||
   user.bonusEligibility === 'grandfathered'
 
-// MEXAS markets do not require identity verification or a prior purchase to comment.
-export const canCommentOnMarket = (_user: User) => true
+// MEXAS disables market comments entirely.
+export const canCommentOnMarket = (_user: User) => false
 
 // expires: sep 26th, ~530pm PT
 const LIMITED_TIME_DEAL_END = 1727311753233 + DAY_MS
