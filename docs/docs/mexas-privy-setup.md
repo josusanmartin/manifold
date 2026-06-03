@@ -26,8 +26,10 @@ on-chain wallet balance minus open reserved order amounts and filled exposure.
 4. The user deposits MEX directly to that wallet address on Arbitrum One.
 5. The frontend and local APIs read the wallet's MEX balance on-chain.
 6. Opening a non-crossing limit order reserves internal available MEX.
-7. Cancelling or expiring an open order releases only the remaining reservation.
-8. Withdrawals transfer MEX directly from the user's Privy wallet and are capped
+7. Crossing orders remain paused until launch readiness verifies Supabase SQL,
+   treasury gas, signer env, and escrow settlement health.
+8. Cancelling or expiring an open order releases only the remaining reservation.
+9. Withdrawals transfer MEX directly from the user's Privy wallet and are capped
    by the lower of the on-chain balance and internal available MEX.
 
 `record-mexas-purchase` is intentionally disabled. It must not be used to
@@ -51,10 +53,21 @@ ARBITRUM_RPC_URL=https://your-arbitrum-rpc.example
 `NEXT_PUBLIC_ARBITRUM_RPC_URL` and `ARBITRUM_RPC_URL` are optional. If omitted,
 the app uses `https://arb1.arbitrum.io/rpc`.
 
-`MEXAS_TREASURY_WALLET_ADDRESS` and
-`NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS` are launch-readiness placeholders
-for a future escrow/treasury settlement implementation. They are not used for
-wallet deposits.
+Treasury/settlement env:
+
+```bash
+MEXAS_TREASURY_WALLET_ADDRESS=0xcdD889cb41E6ae9E03871ad26FfF771d63e57b21
+NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS=0xcdD889cb41E6ae9E03871ad26FfF771d63e57b21
+MEXAS_TREASURY_SIGNER_SECRET=0x... # secret; must derive to the treasury address
+MEXAS_MATCHING_ENGINE_MODE=rpc
+MEXAS_SETTLEMENT_MODE=escrow
+MEXAS_ESCROW_IMPLEMENTATION=onchain-transfer
+MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS=true
+```
+
+The treasury address is used for order-stake capture and future treasury-signed
+release/payout transfers. Wallet deposits still go directly to each user's Privy
+wallet address.
 
 ## Deploy
 
@@ -71,5 +84,6 @@ comment, prize, and Manifold proxy endpoints.
   escrow/settlement implementation replaces it.
 - Users need Privy authentication because market actions are server-side and
   tied to the Privy user id.
-- Matching crossed orders and resolving filled positions must stay blocked
-  until on-chain escrow settlement is implemented and verified.
+- Matching crossed orders and resolving filled positions must stay blocked until
+  `check:mexas-launch` verifies Supabase launch SQL, treasury gas, signer env,
+  and escrow settlement readiness.

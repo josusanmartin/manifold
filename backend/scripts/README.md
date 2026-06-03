@@ -54,22 +54,20 @@ This script loads local `.env` files, checks production Vercel env names, verifi
 
 Current launch blockers should be resolved in this order:
 
-1. Add `MEXAS_TREASURY_SIGNER_SECRET` to Vercel production. The private key
-   must derive exactly to `MEXAS_TREASURY_WALLET_ADDRESS`.
-
-   ```shell
-   $ vercel env add MEXAS_TREASURY_SIGNER_SECRET production
-   ```
-
-2. Fund the treasury wallet with enough Arbitrum ETH for outgoing ERC-20
+1. Fund the treasury wallet with enough Arbitrum ETH for outgoing ERC-20
    transfers. The readiness script enforces `MEXAS_TREASURY_MIN_GAS_WEI`,
    defaulting to `0.0001 ETH`.
 
-3. Apply the MEXAS launch SQL in Supabase so `contracts.token` can become
+   ```shell
+   # Current production treasury address:
+   # 0xcdD889cb41E6ae9E03871ad26FfF771d63e57b21
+   ```
+
+2. Apply the MEXAS launch SQL in Supabase so `contracts.token` can become
    `MEX`, the matching RPC is installed, escrow capture is guarded, and the
    backend-only treasury ledger exists.
 
-4. If site checks report `Vercel Firewall challenge active`, disable Attack
+3. If site checks report `Vercel Firewall challenge active`, disable Attack
    Challenge Mode or adjust the Vercel WAF challenge rule before launch. Vercel
    requires this to be done interactively; run:
 
@@ -77,8 +75,13 @@ Current launch blockers should be resolved in this order:
    $ vercel firewall attack-mode disable
    ```
 
-5. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
+4. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
    markets until every launch-readiness line is `PASS`.
+
+`MEXAS_TREASURY_SIGNER_SECRET` is already expected in Vercel production and must
+derive exactly to `MEXAS_TREASURY_WALLET_ADDRESS`. If either treasury env fails
+readiness, rotate both treasury address envs and signer together, redeploy, and
+re-run `check:mexas-launch`.
 
 To apply the required MEXAS SQL migrations and normalize every contract row
 whose JSON data marks it as a MEX market, run:
@@ -94,7 +97,7 @@ function grants, and indexes. To review or paste the SQL manually in Supabase,
 run:
 
 ```shell
-$ yarn --silent --cwd backend/scripts apply:mexas-launch-sql --print-sql > mexas-launch.sql
+$ yarn --silent --cwd backend/scripts print:mexas-launch-sql > mexas-launch.sql
 ```
 
 The printed SQL is wrapped in `begin; ... commit;` and contains a verification

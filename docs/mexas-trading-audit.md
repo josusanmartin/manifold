@@ -116,10 +116,11 @@ Escenarios probados:
   mercados ya resueltos.
 - Produccion smoke: paginas, redirects, endpoints bloqueados, orderbook,
   readiness de ordenes/resolucion y auth fail-closed pasaron.
-- Produccion launch readiness: sigue bloqueado correctamente por SQL no aplicado
-  en Supabase produccion, ausencia de `MEXAS_TREASURY_SIGNER_SECRET` en Vercel
-  production, tesoreria sin gas ETH en Arbitrum y ausencia de un connection
-  string local para aplicar/verificar SQL directamente.
+- Produccion launch readiness: signer/env de treasury ya pasan y derivan a
+  `0xcdD889cb41E6ae9E03871ad26FfF771d63e57b21`; sigue bloqueado correctamente
+  por SQL no aplicado en Supabase produccion, tesoreria sin gas ETH en Arbitrum
+  y ausencia de un connection string local para aplicar/verificar SQL
+  directamente.
 - La auditoria encontro una posicion de prueba parcialmente ejecutada y no
   respaldada por escrow en `ukrwarend26a/hnPI2tcupSt6`. Se corrigio el auditor
   para contar posiciones canceladas pero ya llenadas, se acredito el unwind
@@ -128,15 +129,15 @@ Escenarios probados:
 
 Los blockers de launch real siguen siendo estructurales:
 
+- fondear la treasury `0xcdD889cb41E6ae9E03871ad26FfF771d63e57b21` con al
+  menos `0.0001 ETH` en Arbitrum para gas de pagos ERC-20 salientes;
 - aplicar el SQL de launch en Supabase produccion para `contracts.token = 'MEX'`,
   indices de libro, RPC `mexas_orderbook_matching_engine_ready`, ledger
   `mexas_treasury_transfers` y guard de captura escrow
   `mexas_escrow_capture_ready`. El SQL manual se imprime con
   `COREPACK_ENABLE_STRICT=0 corepack yarn --silent --cwd backend/scripts print:mexas-launch-sql > /tmp/mexas-launch.sql`;
-- configurar y proteger `MEXAS_TREASURY_SIGNER_SECRET` en produccion antes de
-  cualquier pago on-chain saliente;
 - aunque `MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS` este configurado, el runtime debe
-  mantener `escrowCaptureEnabled=false` hasta que el SQL de produccion, signer y
+  mantener `escrowCaptureEnabled=false` hasta que el SQL de produccion, gas y
   scheduler runtime esten verificados;
 - desplegar/confirmar el scheduler runtime despues de aplicar el SQL.
 
