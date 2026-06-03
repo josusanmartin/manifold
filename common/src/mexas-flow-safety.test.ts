@@ -237,6 +237,12 @@ describe('MEXAS flow safety guardrails', () => {
       'const mexasContractIds = await getMexasContractIds(db, contractId)',
       'query = query.in',
     ])
+    expectMarkersInOrder(source, [
+      'const params = API.bets.props.parse',
+      "if (params.kinds !== 'open-limit')",
+      "throw new APIError(404, 'Bets history is not available on MEXAS.')",
+      'const db = getSupabaseAdminClient()',
+    ])
     expect(source).toContain(
       "query = query.in('contract_id', mexasContractIds)"
     )
@@ -1323,6 +1329,8 @@ describe('MEXAS flow safety guardrails', () => {
       'bets mexwcwin26a open-limit',
       '/api/v0/bets?contractSlug=ganara-mexico-la-copa-mundial-2026&kinds=open-limit',
       'bets mexico slug open-limit',
+      'blocked broad MEXAS bets history',
+      '/api/v0/bets?contractId=mexwcwin26a',
       'for (const payload of JSON_PAYLOADS)',
       'checkJsonPayloadCopy(payload.name, payload.path)',
       'blocked bets unknown username',
@@ -1363,6 +1371,36 @@ describe('MEXAS flow safety guardrails', () => {
       '/api/v0/market/mexwcwin26a/resolve',
     ])
     expect(source).toContain("'Open options'")
+  })
+
+  test('MEXAS market UI does not call the broad bets history endpoint', () => {
+    const contractPage = readRepoFile('web/components/contract/contract-page.tsx')
+    const yourTrades = readRepoFile('web/components/contract/your-trades.tsx')
+    const betPanel = readRepoFile('web/components/bet/bet-panel.tsx')
+    const chartPositions = readRepoFile('web/hooks/use-chart-positions.ts')
+
+    expectMarkersInOrder(contractPage, [
+      'const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(liveContract)',
+      'enabled: !isMexasOrderBookOnly',
+      'const newBets = useContractBets',
+    ])
+    expectMarkersInOrder(yourTrades, [
+      'const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)',
+      'enabled: !isMexasOrderBookOnly',
+      'const visibleUserBets = isMexasOrderBookOnly',
+      '? []',
+      '{ enabled: isMexasOrderBookOnly ? !!user : true }',
+    ])
+    expectMarkersInOrder(betPanel, [
+      'const orderBookOnly = isMexasOrderBookOnlyContract(contract)',
+      "kinds: orderBookOnly ? 'open-limit' : undefined",
+      "api('bets', params)",
+    ])
+    expectMarkersInOrder(chartPositions, [
+      'const orderBookOnly = isMexasOrderBookOnlyContract(contract)',
+      "api('bets', params)",
+      'enabled: !orderBookOnly',
+    ])
   })
 
   test('production smoke covers public static discovery files', () => {

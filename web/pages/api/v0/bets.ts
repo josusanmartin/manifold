@@ -115,6 +115,10 @@ export default async function handler(
 
   try {
     const params = API.bets.props.parse(normalizeQuery(req.query))
+    if (params.kinds !== 'open-limit') {
+      throw new APIError(404, 'Bets history is not available on MEXAS.')
+    }
+
     const db = getSupabaseAdminClient()
     const contractId = params.contractSlug
       ? await getContractIdFromSlug(db, params.contractSlug)

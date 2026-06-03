@@ -9,18 +9,20 @@ import { usePersistentInMemoryState } from './use-persistent-in-memory-state'
 
 export function useBetsOnce(
   api: (params: APIParams<'bets'>) => Promise<APIResponse<'bets'>>,
-  options: APIParams<'bets'>
+  options: APIParams<'bets'> & { enabled?: boolean }
 ) {
+  const { enabled = true, ...apiOptions } = options
   const [bets, setBets] = usePersistentInMemoryState<Bet[] | undefined>(
     undefined,
-    `use-bets-${JSON.stringify(options)}`
+    `use-bets-${JSON.stringify(apiOptions)}`
   )
 
   useEffectCheckEquality(() => {
-    api(options ?? {}).then((bets) => setBets(bets))
-  }, [options])
+    if (enabled) api(apiOptions ?? {}).then((bets) => setBets(bets))
+    else setBets(undefined)
+  }, [apiOptions, enabled])
 
-  return bets
+  return enabled ? bets : undefined
 }
 
 export const useContractBets = (

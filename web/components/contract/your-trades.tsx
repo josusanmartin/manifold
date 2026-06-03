@@ -2,6 +2,7 @@ import { useBetsOnce, useUnfilledBets } from 'client-common/hooks/use-bets'
 import { Bet, LimitBet } from 'common/bet'
 import { Contract } from 'common/contract'
 import { ContractMetric } from 'common/contract-metric'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { sortBy, uniqBy } from 'lodash'
 import { ContractBetsTable } from 'web/components/bet/contract-bets-table'
 import { YourOrders } from 'web/components/bet/order-book'
@@ -18,20 +19,22 @@ export function YourTrades(props: {
 }) {
   const { contract, contractMetric, yourNewBets } = props
   const user = useUser()
+  const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)
 
   const staticBets = useBetsOnce((params) => api('bets', params), {
     contractId: contract.id,
     userId: !user ? 'loading' : user.id,
     order: 'asc',
+    enabled: !isMexasOrderBookOnly,
   })
 
   const userBets = sortBy(
     uniqBy([...yourNewBets, ...(staticBets ?? [])], 'id'),
     'createdTime'
   )
-  const visibleUserBets = userBets.filter(
-    (bet) => !bet.isRedemption && bet.amount !== 0
-  )
+  const visibleUserBets = isMexasOrderBookOnly
+    ? []
+    : userBets.filter((bet) => !bet.isRedemption && bet.amount !== 0)
 
   const allLimitBets =
     contract.mechanism === 'cpmm-1'
@@ -40,7 +43,7 @@ export function YourTrades(props: {
           contract.id,
           (params) => api('bets', params),
           useIsPageVisible,
-          { enabled: true }
+          { enabled: isMexasOrderBookOnly ? !!user : true }
         ) ?? []
       : []
   const userLimitBets = allLimitBets.filter(

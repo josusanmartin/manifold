@@ -3,6 +3,7 @@ import { DisplayUser } from 'common/api/user-types'
 import { getContractBetMetrics } from 'common/calculate'
 import { ChartPosition } from 'common/chart-position'
 import { Contract } from 'common/contract'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { useMemo, useState } from 'react'
 import { getAnswerColor } from 'web/components/charts/contract/choice'
 import { api } from 'web/lib/api/api'
@@ -19,6 +20,7 @@ export const useChartPositions = (
     ? externalDisplayUser
     : internalDisplayUser
   const setDisplayUser = externalSetDisplayUser ?? setInternalDisplayUser
+  const orderBookOnly = isMexasOrderBookOnlyContract(contract)
 
   const usersBets = useBetsOnce((params) => api('bets', params), {
     contractId: contract.id,
@@ -28,6 +30,7 @@ export const useChartPositions = (
     includeZeroShareRedemptions: false,
     beforeTime: displayUser?.id ? undefined : 1,
     order: 'asc',
+    enabled: !orderBookOnly,
   })
   const [hoveredChartPosition, setHoveredChartPosition] =
     useState<ChartPosition | null>(null)

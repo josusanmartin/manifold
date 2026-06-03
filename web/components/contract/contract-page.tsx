@@ -121,6 +121,7 @@ export function ContractPageContent(props: ContractParams) {
     totalBets: props.totalBets,
     pointsString: pointsString,
     multiPointsString: multiPointsString,
+    enabled: !isMexasOrderBookOnly,
   })
 
   const { isResolved, outcomeType, resolution, closeTime, creatorId } =
@@ -498,6 +499,7 @@ const useBetData = (props: {
   totalBets: number
   pointsString: string | undefined
   multiPointsString: MultiBase64Points | undefined
+  enabled?: boolean
 }) => {
   const {
     contractId,
@@ -506,6 +508,7 @@ const useBetData = (props: {
     lastBetTime,
     pointsString,
     multiPointsString,
+    enabled = true,
   } = props
 
   const isNumber = outcomeType === 'NUMBER'
@@ -519,6 +522,7 @@ const useBetData = (props: {
       includeZeroShareRedemptions: true,
       // TODO: this shows the redemptions in the trades tab??
       filterRedemptions: !isNumber && !isMultiNumeric,
+      enabled,
     },
     useIsPageVisible,
     (params) => api('bets', params)

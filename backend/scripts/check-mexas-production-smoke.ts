@@ -718,6 +718,13 @@ async function runSmoke() {
       'bets mexico slug open-limit'
     )
   )
+  results.push(
+    await checkExpectedStatus(
+      'blocked broad MEXAS bets history',
+      '/api/v0/bets?contractId=mexwcwin26a',
+      404
+    )
+  )
   for (const payload of JSON_PAYLOADS) {
     results.push(await checkJsonPayloadCopy(payload.name, payload.path))
   }

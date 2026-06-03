@@ -347,6 +347,7 @@ export const BuyPanelBody = (
       userId: user?.id,
       enabled: !!user?.id,
       afterTime: contract?.lastBetTime ?? user?.lastBetTime,
+      kinds: orderBookOnly ? 'open-limit' : undefined,
     }),
     useIsPageVisible,
     (params) => api('bets', params)
