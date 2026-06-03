@@ -366,6 +366,10 @@ describe('MEXAS flow safety guardrails', () => {
       'mexasReleaseCreditKey: getMexasOrderReleaseCreditKey(currentBet.id)',
       "mexasReleaseReason: 'resolution'",
       ".eq('updated_time', typedCurrentRow.updated_time)",
+      ".select('bet_id')",
+      '.maybeSingle()',
+      'if (!updatedRow)',
+      'Order changed during resolution. Please retry resolution.',
     ])
   })
 
@@ -1777,11 +1781,11 @@ describe('MEXAS flow safety guardrails', () => {
       'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-test-unwind'
     )
     expect(source).toContain(
-      'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts apply:mexas-test-unwind'
-    )
-    expect(source).toContain(
       'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts print:mexas-test-unwind-sql > /tmp/mexas-test-unwind.sql'
     )
+    expect(source).toContain('transaction-wrapped SQL path')
+    expect(source).toContain('change rollback to commit only after review')
+    expect(source).toContain('REST unwind script remains available for dry-run')
   })
 
   test('provides read-only and confirmed test-unwind MEXAS settlement scripts', () => {
@@ -1822,6 +1826,9 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain(
       'v_credit_amount numeric := ${sqlNumber(bet.cancelCredit)}'
     )
+    expect(source).toContain(
+      "when jsonb_typeof(v_user_data -> 'mexasBalanceCreditKeys') = 'array'"
+    )
     expect(source).toContain("'mexasBalanceCreditKeys'")
     expect(source).toContain("'mexasTestUnwound', true")
     expect(source).toContain('rollback;')
@@ -1829,6 +1836,13 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('.insert(')
     expect(source).not.toContain('.delete(')
     expect(source).not.toContain('.rpc(')
+    expectMarkersInOrder(source, [
+      'if (printUnwindSql)',
+      'printTestUnwindSql(exposures)',
+      'return',
+      '} else if (json)',
+      'if (exposures.length) process.exitCode = 1',
+    ])
     expectMarkersInOrder(unwindSource, [
       "const TEST_UNWIND_CONTRACT_IDS = ['ukrwarend26a'] as const",
       "const apply = process.argv.includes('--apply')",

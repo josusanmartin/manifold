@@ -1135,7 +1135,7 @@ async function checkMexasSettlementExposure(
           contractExposureDetails.length > 5
             ? `; ${contractExposureDetails.length - 5} more`
             : ''
-        }. Run "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-settlement" for the full exposure report. For test-only REST remediation, run "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-test-unwind" first, then "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts apply:mexas-test-unwind" only after reviewing the dry-run output. For SQL Editor remediation, run "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts print:mexas-test-unwind-sql > /tmp/mexas-test-unwind.sql" and review the rollback-protected SQL manually.`
+        }. Run "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-settlement" for the full exposure report. For test-only remediation, use the transaction-wrapped SQL path: run "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts print:mexas-test-unwind-sql > /tmp/mexas-test-unwind.sql", review the rollback-protected SQL manually, then change rollback to commit only after review. The REST unwind script remains available for dry-run inspection with "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-test-unwind".`
       )
     }
 

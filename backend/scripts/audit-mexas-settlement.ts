@@ -253,7 +253,11 @@ function printTestUnwindSql(exposures: ContractExposure[]) {
       console.log("    raise exception 'User missing for MEXAS unwind: %', v_user_id;")
       console.log('  end if;')
       console.log('')
-      console.log("  v_credit_keys := coalesce(v_user_data -> 'mexasBalanceCreditKeys', '[]'::jsonb);")
+      console.log("  v_credit_keys := case")
+      console.log("    when jsonb_typeof(v_user_data -> 'mexasBalanceCreditKeys') = 'array'")
+      console.log("      then v_user_data -> 'mexasBalanceCreditKeys'")
+      console.log("    else '[]'::jsonb")
+      console.log('  end;')
       console.log('  if v_credit_keys ? v_credit_key then')
       console.log("    raise exception 'Unwind credit key already exists: %', v_credit_key;")
       console.log('  end if;')
@@ -362,6 +366,7 @@ async function main() {
 
   if (printUnwindSql) {
     printTestUnwindSql(exposures)
+    return
   } else if (json) {
     console.log(JSON.stringify({ exposures }, null, 2))
   } else {

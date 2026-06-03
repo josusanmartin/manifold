@@ -281,7 +281,7 @@ async function releaseOpenOrder(
 
   const data = getRowData(typedCurrentRow)
   const now = Date.now()
-  const { error } = await db
+  const { data: updatedRow, error } = await db
     .from('contract_bets')
     .update({
       is_cancelled: currentBet.isFilled ? currentBet.isCancelled : true,
@@ -296,8 +296,16 @@ async function releaseOpenOrder(
     })
     .eq('bet_id', currentBet.id)
     .eq('updated_time', typedCurrentRow.updated_time)
+    .select('bet_id')
+    .maybeSingle()
 
   if (error) throw error
+  if (!updatedRow) {
+    throw new APIError(
+      503,
+      'Order changed during resolution. Please retry resolution.'
+    )
+  }
 }
 
 async function refreshMexasOpenReservedAmount(
