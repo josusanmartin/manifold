@@ -3,7 +3,6 @@ import { ReactNode, useEffect, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { useIsMobile } from 'web/hooks/use-is-mobile'
 import { useTracking } from 'web/hooks/use-tracking'
-import { GoogleOneTapLogin } from 'web/lib/firebase/google-onetap-login'
 import { ConfettiOnDemand } from '../confetti-on-demand'
 import { BottomNavBar } from '../nav/bottom-nav-bar'
 import Sidebar from '../nav/sidebar'
@@ -64,7 +63,6 @@ export function Page(props: {
   return (
     <>
       <ConfettiOnDemand />
-      <GoogleOneTapLogin className="fixed bottom-12 right-4 z-[1000]" />
       <FirstStreakModalManager />
       <Col
         className={clsx(

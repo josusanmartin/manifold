@@ -30,6 +30,10 @@ import {
 } from 'web/components/outcome-label'
 import { Tooltip } from 'web/components/widgets/tooltip'
 import { useAnimatedNumber } from 'web/hooks/use-animated-number'
+import {
+  mexasOrderBookPriceLabel,
+  useMexasOrderBookMidPrice,
+} from 'web/hooks/use-mexas-order-book-mid-price'
 import { Clock } from '../clock/clock'
 
 export function BinaryResolutionOrChance(props: {
@@ -42,6 +46,10 @@ export function BinaryResolutionOrChance(props: {
   const { resolution } = contract
   const textColor = getTextColor(contract)
   const orderBookOnly = isMexasOrderBookOnlyContract(contract)
+  const mexasMidPrice = useMexasOrderBookMidPrice(
+    contract.id,
+    orderBookOnly && !resolution
+  )
 
   const spring = useAnimatedNumber(getDisplayProbability(contract))
 
@@ -68,7 +76,7 @@ export function BinaryResolutionOrChance(props: {
         <>
           <animated.div className={textColor}>
             {orderBookOnly
-              ? 'Sin precio'
+              ? mexasOrderBookPriceLabel(mexasMidPrice)
               : spring.to((val) => formatPercent(val))}
           </animated.div>
           <div
@@ -78,7 +86,11 @@ export function BinaryResolutionOrChance(props: {
               subtextClassName
             )}
           >
-            {orderBookOnly ? 'solo órdenes límite' : 'probabilidad'}
+            {orderBookOnly
+              ? mexasMidPrice == null
+                ? 'solo órdenes límite'
+                : 'precio medio'
+              : 'probabilidad'}
           </div>
         </>
       )}

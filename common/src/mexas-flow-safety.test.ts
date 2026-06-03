@@ -1167,6 +1167,12 @@ describe('MEXAS flow safety guardrails', () => {
       'web/components/contract/order-book-panel.tsx'
     )
     const checkoutSource = readRepoFile('web/pages/checkout.tsx')
+    const midPriceHookSource = readRepoFile(
+      'web/hooks/use-mexas-order-book-mid-price.ts'
+    )
+    const contractPriceSource = readRepoFile(
+      'web/components/contract/contract-price.tsx'
+    )
     const limitOrdersTableSource = readRepoFile(
       'web/components/bet/limit-orders-table.tsx'
     )
@@ -1176,12 +1182,18 @@ describe('MEXAS flow safety guardrails', () => {
     expect(panelSource).toContain("isBid ? 'Compras SÍ' : 'Ventas SÍ'")
     expect(panelSource).toContain("isBid ? 'Compra' : 'Venta'")
     expect(panelSource).not.toContain('sumBy(bet.fills')
-    expectMarkersInOrder(checkoutSource, [
+    expectMarkersInOrder(midPriceHookSource, [
       'function remainingOrderAmount',
       '(order.orderAmount ?? 0) - (order.amount ?? 0)',
+      'export function getMexasOrderBookMidPrice',
+      "order.outcome === 'YES'",
+      "order.outcome === 'NO'",
     ])
-    expect(checkoutSource).not.toContain('fills?:')
-    expect(checkoutSource).not.toContain('order.fills')
+    expect(midPriceHookSource).not.toContain('fills?:')
+    expect(midPriceHookSource).not.toContain('order.fills')
+    expect(checkoutSource).toContain('useMexasOrderBookMidPrice')
+    expect(contractPriceSource).toContain('useMexasOrderBookMidPrice')
+    expect(contractPriceSource).toContain("'precio medio'")
     expectMarkersInOrder(limitOrdersTableSource, [
       'isMexasOrderBookOnlyContract(contract)',
       'getMexasOpenOrderAmount(bet)',
@@ -1208,10 +1220,16 @@ describe('MEXAS flow safety guardrails', () => {
       'return res.status(404)',
       'if (!isMexasOrderBookOnlyContract(convertContract(contractRow)))',
       'return res.status(404)',
+      'await runOrderBookMaintenance(db, contractId)',
       ".from('contract_bets')",
       ".eq('data->>mexasFundsReserved', 'true')",
       ".eq('data->>mexasFundsReleased', 'false')",
     ])
+    expect(source).toContain('const ORDER_BOOK_MAINTENANCE_TIMEOUT_MS = 750')
+    expect(source).toContain('Promise.race')
+    expect(source).toContain('releaseClosedMexasMarketOrders(db, { contractId })')
+    expect(source).toContain('releaseExpiredMexasOrders(db, { contractId })')
+    expect(source).toContain('releaseUnbackedMexasOrders(db, { contractId })')
   })
 
   test('serves public order book rows by best price-time per side, not newest rows', () => {

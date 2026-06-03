@@ -9,90 +9,16 @@ import { SEO } from 'web/components/SEO'
 import { Row } from 'web/components/layout/row'
 import { ExternalLinkIcon } from '@heroicons/react/solid'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import {
+  mexasOrderBookPriceLabel,
+  useMexasOrderBookMidPrice,
+} from 'web/hooks/use-mexas-order-book-mid-price'
 
 const FEATURED_MARKET_URL = '/mexas-test/ganara-mexico-la-copa-mundial-2026'
 const FEATURED_MARKET_ID = 'mexwcwin26a'
 const UKRAINE_MARKET_URL =
   '/mexas-test/will-the-russia-ukraine-war-end-by-december-31-2026'
 const UKRAINE_MARKET_ID = 'ukrwarend26a'
-
-type OrderBookBet = {
-  amount?: number
-  isCancelled?: boolean
-  isFilled?: boolean
-  limitProb?: number
-  orderAmount?: number
-  outcome?: string
-}
-
-function remainingOrderAmount(order: OrderBookBet) {
-  return Math.max(0, (order.orderAmount ?? 0) - (order.amount ?? 0))
-}
-
-function getOrderBookMidPrice(orders: OrderBookBet[]) {
-  const openOrders = orders.filter((order) => {
-    return (
-      order.limitProb != null &&
-      order.orderAmount != null &&
-      !order.isFilled &&
-      !order.isCancelled &&
-      remainingOrderAmount(order) > 0
-    )
-  })
-  const bids = openOrders
-    .filter((order) => order.outcome === 'YES')
-    .map((order) => order.limitProb as number)
-  const asks = openOrders
-    .filter((order) => order.outcome === 'NO')
-    .map((order) => order.limitProb as number)
-
-  if (!bids.length || !asks.length) return undefined
-
-  const bestBid = Math.max(...bids)
-  const bestAsk = Math.min(...asks)
-  return (bestBid + bestAsk) / 2
-}
-
-function priceLabel(price?: number) {
-  return price == null ? 'Sin precio' : `${(price * 100).toFixed(1)}c`
-}
-
-function useOrderBookMidPrice(contractId: string) {
-  const [midPrice, setMidPrice] = useState<number | undefined>()
-
-  useEffect(() => {
-    let cancelled = false
-
-    const load = async () => {
-      try {
-        const response = await fetch(
-          `/api/mexas-order-book?contractId=${encodeURIComponent(
-            contractId
-          )}&limit=500`
-        )
-        if (!response.ok) {
-          throw new Error(`Order book failed: ${response.status}`)
-        }
-        const orders = (await response.json()) as OrderBookBet[]
-        if (!cancelled) setMidPrice(getOrderBookMidPrice(orders))
-      } catch (error) {
-        console.error(error)
-        if (!cancelled) setMidPrice(undefined)
-      }
-    }
-
-    load()
-    const interval = setInterval(load, 10_000)
-
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [contractId])
-
-  return midPrice
-}
 
 function MarketHeader() {
   return (
@@ -145,7 +71,7 @@ function PriceButton(props: {
 }
 
 function SimpleMarketCard() {
-  const midPrice = useOrderBookMidPrice(UKRAINE_MARKET_ID)
+  const midPrice = useMexasOrderBookMidPrice(UKRAINE_MARKET_ID)
 
   return (
     <section className="border-ink-200 bg-canvas-0 overflow-hidden rounded-md border">
@@ -166,7 +92,7 @@ function SimpleMarketCard() {
             </h2>
           </Col>
           <div className="text-ink-900 text-2xl font-semibold">
-            {priceLabel(midPrice)}
+            {mexasOrderBookPriceLabel(midPrice)}
           </div>
         </Row>
       </div>
@@ -194,7 +120,7 @@ function SimpleMarketCard() {
 }
 
 function FeaturedMarketTable() {
-  const midPrice = useOrderBookMidPrice(FEATURED_MARKET_ID)
+  const midPrice = useMexasOrderBookMidPrice(FEATURED_MARKET_ID)
 
   return (
     <section className="border-ink-200 bg-canvas-0 overflow-hidden rounded-md border">
@@ -206,7 +132,7 @@ function FeaturedMarketTable() {
             <div className="text-ink-500 text-xs">MEX 0 Vol.</div>
           </Col>
           <div className="text-ink-900 text-2xl font-semibold">
-            {priceLabel(midPrice)}
+            {mexasOrderBookPriceLabel(midPrice)}
           </div>
         </Row>
         <Row className="flex-wrap gap-2">

@@ -14,6 +14,7 @@ import {
 type ErrorResponse = { message: string }
 const ORDER_BOOK_PAGE_SIZE = 1000
 const MAX_ORDER_BOOK_ROWS = 5000
+const ORDER_BOOK_MAINTENANCE_TIMEOUT_MS = 750
 
 function getSupabaseAdminClient() {
   const key =
@@ -76,6 +77,32 @@ function getBestOpenMexasOrders(orders: LimitBet[], sideLimit: number) {
   return [...bids, ...asks]
 }
 
+async function runOrderBookMaintenance(
+  db: ReturnType<typeof getSupabaseAdminClient>,
+  contractId: string
+) {
+  const maintenancePromise = (async () => {
+    await releaseClosedMexasMarketOrders(db, { contractId })
+    await releaseExpiredMexasOrders(db, { contractId })
+    await releaseUnbackedMexasOrders(db, { contractId })
+  })().catch((error) => {
+    console.warn('Failed to maintain Mexas order book:', error)
+  })
+
+  const timedOut = await Promise.race([
+    maintenancePromise.then(() => false),
+    new Promise<true>((resolve) =>
+      setTimeout(() => resolve(true), ORDER_BOOK_MAINTENANCE_TIMEOUT_MS)
+    ),
+  ])
+
+  if (timedOut) {
+    console.warn(
+      `Mexas order book maintenance exceeded ${ORDER_BOOK_MAINTENANCE_TIMEOUT_MS}ms for ${contractId}.`
+    )
+  }
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<Bet[] | ErrorResponse>
@@ -112,9 +139,7 @@ export default async function handler(
       return res.status(404).json({ message: 'Order book not found.' })
     }
 
-    await releaseClosedMexasMarketOrders(db, { contractId })
-    await releaseExpiredMexasOrders(db, { contractId })
-    await releaseUnbackedMexasOrders(db, { contractId })
+    await runOrderBookMaintenance(db, contractId)
 
     const rows: Row<'contract_bets'>[] = []
     for (

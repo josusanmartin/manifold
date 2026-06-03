@@ -15,7 +15,6 @@ import { useIOSBodyFix } from 'web/hooks/use-ios-body-fix'
 import { useMobileScrollRestoration } from 'web/hooks/use-mobile-scroll-restoration'
 import { useRefreshAllClients } from 'web/hooks/use-refresh-all-clients'
 import { ThemeProvider } from 'web/hooks/use-theme'
-import { GoogleOneTapSetup } from 'web/lib/firebase/google-onetap-login'
 import {
   MEXAS_SITE_DESCRIPTION,
   MEXAS_SITE_NAME,
@@ -183,8 +182,8 @@ function MyApp({ Component, pageProps }: AppProps<ManifoldPageProps>) {
         <div
           className={'flex h-screen flex-col items-center justify-center p-4'}
         >
-          You cannot use developer tools with manifold. Please close them and
-          refresh.
+          No puedes usar herramientas de desarrollo con MEXAS. Cierra las
+          herramientas y actualiza la página.
         </div>
       ) : (
         <ThemeProvider>
@@ -207,8 +206,6 @@ function MyApp({ Component, pageProps }: AppProps<ManifoldPageProps>) {
           </PrivyWalletProviders>
         </ThemeProvider>
       )}
-
-      {!process.env.NEXT_PUBLIC_PRIVY_APP_ID && <GoogleOneTapSetup />}
 
       {/* Umami, for pageview analytics on https://analytics.umami.is/share/ARwUIC9GWLNyowjq/Manifold%20Markets */}
       <Script
