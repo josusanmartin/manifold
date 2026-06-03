@@ -961,6 +961,48 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('production smoke wraps every request with a per-request timeout', () => {
+    const source = readRepoFile(
+      'backend/scripts/check-mexas-production-smoke.ts'
+    )
+
+    expectMarkersInOrder(source, [
+      'const SMOKE_FETCH_TIMEOUT_MS = Number(',
+      'process.env.MEXAS_SMOKE_FETCH_TIMEOUT_MS ?? 15_000',
+      'async function smokeFetch',
+      'signal: AbortSignal.timeout(SMOKE_FETCH_TIMEOUT_MS)',
+      'Fetch ${path} failed after ${SMOKE_FETCH_TIMEOUT_MS}ms',
+      'async function fetchText',
+      'const response = await smokeFetch(path',
+      'async function fetchManual',
+      'const response = await smokeFetch(path',
+      'async function checkRedirect',
+      "const response = await smokeFetch(path, { redirect: 'manual' })",
+      'async function checkBlockedApi',
+      "const response = await smokeFetch(path, { redirect: 'manual' })",
+    ])
+    expect(countOccurrences(source, 'fetch(`${SITE_URL}${path}`')).toBe(1)
+  })
+
+  test('MEXAS market static props bypass legacy comments and related-market prefetches', () => {
+    const source = readRepoFile('common/src/contract-params.ts')
+
+    expect(source).toContain("import { isMexasOrderBookOnlyContract }")
+    expectMarkersInOrder(source, [
+      'function getMexasContractParams',
+      'comments: []',
+      'totalComments: 0',
+      'relatedContracts: []',
+      'chartAnnotations: []',
+      'dashboards: []',
+      'export async function getContractParams',
+      'if (isMexasOrderBookOnlyContract(contract))',
+      'return getMexasContractParams(contract)',
+      'const contractSlug = contract.slug',
+      'await Promise.all',
+    ])
+  })
+
   test('production smoke covers allowed MEXAS API endpoints and method guards', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'

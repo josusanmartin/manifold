@@ -29,6 +29,7 @@ import {
 } from './answer'
 import { getBetPointsBetween, getTotalBetCount } from './bets'
 import { MarketContract } from './contract'
+import { isMexasOrderBookOnlyContract } from './mexas-market'
 import { getDashboardsToDisplayOnContract } from './supabase/dashboards'
 import { unauthedApi } from './util/api'
 
@@ -64,10 +65,44 @@ const retryUnAuthedApi = async <T>(
   throw lastError
 }
 
+function getMexasContractParams(
+  contract: Contract
+): Omit<ContractParams, 'cash'> {
+  return removeUndefinedProps({
+    outcomeType: contract.outcomeType,
+    contract,
+    lastBetTime: contract.lastBetTime,
+    pointsString:
+      contract.mechanism === 'cpmm-1'
+        ? pointsToBase64([
+            [
+              contract.createdTime,
+              (contract as Contract & { prob: number }).prob,
+            ],
+          ])
+        : pointsToBase64([]),
+    multiPointsString: {},
+    comments: [],
+    totalComments: 0,
+    totalPositions: 0,
+    totalBets: 0,
+    topContractMetrics: [],
+    relatedContracts: [],
+    chartAnnotations: [],
+    pinnedComments: [],
+    topics: [],
+    dashboards: [],
+  })
+}
+
 export async function getContractParams(
   contract: Contract,
   db: SupabaseClient
 ): Promise<Omit<ContractParams, 'cash'>> {
+  if (isMexasOrderBookOnlyContract(contract)) {
+    return getMexasContractParams(contract)
+  }
+
   const contractSlug = contract.slug
   const isCpmm1 = contract.mechanism === 'cpmm-1'
   const hasMechanism = contract.mechanism !== 'none'

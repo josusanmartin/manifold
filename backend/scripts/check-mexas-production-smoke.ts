@@ -12,6 +12,10 @@ const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
   'https://mexas-manifold.vercel.app'
 
+const SMOKE_FETCH_TIMEOUT_MS = Number(
+  process.env.MEXAS_SMOKE_FETCH_TIMEOUT_MS ?? 15_000
+)
+
 const FORBIDDEN_VISIBLE_COPY = [
   'Receive Mana',
   'Send Mana',
@@ -215,14 +219,34 @@ function getVisibleText(html: string) {
   )
 }
 
+function describeFetchError(error: unknown) {
+  if (error instanceof Error) return error.message
+  return String(error)
+}
+
+async function smokeFetch(path: string, init?: RequestInit) {
+  try {
+    return await fetch(`${SITE_URL}${path}`, {
+      signal: AbortSignal.timeout(SMOKE_FETCH_TIMEOUT_MS),
+      ...init,
+    })
+  } catch (error) {
+    throw new Error(
+      `Fetch ${path} failed after ${SMOKE_FETCH_TIMEOUT_MS}ms: ${describeFetchError(
+        error
+      )}`
+    )
+  }
+}
+
 async function fetchText(path: string) {
-  const response = await fetch(`${SITE_URL}${path}`, { redirect: 'follow' })
+  const response = await smokeFetch(path, { redirect: 'follow' })
   const text = await response.text()
   return { response, text }
 }
 
 async function fetchManual(path: string, init?: RequestInit) {
-  const response = await fetch(`${SITE_URL}${path}`, {
+  const response = await smokeFetch(path, {
     redirect: 'manual',
     ...init,
   })
@@ -231,7 +255,7 @@ async function fetchManual(path: string, init?: RequestInit) {
 }
 
 async function checkRedirect(path: string, destination: string) {
-  const response = await fetch(`${SITE_URL}${path}`, { redirect: 'manual' })
+  const response = await smokeFetch(path, { redirect: 'manual' })
   const location = response.headers.get('location') ?? ''
   const locationUrl = location ? new URL(location, SITE_URL) : undefined
   const actualDestination = locationUrl
@@ -466,7 +490,7 @@ async function checkExpectedStatus(
 }
 
 async function checkBlockedApi(path: string) {
-  const response = await fetch(`${SITE_URL}${path}`, { redirect: 'manual' })
+  const response = await smokeFetch(path, { redirect: 'manual' })
   return response.status === 404
     ? pass(`blocked api ${path}`, '404')
     : fail(`blocked api ${path}`, `${response.status}`)
