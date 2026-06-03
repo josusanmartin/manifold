@@ -1061,13 +1061,25 @@ describe('MEXAS flow safety guardrails', () => {
       'escrowRuntime.message',
       'escrowCaptureRequired && !params.mexasEscrowTxHash && !params.dryRun',
       'La orden requiere una transferencia MEXAS on-chain a tesorería.',
+      'bet = createMexasOpenLimitBet',
+      'const crossingOrderRows = await loadMexasCrossingOrderRows',
+      'await assertMexasCanMatchCrossingOrders(db, hasCrossingOrders)',
+      'if (params.dryRun)',
+      'await assertMexasCanAcceptLimitOrders(db)',
       'verifyMexasEscrowCapture',
       'payerAddress: walletAddress',
       'requiredAmount: params.amount',
       'txHash: params.mexasEscrowTxHash',
+      'bet = {',
+      'mexasStakeEscrowed: true',
+      'mexasEscrowTxHash: escrowCapture.txHash',
+      'reservedAmount = getMexasRemainingReservedAmount(bet)',
+      'if (!escrowCapture)',
+      'await updateUserBalanceCas(db, userId, -reservedAmount',
+      '.insert(betToRow(bet))',
+      'inserted = true',
       'if (escrowCapture)',
       'await updateUserBalanceCas(db, userId, 0',
-      'await updateUserBalanceCas(db, userId, -reservedAmount',
     ])
     expectMarkersInOrder(apiSource, [
       'mexasStakeEscrowed: params.escrowCapture ? true : undefined',
@@ -1076,7 +1088,6 @@ describe('MEXAS flow safety guardrails', () => {
       'mexasEscrowTreasuryAddress: params.escrowCapture?.treasuryAddress',
       'mexasEscrowAmount: params.escrowCapture?.capturedAmount',
     ])
-    expect(apiSource).toContain('escrowCapture,')
     expectMarkersInOrder(settlementSource, [
       'export async function getMexasEscrowRuntimeStatus',
       'await assertMexasOrderbookMatchingEngineReady(db)',

@@ -814,7 +814,9 @@ async function placeBinaryBet(
       }
 
       const lock = await acquireMexasOrderLock(db, params.contractId)
-      let bet: (LimitBet & { outcome: MexasOutcome }) | undefined
+      let bet:
+        | (LimitBet & MexasReservedOrderData & { outcome: MexasOutcome })
+        | undefined
       let reservedAmount = 0
       let debited = false
       let inserted = false
@@ -861,31 +863,11 @@ async function placeBinaryBet(
         ) {
           throw new APIError(403, 'Insufficient balance.')
         }
-        if (params.mexasEscrowTxHash) {
-          const walletAddress = getPrivyWalletAddress(
-            latestSyncedUserRow as Row<'users'>
-          )
-          if (!walletAddress) {
-            throw new APIError(
-              403,
-              'Conecta una Wallet Privy antes de abrir órdenes MEX.'
-            )
-          }
-          escrowCapture = await verifyMexasEscrowCapture({
-            db,
-            payerAddress: walletAddress,
-            requiredAmount: params.amount,
-            txHash: params.mexasEscrowTxHash,
-          })
-        }
         bet = createMexasOpenLimitBet(
           lockedContract as MarketContract & { prob: number },
-          {
-            ...params,
-            escrowCapture,
-          },
+          params,
           userId
-        ) as LimitBet & { outcome: MexasOutcome }
+        ) as LimitBet & MexasReservedOrderData & { outcome: MexasOutcome }
 
         const crossingOrderRows = await loadMexasCrossingOrderRows(
           db,
@@ -922,12 +904,33 @@ async function placeBinaryBet(
         }
 
         await assertMexasCanAcceptLimitOrders(db)
-        reservedAmount = getMexasRemainingReservedAmount(bet)
-        if (escrowCapture) {
-          await updateUserBalanceCas(db, userId, 0, {
-            lastBetTime: bet.createdTime,
+        if (params.mexasEscrowTxHash) {
+          const walletAddress = getPrivyWalletAddress(
+            latestSyncedUserRow as Row<'users'>
+          )
+          if (!walletAddress) {
+            throw new APIError(
+              403,
+              'Conecta una Wallet Privy antes de abrir órdenes MEX.'
+            )
+          }
+          escrowCapture = await verifyMexasEscrowCapture({
+            db,
+            payerAddress: walletAddress,
+            requiredAmount: params.amount,
+            txHash: params.mexasEscrowTxHash,
           })
-        } else {
+          bet = {
+            ...bet,
+            mexasStakeEscrowed: true,
+            mexasEscrowTxHash: escrowCapture.txHash,
+            mexasEscrowPayerAddress: escrowCapture.payerAddress,
+            mexasEscrowTreasuryAddress: escrowCapture.treasuryAddress,
+            mexasEscrowAmount: escrowCapture.capturedAmount,
+          }
+        }
+        reservedAmount = getMexasRemainingReservedAmount(bet)
+        if (!escrowCapture) {
           await updateUserBalanceCas(db, userId, -reservedAmount, {
             lastBetTime: bet.createdTime,
           })
@@ -939,6 +942,11 @@ async function placeBinaryBet(
           .insert(betToRow(bet))
         if (betError) throw betError
         inserted = true
+        if (escrowCapture) {
+          await updateUserBalanceCas(db, userId, 0, {
+            lastBetTime: bet.createdTime,
+          })
+        }
         if (!hasCrossingOrders) {
           await refreshMexasOpenReservedAmount(db, userId)
         }
