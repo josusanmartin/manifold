@@ -979,15 +979,16 @@ describe('MEXAS flow safety guardrails', () => {
       ".eq('data->>mexasFundsReserved', 'true')",
       ".eq('data->>mexasFundsReleased', 'false')",
       'bet.userId !== takerUserId',
-      '!hasMexasEscrowedStake',
+      'isMexasExecutableLimitOrder(',
+      'executionMode',
       'isMexasCrossingOrder(outcome, limitProb, bet as LimitBet)',
     ])
     expect(apiSource).toContain('takerUserId: userId')
     expectMarkersInOrder(bookSource, [
-      'hasMexasEscrowedStake',
+      'isMexasExecutableLimitOrder',
       'takerUserId?: string',
       '(!takerUserId || maker.userId !== takerUserId)',
-      '!hasMexasEscrowedStake',
+      'isMexasExecutableLimitOrder(reservedMaker, executionMode)',
       'takerUserId,',
     ])
     expect(sqlSource).toContain('and b.user_id <> v_taker.user_id')
@@ -1425,8 +1426,8 @@ describe('MEXAS flow safety guardrails', () => {
 
     expectMarkersInOrder(source, [
       'function isVisibleMexasLimitOrder',
-      '!hasMexasEscrowedStake',
-      'getMexasOpenOrderAmount',
+      'executionMode: MexasOrderExecutionMode',
+      'isMexasExecutableLimitOrder(',
     ])
     expectMarkersInOrder(source, [
       ".from('contracts')",
@@ -1464,7 +1465,10 @@ describe('MEXAS flow safety guardrails', () => {
       'function getBestOpenMexasOrders',
       "orders.filter((order) => order.outcome === 'YES')",
       "orders.filter((order) => order.outcome === 'NO')",
-      'rows.map((row) => convertBet(row)).filter(isVisibleMexasLimitOrder)',
+      'const executionMode = getMexasOrderExecutionMode()',
+      'rows',
+      '.map((row) => convertBet(row))',
+      'isVisibleMexasLimitOrder(bet, executionMode)',
     ])
     expect(source).toContain(".order('created_time', { ascending: true })")
     expect(source).toContain(".order('bet_id', { ascending: true })")
@@ -1817,7 +1821,8 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(helper).toContain("db.rpc('mexas_orderbook_matching_engine_ready')")
     expectMarkersInOrder(migration, [
-      'create or replace function public.mexas_orderbook_matching_engine_ready',
+      'create',
+      'or replace function public.mexas_orderbook_matching_engine_ready',
       "to_regprocedure('public.mexas_match_orderbook_limit_order(text,bigint,integer)') as matcher",
       "to_regprocedure('public.mexas_orderbook_matching_engine_ready()') as health",
       'when matcher is null or health is null then false',
@@ -1825,8 +1830,14 @@ describe('MEXAS flow safety guardrails', () => {
       "not has_function_privilege('anon', matcher, 'execute')",
       "to_regclass('public.contract_bets_mexas_orderbook_no_asks_idx') is not null",
       "to_regclass('public.contract_bets_mexas_orderbook_yes_bids_idx') is not null",
-      'revoke execute on function public.mexas_orderbook_matching_engine_ready() from public, anon, authenticated',
-      'grant execute on function public.mexas_orderbook_matching_engine_ready() to service_role',
+      "to_regclass('public.contract_bets_mexas_orderbook_escrow_no_asks_idx') is not null",
+      "to_regclass('public.contract_bets_mexas_orderbook_escrow_yes_bids_idx') is not null",
+      'revoke',
+      'execute on function public.mexas_orderbook_matching_engine_ready',
+      'authenticated',
+      'grant',
+      'execute on function public.mexas_orderbook_matching_engine_ready',
+      'service_role',
     ])
   })
 
@@ -1895,8 +1906,16 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain(
       "to_regclass('public.contract_bets_mexas_orderbook_yes_bids_idx') is null"
     )
+    expect(source).toContain(
+      "to_regclass('public.contract_bets_mexas_orderbook_escrow_no_asks_idx') is null"
+    )
+    expect(source).toContain(
+      "to_regclass('public.contract_bets_mexas_orderbook_escrow_yes_bids_idx') is null"
+    )
     expect(source).toContain("'NO ask orderbook index missing'")
     expect(source).toContain("'YES bid orderbook index missing'")
+    expect(source).toContain("'escrow NO ask orderbook index missing'")
+    expect(source).toContain("'escrow YES bid orderbook index missing'")
     expect(source).toContain(
       '2026060301_add_mexas_treasury_settlement_ledger.sql'
     )
@@ -2580,12 +2599,17 @@ describe('MEXAS flow safety guardrails', () => {
     )
     expectMarkersInOrder(matchingSqlSource, [
       "coalesce((v_taker_data ->> 'mexasFundsReleased')::boolean, false)",
-      "coalesce((v_taker_data ->> 'mexasStakeEscrowed')::boolean, false)",
-      'Taker escrowed MEXAS stake cannot be matched by the internal settlement RPC',
-      "coalesce((b.data ->> 'mexasStakeEscrowed')::boolean, false) = false",
+      "v_taker_escrowed := coalesce((v_taker_data ->> 'mexasStakeEscrowed')::boolean, false)",
+      'Escrowed taker reserved amount must equal order amount',
+      "coalesce((b.data ->> 'mexasStakeEscrowed')::boolean, false) = v_taker_escrowed",
+      'Escrowed maker price-improvement refund requires treasury transfer',
+      'Escrowed taker price-improvement refund requires treasury transfer',
     ])
     expect(indexSqlSource).toContain(
       "coalesce((data ->> 'mexasStakeEscrowed')::boolean, false) = false"
+    )
+    expect(indexSqlSource).toContain(
+      "coalesce((data ->> 'mexasStakeEscrowed')::boolean, false) = true"
     )
     expect(schedulerSource).toContain(
       "coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = false"

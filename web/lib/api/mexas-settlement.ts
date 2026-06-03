@@ -13,6 +13,7 @@ function getMexasSettlementSettings(): MexasSettlementSettings {
   return {
     allowUnescrowedMatching: process.env.MEXAS_ALLOW_UNESCROWED_MATCHING,
     allowUnescrowedResolution: process.env.MEXAS_ALLOW_UNESCROWED_RESOLUTION,
+    enableEscrowCaptureOrders: process.env.MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS,
     escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION,
     matchingEngineMode: process.env.MEXAS_MATCHING_ENGINE_MODE,
     settlementMode: process.env.MEXAS_SETTLEMENT_MODE,
@@ -40,10 +41,7 @@ export async function assertMexasCanAcceptLimitOrders(_db: SupabaseClient) {
     return
   }
 
-  throw new APIError(
-    503,
-    'No se pueden abrir órdenes MEXAS en este momento.'
-  )
+  throw new APIError(503, 'No se pueden abrir órdenes MEXAS en este momento.')
 }
 
 export function assertMexasCanResolveFilledPositions(

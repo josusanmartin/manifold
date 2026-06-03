@@ -25,6 +25,7 @@ declare
   v_taker_reserved_amount numeric;
   v_taker_amount numeric;
   v_taker_shares numeric;
+  v_taker_escrowed boolean;
   v_taker_unused_refund numeric := 0;
   v_taker_refund_credit_key text;
   v_taker_user_data jsonb;
@@ -35,6 +36,7 @@ declare
   v_maker_reserved_amount numeric;
   v_maker_amount numeric;
   v_maker_shares numeric;
+  v_maker_escrowed boolean;
   v_maker_unused_refund numeric := 0;
   v_maker_refund_credit_key text;
   v_maker_user_data jsonb;
@@ -138,10 +140,7 @@ begin
     raise exception 'Taker MEXAS funds are already released' using errcode = '25006';
   end if;
 
-  if coalesce((v_taker_data ->> 'mexasStakeEscrowed')::boolean, false) then
-    raise exception 'Taker escrowed MEXAS stake cannot be matched by the internal settlement RPC' using errcode = '25006';
-  end if;
-
+  v_taker_escrowed := coalesce((v_taker_data ->> 'mexasStakeEscrowed')::boolean, false);
   v_taker_limit_prob := (v_taker_data ->> 'limitProb')::numeric;
   v_taker_order_amount := (v_taker_data ->> 'orderAmount')::numeric;
   v_taker_reserved_amount := coalesce((v_taker_data ->> 'mexasReservedAmount')::numeric, v_taker_order_amount);
@@ -156,6 +155,18 @@ begin
 
   if v_taker_order_amount is null or v_taker_order_amount <= 0 then
     raise exception 'Invalid taker order amount' using errcode = '22023';
+  end if;
+
+  if v_taker_escrowed and abs(v_taker_reserved_amount - v_taker_order_amount) > v_epsilon then
+    raise exception 'Escrowed taker reserved amount must equal order amount' using errcode = '22023';
+  end if;
+
+  if v_taker_escrowed and (
+    v_taker_data ->> 'mexasEscrowTxHash' is null
+    or v_taker_data ->> 'mexasEscrowPayerAddress' is null
+    or v_taker_data ->> 'mexasEscrowTreasuryAddress' is null
+  ) then
+    raise exception 'Escrowed taker is missing capture metadata' using errcode = '22023';
   end if;
 
   while v_remaining_amount > v_epsilon and v_match_count < p_max_matches loop
@@ -175,7 +186,7 @@ begin
       and b.data ->> 'orderAmount' is not null
       and coalesce((b.data ->> 'mexasFundsReserved')::boolean, false) = true
       and coalesce((b.data ->> 'mexasFundsReleased')::boolean, false) = false
-      and coalesce((b.data ->> 'mexasStakeEscrowed')::boolean, false) = false
+      and coalesce((b.data ->> 'mexasStakeEscrowed')::boolean, false) = v_taker_escrowed
       and b.data ->> 'outcome' in ('YES', 'NO')
       and b.data ->> 'outcome' <> v_taker_outcome
       and (b.data ->> 'limitProb')::numeric > 0
@@ -202,6 +213,7 @@ begin
     v_maker_reserved_amount := coalesce((v_maker_data ->> 'mexasReservedAmount')::numeric, v_maker_order_amount);
     v_maker_amount := coalesce(v_maker.amount, 0);
     v_maker_shares := coalesce(v_maker.shares, 0);
+    v_maker_escrowed := coalesce((v_maker_data ->> 'mexasStakeEscrowed')::boolean, false);
     v_maker_remaining_amount := greatest(0, v_maker_order_amount - v_maker_amount);
     v_price := v_maker_limit_prob;
     v_taker_price := case when v_taker_outcome = 'YES' then v_price else 1 - v_price end;
@@ -214,6 +226,18 @@ begin
 
     v_taker_fill_amount := round(v_shares * v_taker_price, 8);
     v_maker_fill_amount := round(v_shares * v_maker_price, 8);
+
+    if v_maker_escrowed and abs(v_maker_reserved_amount - v_maker_order_amount) > v_epsilon then
+      raise exception 'Escrowed maker reserved amount must equal order amount' using errcode = '22023';
+    end if;
+
+    if v_maker_escrowed and (
+      v_maker_data ->> 'mexasEscrowTxHash' is null
+      or v_maker_data ->> 'mexasEscrowPayerAddress' is null
+      or v_maker_data ->> 'mexasEscrowTreasuryAddress' is null
+    ) then
+      raise exception 'Escrowed maker is missing capture metadata' using errcode = '22023';
+    end if;
 
     v_taker_amount := round(v_taker_amount + v_taker_fill_amount, 8);
     v_taker_shares := round(v_taker_shares + v_shares, 8);
@@ -244,6 +268,10 @@ begin
     );
 
     if v_maker_unused_refund > v_epsilon then
+      if v_maker_escrowed then
+        raise exception 'Escrowed maker price-improvement refund requires treasury transfer' using errcode = '25006';
+      end if;
+
       v_maker_refund_credit_key := 'mexas-order-price-improvement:' || v_maker.bet_id;
 
       select
@@ -349,7 +377,8 @@ begin
       and (b.expires_at is null or b.expires_at > v_now_ts)
       and b.data ->> 'orderAmount' is not null
       and coalesce((b.data ->> 'mexasFundsReserved')::boolean, false) = true
-      and coalesce((b.data ->> 'mexasFundsReleased')::boolean, false) = false;
+      and coalesce((b.data ->> 'mexasFundsReleased')::boolean, false) = false
+      and coalesce((b.data ->> 'mexasStakeEscrowed')::boolean, false) = false;
 
     update public.users
     set data = jsonb_set(
@@ -390,6 +419,10 @@ begin
   end;
 
   if v_taker_unused_refund > v_epsilon then
+    if v_taker_escrowed then
+      raise exception 'Escrowed taker price-improvement refund requires treasury transfer' using errcode = '25006';
+    end if;
+
     v_taker_refund_credit_key := 'mexas-order-price-improvement:' || v_taker.bet_id;
 
     select
@@ -484,7 +517,8 @@ begin
     and (b.expires_at is null or b.expires_at > v_now_ts)
     and b.data ->> 'orderAmount' is not null
     and coalesce((b.data ->> 'mexasFundsReserved')::boolean, false) = true
-    and coalesce((b.data ->> 'mexasFundsReleased')::boolean, false) = false;
+    and coalesce((b.data ->> 'mexasFundsReleased')::boolean, false) = false
+    and coalesce((b.data ->> 'mexasStakeEscrowed')::boolean, false) = false;
 
   update public.users
   set data = jsonb_set(

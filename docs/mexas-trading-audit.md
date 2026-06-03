@@ -33,9 +33,10 @@ y Arbitrum para leer balances ERC-20 y verificar recibos de transferencia.
 - Las cancelaciones, expiraciones y resoluciones ya pueden enviar pagos
   salientes desde tesoreria mediante un ledger idempotente con estado
   `processing`, firma backend y verificacion de receipt confirmado.
-- El RPC interno de matching rechaza stake marcado como escrowed y el libro
-  publico no lo muestra como liquidez ejecutable hasta que exista un matcher
-  on-chain completo para ese modo.
+- El RPC interno de matching separa estrictamente los modos de ejecucion:
+  ordenes wallet-reserved solo cruzan contra wallet-reserved, y ordenes
+  treasury-escrowed solo cruzan contra treasury-escrowed. No mezcla los dos
+  modelos de settlement.
 - El matching usa price-time priority: mejor precio primero, luego orden mas vieja,
   luego `bet_id` como desempate determinista.
 - La colocacion de ordenes toma un lock por mercado y usa CAS por fila de orden,
@@ -46,10 +47,10 @@ y Arbitrum para leer balances ERC-20 y verificar recibos de transferencia.
 ## Barrera de settlement
 
 El flujo activo de produccion todavia no debe habilitar escrow on-chain. La
-captura wallet -> tesoreria y el pago tesoreria -> usuario existen como codigo,
-pero `MEXAS_ONCHAIN_ESCROW_CAPABILITIES` sigue en `false` porque el matcher SQL
-actual opera solo con reservas respaldadas por wallet y excluye
-`mexasStakeEscrowed=true`.
+captura wallet -> tesoreria, el matching separado de stake escrowed y el pago
+tesoreria -> usuario existen como codigo, pero
+`MEXAS_ONCHAIN_ESCROW_CAPABILITIES` sigue en `false` hasta que produccion tenga
+SQL/env/signer/scheduler verificados end-to-end.
 
 Cuando dos ordenes sin escrow hacen match, el codigo cambia saldos internos,
 pero no transfiere MEX desde la wallet del perdedor a una cuenta custodiada ni
@@ -91,8 +92,8 @@ Los blockers de launch real siguen siendo estructurales:
   `mexas_escrow_capture_ready`;
 - configurar y proteger `MEXAS_TREASURY_SIGNER_SECRET` en produccion antes de
   cualquier pago on-chain saliente;
-- implementar matching SQL para stake escrowed antes de activar
-  `captureOrderStake` y mostrar esas ordenes como liquidez ejecutable;
+- mantener `MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS` apagado hasta que el SQL de
+  produccion, signer y scheduler runtime esten verificados;
 - subir `MEXAS_ONCHAIN_ESCROW_CAPABILITIES` solo cuando captura, release y
   payout esten cubiertos end-to-end en el matcher y las rutas runtime;
 - desplegar/confirmar el scheduler runtime despues de aplicar el SQL.

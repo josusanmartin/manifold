@@ -148,6 +148,14 @@ begin
     v_failures := array_append(v_failures, 'YES bid orderbook index missing');
   end if;
 
+  if to_regclass('public.contract_bets_mexas_orderbook_escrow_no_asks_idx') is null then
+    v_failures := array_append(v_failures, 'escrow NO ask orderbook index missing');
+  end if;
+
+  if to_regclass('public.contract_bets_mexas_orderbook_escrow_yes_bids_idx') is null then
+    v_failures := array_append(v_failures, 'escrow YES bid orderbook index missing');
+  end if;
+
   if to_regprocedure('public.mexas_treasury_settlement_ledger_ready()') is null then
     v_failures := array_append(v_failures, 'treasury settlement ledger health RPC missing');
   elsif public.mexas_treasury_settlement_ledger_ready() is distinct from true then

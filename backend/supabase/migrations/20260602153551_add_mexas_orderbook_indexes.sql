@@ -37,3 +37,39 @@ where
   and coalesce((data ->> 'mexasFundsReleased')::boolean, false) = false
   and coalesce((data ->> 'mexasStakeEscrowed')::boolean, false) = false
   and data ->> 'outcome' = 'YES';
+
+create index if not exists contract_bets_mexas_orderbook_escrow_no_asks_idx on public.contract_bets (
+  contract_id,
+  ((data ->> 'limitProb')::numeric) asc,
+  created_time asc,
+  bet_id asc
+)
+where
+  coalesce(is_cancelled, false) = false
+  and coalesce(is_filled, false) = false
+  and coalesce(is_redemption, false) = false
+  and data ->> 'answerId' is null
+  and data ->> 'limitProb' is not null
+  and data ->> 'orderAmount' is not null
+  and coalesce((data ->> 'mexasFundsReserved')::boolean, false) = true
+  and coalesce((data ->> 'mexasFundsReleased')::boolean, false) = false
+  and coalesce((data ->> 'mexasStakeEscrowed')::boolean, false) = true
+  and data ->> 'outcome' = 'NO';
+
+create index if not exists contract_bets_mexas_orderbook_escrow_yes_bids_idx on public.contract_bets (
+  contract_id,
+  ((data ->> 'limitProb')::numeric) desc,
+  created_time asc,
+  bet_id asc
+)
+where
+  coalesce(is_cancelled, false) = false
+  and coalesce(is_filled, false) = false
+  and coalesce(is_redemption, false) = false
+  and data ->> 'answerId' is null
+  and data ->> 'limitProb' is not null
+  and data ->> 'orderAmount' is not null
+  and coalesce((data ->> 'mexasFundsReserved')::boolean, false) = true
+  and coalesce((data ->> 'mexasFundsReleased')::boolean, false) = false
+  and coalesce((data ->> 'mexasStakeEscrowed')::boolean, false) = true
+  and data ->> 'outcome' = 'YES';

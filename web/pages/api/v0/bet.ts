@@ -14,9 +14,11 @@ import {
   getMexasOpenOrderAmount,
   getMexasLimitOrderExpiresAt,
   hasValidMexasLimitOrderExpiration,
+  isMexasExecutableLimitOrder,
   isMexasCrossingOrder,
   matchMexasLimitOrder,
   sortMexasMakersForTaker,
+  type MexasOrderExecutionMode,
   type MexasOutcome,
 } from 'common/mexas-order-book'
 import { hasOperationalMexasEscrow } from 'common/mexas-settlement'
@@ -650,6 +652,7 @@ type LimitBetRow = {
 async function loadMexasCrossingOrderRows(
   db: SupabaseClient,
   contractId: string,
+  executionMode: MexasOrderExecutionMode,
   outcome: MexasOutcome,
   limitProb: number,
   takerUserId: string
@@ -686,10 +689,10 @@ async function loadMexasCrossingOrderRows(
         bet.userId !== takerUserId &&
         bet.limitProb !== undefined &&
         bet.orderAmount !== undefined &&
-        !bet.isFilled &&
-        !bet.isCancelled &&
-        !hasMexasEscrowedStake(bet as LimitBet & MexasReservedOrderData) &&
-        getMexasOpenOrderAmount(bet as LimitBet) > EPSILON &&
+        isMexasExecutableLimitOrder(
+          bet as LimitBet & MexasReservedOrderData,
+          executionMode
+        ) &&
         isMexasCrossingOrder(outcome, limitProb, bet as LimitBet)
       )
     })
@@ -883,6 +886,7 @@ async function placeBinaryBet(
         const crossingOrderRows = await loadMexasCrossingOrderRows(
           db,
           params.contractId,
+          escrowCaptureRequired ? 'treasury-escrowed' : 'wallet-reserved',
           bet.outcome,
           bet.limitProb,
           userId
@@ -893,6 +897,9 @@ async function placeBinaryBet(
         if (params.dryRun) {
           const simulated = matchMexasLimitOrder({
             amount: bet.orderAmount,
+            executionMode: escrowCaptureRequired
+              ? 'treasury-escrowed'
+              : 'wallet-reserved',
             limitProb: bet.limitProb,
             makers: crossingOrderRows.map((entry) => entry.bet),
             outcome: bet.outcome,

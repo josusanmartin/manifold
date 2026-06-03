@@ -39,6 +39,7 @@ export type MexasSettlementAudit = {
 export type MexasSettlementSettings = {
   allowUnescrowedMatching?: string
   allowUnescrowedResolution?: string
+  enableEscrowCaptureOrders?: string
   escrowImplementation?: string
   matchingEngineMode?: string
   settlementMode?: string
@@ -134,7 +135,8 @@ export function getMissingMexasEscrowCapabilities() {
 export function canMexasMatchCrossingOrders(settings: MexasSettlementSettings) {
   return (
     hasTransactionalMexasMatchingEngine(settings) &&
-    hasOperationalMexasEscrow(settings)
+    hasOperationalMexasEscrow(settings) &&
+    settings.enableEscrowCaptureOrders === 'true'
   )
 }
 

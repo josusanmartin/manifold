@@ -18,6 +18,7 @@ import { MEXAS_TOKEN } from 'common/crypto/mexas'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import {
   getMexasCrossingOrders,
+  type MexasOrderExecutionMode,
   type MexasOutcome,
 } from 'common/mexas-order-book'
 import { CandidateBet } from 'common/new-bet'
@@ -253,11 +254,16 @@ export default function LimitOrderPanel(props: {
       : getBinaryMCProb(preLimitProb, outcome as 'YES' | 'NO')
 
   const amount = betAmount ?? 0
+  const mexasOrderExecutionMode: MexasOrderExecutionMode =
+    mexasOrderReadiness?.escrowCaptureEnabled === true
+      ? 'treasury-escrowed'
+      : 'wallet-reserved'
   const mexasCanCrossOrders =
     orderBookOnly && mexasOrderReadiness?.matchingEngineReady === true
   const mexasBlockedCrossingOrders =
     orderBookOnly && !mexasCanCrossOrders && outcome && limitProb !== undefined
       ? getMexasCrossingOrders({
+          executionMode: mexasOrderExecutionMode,
           limitProb,
           makers: unfilledBets,
           outcome: outcome as MexasOutcome,

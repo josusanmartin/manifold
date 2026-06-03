@@ -48,6 +48,7 @@ function getSingleQueryValue(value: string | string[] | undefined) {
 
 function getMexasSettlementSettings(): MexasSettlementSettings {
   return {
+    enableEscrowCaptureOrders: process.env.MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS,
     escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION,
     matchingEngineMode: process.env.MEXAS_MATCHING_ENGINE_MODE,
     settlementMode: process.env.MEXAS_SETTLEMENT_MODE,

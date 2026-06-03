@@ -1,10 +1,16 @@
 import { LimitBet, type Bet } from 'common/bet'
 import {
-  hasMexasEscrowedStake,
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
-import { getMexasOpenOrderAmount } from 'common/mexas-order-book'
+import {
+  isMexasExecutableLimitOrder,
+  type MexasOrderExecutionMode,
+} from 'common/mexas-order-book'
+import {
+  hasOperationalMexasEscrow,
+  type MexasSettlementSettings,
+} from 'common/mexas-settlement'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import { createClient, type Row } from 'common/supabase/utils'
@@ -42,16 +48,34 @@ function getSingleQueryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
 
-function isVisibleMexasLimitOrder(bet: Bet): bet is LimitBet {
+function getMexasSettlementSettings(): MexasSettlementSettings {
+  return {
+    escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION,
+    matchingEngineMode: process.env.MEXAS_MATCHING_ENGINE_MODE,
+    settlementMode: process.env.MEXAS_SETTLEMENT_MODE,
+  }
+}
+
+function getMexasOrderExecutionMode(): MexasOrderExecutionMode {
+  return process.env.MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS === 'true' &&
+    hasOperationalMexasEscrow(getMexasSettlementSettings())
+    ? 'treasury-escrowed'
+    : 'wallet-reserved'
+}
+
+function isVisibleMexasLimitOrder(
+  bet: Bet,
+  executionMode: MexasOrderExecutionMode
+): bet is LimitBet {
   return (
     bet.limitProb !== undefined &&
     bet.orderAmount !== undefined &&
     !bet.answerId &&
-    !bet.isFilled &&
-    !bet.isCancelled &&
     (bet.outcome === 'YES' || bet.outcome === 'NO') &&
-    !hasMexasEscrowedStake(bet as LimitBet & MexasReservedOrderData) &&
-    getMexasOpenOrderAmount(bet as LimitBet) > 0
+    isMexasExecutableLimitOrder(
+      bet as LimitBet & MexasReservedOrderData,
+      executionMode
+    )
   )
 }
 
@@ -145,6 +169,7 @@ export default async function handler(
     }
 
     await runOrderBookMaintenance(db, contractId)
+    const executionMode = getMexasOrderExecutionMode()
 
     const rows: Row<'contract_bets'>[] = []
     for (
@@ -171,7 +196,11 @@ export default async function handler(
     }
 
     const bets = getBestOpenMexasOrders(
-      rows.map((row) => convertBet(row)).filter(isVisibleMexasLimitOrder),
+      rows
+        .map((row) => convertBet(row))
+        .filter((bet): bet is LimitBet =>
+          isVisibleMexasLimitOrder(bet, executionMode)
+        ),
       limit
     )
     res.setHeader('Cache-Control', 's-maxage=5, stale-while-revalidate=30')
