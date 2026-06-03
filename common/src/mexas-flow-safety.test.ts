@@ -1282,6 +1282,36 @@ describe('MEXAS flow safety guardrails', () => {
     expect(countOccurrences(source, 'fetch(`${SITE_URL}${path}`')).toBe(1)
   })
 
+  test('launch checks diagnose Vercel Firewall challenges explicitly', () => {
+    const smokeSource = readRepoFile(
+      'backend/scripts/check-mexas-production-smoke.ts'
+    )
+    const readinessSource = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    for (const source of [smokeSource, readinessSource]) {
+      expect(source).toContain('x-vercel-mitigated')
+      expect(source).toContain('Vercel Firewall challenge active')
+      expect(source).toContain('vercel firewall attack-mode disable')
+      expect(source).toContain('adjust the Vercel WAF challenge rule')
+    }
+    expectMarkersInOrder(smokeSource, [
+      'function isVercelChallenge',
+      "response.headers.get('x-vercel-mitigated') === 'challenge'",
+      'function describeResponseStatus',
+      'Vercel Firewall challenge active',
+      'describeResponseStatus(response)',
+    ])
+    expectMarkersInOrder(readinessSource, [
+      'async function checkUrl',
+      "response.headers.get('x-vercel-mitigated')",
+      'function describeSiteResponse',
+      'Vercel Firewall challenge active',
+      'describeSiteResponse(response)',
+    ])
+  })
+
   test('production smoke covers broad legacy page redirects and rejects legacy redirect destinations', () => {
     const smokeSource = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'

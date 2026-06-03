@@ -312,6 +312,16 @@ function describeFetchError(error: unknown) {
   return String(error)
 }
 
+function isVercelChallenge(response: Response) {
+  return response.headers.get('x-vercel-mitigated') === 'challenge'
+}
+
+function describeResponseStatus(response: Response) {
+  if (!isVercelChallenge(response)) return `${response.status}`
+
+  return `${response.status} Vercel Firewall challenge active. Disable Attack Challenge Mode interactively with "vercel firewall attack-mode disable" or adjust the Vercel WAF challenge rule before launch.`
+}
+
 async function smokeFetch(path: string, init?: RequestInit) {
   try {
     return await fetch(`${SITE_URL}${path}`, {
@@ -344,6 +354,10 @@ async function fetchManual(path: string, init?: RequestInit) {
 
 async function checkRedirect(path: string, destination: string) {
   const response = await smokeFetch(path, { redirect: 'manual' })
+  if (isVercelChallenge(response)) {
+    return fail(`redirect ${path}`, describeResponseStatus(response))
+  }
+
   const location = response.headers.get('location') ?? ''
   const decodedLocation = decodeEntities(decodeURIComponentSafe(location))
   const forbiddenLocation = FORBIDDEN_VISIBLE_COPY.filter((copy) =>
@@ -384,12 +398,16 @@ function decodeURIComponentSafe(value: string) {
 async function checkPage(path: string, required: string[]) {
   const results: SmokeResult[] = []
   const { response, text } = await fetchText(path)
+  if (isVercelChallenge(response)) {
+    return [fail(`page ${path}`, describeResponseStatus(response))]
+  }
+
   const visibleText = getVisibleText(text)
 
   results.push(
     response.status >= 200 && response.status < 400
       ? pass(`page ${path}`, `${response.status}`)
-      : fail(`page ${path}`, `${response.status}`)
+      : fail(`page ${path}`, describeResponseStatus(response))
   )
 
   const missingRequired = required.filter((copy) => !visibleText.includes(copy))
@@ -414,11 +432,14 @@ async function checkPage(path: string, required: string[]) {
 async function checkStaticFile(path: string, required: string[]) {
   const results: SmokeResult[] = []
   const { response, text } = await fetchText(path)
+  if (isVercelChallenge(response)) {
+    return [fail(`static ${path}`, describeResponseStatus(response))]
+  }
 
   results.push(
     response.status >= 200 && response.status < 400
       ? pass(`static ${path}`, `${response.status}`)
-      : fail(`static ${path}`, `${response.status}`)
+      : fail(`static ${path}`, describeResponseStatus(response))
   )
 
   const missingRequired = required.filter((copy) => !text.includes(copy))
@@ -440,6 +461,10 @@ async function checkStaticFile(path: string, required: string[]) {
 
 async function checkBlockedStaticFile(path: string) {
   const { response } = await fetchManual(path)
+  if (isVercelChallenge(response)) {
+    return fail(`blocked static ${path}`, describeResponseStatus(response))
+  }
+
   if (response.status === 404) return pass(`blocked static ${path}`, '404')
 
   if (response.status >= 300 && response.status < 400) {
@@ -461,7 +486,9 @@ async function checkBlockedStaticFile(path: string) {
       : 'no location'
     const followed = await smokeFetch(path, { redirect: 'follow' })
 
-    return followed.status === 404
+    return isVercelChallenge(followed)
+      ? fail(`blocked static ${path}`, describeResponseStatus(followed))
+      : followed.status === 404
       ? pass(
           `blocked static ${path}`,
           `${response.status} -> ${destination} -> 404`
@@ -472,7 +499,7 @@ async function checkBlockedStaticFile(path: string) {
         )
   }
 
-  return fail(`blocked static ${path}`, `${response.status}`)
+  return fail(`blocked static ${path}`, describeResponseStatus(response))
 }
 
 async function checkOrderBook(contractId: string) {
@@ -480,7 +507,7 @@ async function checkOrderBook(contractId: string) {
     `/api/mexas-order-book?contractId=${encodeURIComponent(contractId)}`
   )
   if (response.status < 200 || response.status >= 400) {
-    return fail(`orderbook ${contractId}`, `${response.status}`)
+    return fail(`orderbook ${contractId}`, describeResponseStatus(response))
   }
 
   try {
@@ -499,7 +526,10 @@ async function checkOrderReadiness(contractId: string) {
     `/api/v0/market/${encodeURIComponent(contractId)}/mexas-order-readiness`
   )
   if (response.status < 200 || response.status >= 400) {
-    return fail(`order readiness ${contractId}`, `${response.status}`)
+    return fail(
+      `order readiness ${contractId}`,
+      describeResponseStatus(response)
+    )
   }
 
   try {
@@ -567,7 +597,10 @@ async function checkBlockedResolutionReadiness(contractId: string) {
   )
   return response.status === 401
     ? pass(`auth blocked resolution readiness ${contractId}`, '401')
-    : fail(`blocked resolution readiness ${contractId}`, `${response.status}`)
+    : fail(
+        `blocked resolution readiness ${contractId}`,
+        describeResponseStatus(response)
+      )
 }
 
 async function checkBlockedOrderReadiness(contractId: string) {
@@ -576,7 +609,10 @@ async function checkBlockedOrderReadiness(contractId: string) {
   )
   return response.status === 404
     ? pass(`blocked order readiness ${contractId}`, '404')
-    : fail(`blocked order readiness ${contractId}`, `${response.status}`)
+    : fail(
+        `blocked order readiness ${contractId}`,
+        describeResponseStatus(response)
+      )
 }
 
 async function checkBlockedOrderBook(contractId: string) {
@@ -585,7 +621,7 @@ async function checkBlockedOrderBook(contractId: string) {
   )
   return response.status === 404
     ? pass(`blocked orderbook ${contractId}`, '404')
-    : fail(`blocked orderbook ${contractId}`, `${response.status}`)
+    : fail(`blocked orderbook ${contractId}`, describeResponseStatus(response))
 }
 
 async function checkBlockedBets(contractId: string) {
@@ -594,13 +630,13 @@ async function checkBlockedBets(contractId: string) {
   )
   return response.status === 404
     ? pass(`blocked bets ${contractId}`, '404')
-    : fail(`blocked bets ${contractId}`, `${response.status}`)
+    : fail(`blocked bets ${contractId}`, describeResponseStatus(response))
 }
 
 async function checkBetsArray(path: string, name: string) {
   const { response, text } = await fetchText(path)
   if (response.status < 200 || response.status >= 400) {
-    return fail(name, `${response.status}`)
+    return fail(name, describeResponseStatus(response))
   }
 
   try {
@@ -617,7 +653,7 @@ async function checkBetsArray(path: string, name: string) {
 async function checkJsonPayloadCopy(name: string, path: string) {
   const { response, text } = await fetchText(path)
   if (response.status < 200 || response.status >= 400) {
-    return fail(name, `${response.status}`)
+    return fail(name, describeResponseStatus(response))
   }
 
   try {
@@ -642,14 +678,14 @@ async function checkExpectedStatus(
   const { response } = await fetchManual(path, init)
   return response.status === expectedStatus
     ? pass(name, `${expectedStatus}`)
-    : fail(name, `${response.status}`)
+    : fail(name, describeResponseStatus(response))
 }
 
 async function checkBlockedApi(path: string) {
   const response = await smokeFetch(path, { redirect: 'manual' })
   return response.status === 404
     ? pass(`blocked api ${path}`, '404')
-    : fail(`blocked api ${path}`, `${response.status}`)
+    : fail(`blocked api ${path}`, describeResponseStatus(response))
 }
 
 async function runSmoke() {

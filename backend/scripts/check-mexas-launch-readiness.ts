@@ -1764,7 +1764,16 @@ async function checkTreasuryTransferReconciliation(db: SupabaseClient) {
 
 async function checkUrl(url: string) {
   const response = await fetch(url, { redirect: 'follow' })
-  return response.status
+  return {
+    mitigated: response.headers.get('x-vercel-mitigated') ?? undefined,
+    status: response.status,
+  }
+}
+
+function describeSiteResponse(response: Awaited<ReturnType<typeof checkUrl>>) {
+  if (response.mitigated !== 'challenge') return `${response.status}`
+
+  return `${response.status} Vercel Firewall challenge active. Disable Attack Challenge Mode interactively with "vercel firewall attack-mode disable" or adjust the Vercel WAF challenge rule before launch.`
 }
 
 async function runChecks() {
@@ -2145,11 +2154,11 @@ async function runChecks() {
     '/mexas-test/ganara-mexico-la-copa-mundial-2026',
   ]) {
     try {
-      const status = await checkUrl(`${siteUrl}${path}`)
+      const response = await checkUrl(`${siteUrl}${path}`)
       checks.push(
-        status >= 200 && status < 400
-          ? pass(`site ${path}`, `${status}`)
-          : fail(`site ${path}`, `${status}`)
+        response.status >= 200 && response.status < 400
+          ? pass(`site ${path}`, `${response.status}`)
+          : fail(`site ${path}`, describeSiteResponse(response))
       )
     } catch (error) {
       const message = formatDiagnosticError(error)
