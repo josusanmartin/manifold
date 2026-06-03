@@ -1,3 +1,4 @@
+import { useWallets, type ConnectedWallet } from '@privy-io/react-auth'
 import { SelectorIcon } from '@heroicons/react/solid'
 import { useEvent } from 'client-common/hooks/use-event'
 import { getLimitBetReturns, MultiBetProps } from 'client-common/lib/bet'
@@ -13,12 +14,12 @@ import {
   MultiContract,
 } from 'common/contract'
 import { TRADE_TERM } from 'common/envs/constants'
+import { MEXAS_TOKEN } from 'common/crypto/mexas'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import {
   getMexasCrossingOrders,
   type MexasOutcome,
 } from 'common/mexas-order-book'
-import { MEXAS_ONCHAIN_ESCROW_IMPLEMENTED } from 'common/mexas-settlement'
 import { CandidateBet } from 'common/new-bet'
 import { getPseudoProbability } from 'common/pseudo-numeric'
 import { formatPercent } from 'common/util/format'
@@ -28,11 +29,13 @@ import dayjs from 'dayjs'
 import { clamp } from 'lodash'
 import { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
+import { encodeFunctionData, isAddress, parseUnits, type Hex } from 'viem'
 import { Input } from 'web/components/widgets/input'
 import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
 import { useMexasOrderReadiness } from 'web/hooks/use-mexas-order-readiness'
 import { usePersistentLocalState } from 'web/hooks/use-persistent-local-state'
 import { api } from 'web/lib/api/api'
+import { mexasErc20Abi } from 'web/lib/crypto/mexas'
 import { firebaseLogin, User } from 'web/lib/firebase/users'
 import { track, withTracking } from 'web/lib/service/analytics'
 import { Button } from '../buttons/button'
@@ -57,6 +60,13 @@ const expirationOptions = [
 ]
 
 const WAIT_TO_DISMISS = 3000
+
+function mexasAmountToUnits(amount: number) {
+  return parseUnits(
+    Math.max(0, amount).toFixed(MEXAS_TOKEN.decimals),
+    MEXAS_TOKEN.decimals
+  )
+}
 
 export default function LimitOrderPanel(props: {
   contract: MarketContract
@@ -137,6 +147,7 @@ export default function LimitOrderPanel(props: {
 
   const [lastBetDetails, setLastBetDetails] = useState<Bet | null>(null)
   const privy = usePrivyLogin()
+  const { wallets } = useWallets()
   const mexasOrderReadiness = useMexasOrderReadiness(contract.id, orderBookOnly)
 
   useEffect(() => {
@@ -242,11 +253,10 @@ export default function LimitOrderPanel(props: {
       : getBinaryMCProb(preLimitProb, outcome as 'YES' | 'NO')
 
   const amount = betAmount ?? 0
+  const mexasCanCrossOrders =
+    orderBookOnly && mexasOrderReadiness?.matchingEngineReady === true
   const mexasBlockedCrossingOrders =
-    orderBookOnly &&
-    !MEXAS_ONCHAIN_ESCROW_IMPLEMENTED &&
-    outcome &&
-    limitProb !== undefined
+    orderBookOnly && !mexasCanCrossOrders && outcome && limitProb !== undefined
       ? getMexasCrossingOrders({
           limitProb,
           makers: unfilledBets,
@@ -256,7 +266,7 @@ export default function LimitOrderPanel(props: {
       : []
   const mexasCrossingOrderBlocked =
     orderBookOnly &&
-    !MEXAS_ONCHAIN_ESCROW_IMPLEMENTED &&
+    !mexasCanCrossOrders &&
     mexasBlockedCrossingOrders.length > 0
   const mexasOrderReadinessLoading =
     orderBookOnly && mexasOrderReadiness === undefined
@@ -333,6 +343,51 @@ export default function LimitOrderPanel(props: {
     }
   })
 
+  async function captureMexasEscrowStake() {
+    if (!orderBookOnly || !mexasOrderReadiness?.escrowCaptureEnabled) {
+      return undefined
+    }
+
+    const treasuryAddress =
+      process.env.NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS
+    if (!treasuryAddress || !isAddress(treasuryAddress)) {
+      throw new APIError(500, 'La tesorería MEXAS no está configurada.')
+    }
+
+    const walletAddress =
+      privy.walletAddress ?? (await privy.ensureEmbeddedWallet())
+    if (!walletAddress || !isAddress(walletAddress)) {
+      throw new APIError(403, 'Conecta una Wallet Privy para operar MEX.')
+    }
+
+    const wallet = wallets.find(
+      (candidate) =>
+        candidate.walletClientType === 'privy' &&
+        candidate.address.toLowerCase() === walletAddress.toLowerCase()
+    ) as ConnectedWallet | undefined
+    if (!wallet) {
+      throw new APIError(403, 'No se pudo abrir la Wallet Privy.')
+    }
+
+    await wallet.switchChain(MEXAS_TOKEN.chainId)
+    const provider = await wallet.getEthereumProvider()
+    return (await provider.request({
+      method: 'eth_sendTransaction',
+      params: [
+        {
+          from: walletAddress,
+          to: MEXAS_TOKEN.address,
+          data: encodeFunctionData({
+            abi: mexasErc20Abi,
+            functionName: 'transfer',
+            args: [treasuryAddress, mexasAmountToUnits(amount)],
+          }),
+          value: '0x0',
+        },
+      ],
+    })) as Hex
+  }
+
   async function submitBet() {
     if (!user || betDisabled) return
 
@@ -342,6 +397,7 @@ export default function LimitOrderPanel(props: {
     const answerId = multiProps?.answerToBuy.id
 
     try {
+      const mexasEscrowTxHash = await captureMexasEscrowStake()
       const bet = await api(
         'bet',
         removeUndefinedProps({
@@ -354,6 +410,7 @@ export default function LimitOrderPanel(props: {
           expiresMillisAfter,
           deps: betDeps.current?.map((b) => b.userId),
           silent: expiresMillisAfter && expiresMillisAfter <= 1000,
+          mexasEscrowTxHash,
         } as APIParams<'bet'>)
       )
       console.log(`placed ${TRADE_TERM}. Result:`, bet)

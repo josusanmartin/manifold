@@ -406,6 +406,10 @@ export const API = (_apiTypeCheck = {
         dryRun: z.boolean().optional(),
         deps: z.array(z.string()).optional(),
         deterministic: z.boolean().optional(),
+        mexasEscrowTxHash: z
+          .string()
+          .regex(/^0x[0-9a-fA-F]{64}$/)
+          .optional(),
       })
       .strict(),
   },

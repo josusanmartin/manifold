@@ -11,6 +11,7 @@ import {
 import {
   getMexasOrderReleaseCreditKey,
   getMexasResolutionCreditEvents,
+  type MexasResolutionCreditEvent,
 } from 'common/mexas-resolution'
 import { getMexasSettlementAudit } from 'common/mexas-settlement'
 import { convertBet } from 'common/supabase/bets'
@@ -34,6 +35,10 @@ import {
   releaseUnbackedMexasOrders,
 } from 'web/lib/api/mexas-orders'
 import { assertMexasCanResolveFilledPositions } from 'web/lib/api/mexas-settlement'
+import {
+  getUserPrivyWalletAddress,
+  submitMexasTreasuryTransfer,
+} from 'web/lib/api/mexas-treasury-transfer'
 import { z } from 'zod'
 
 type ErrorResponse = { message: string; details?: unknown }
@@ -123,6 +128,12 @@ function hasFreshOrderLock(data: Record<string, unknown>) {
 
 function getResolutionLockOutcome(data: Record<string, unknown>) {
   const outcome = data.mexasResolvingOutcome
+  return outcome === 'YES' || outcome === 'NO' || outcome === 'CANCEL'
+    ? outcome
+    : undefined
+}
+
+function getMexasTreasuryResolutionOutcome(outcome: resolution | undefined) {
   return outcome === 'YES' || outcome === 'NO' || outcome === 'CANCEL'
     ? outcome
     : undefined
@@ -281,12 +292,6 @@ async function releaseOpenOrder(
     return
   }
   if (currentBet.isCancelled && currentBet.mexasFundsReleased === true) return
-  if (hasMexasEscrowedStake(currentBet)) {
-    throw new APIError(
-      503,
-      'MEXAS escrowed stake resolution release is not implemented.'
-    )
-  }
 
   const data = getRowData(typedCurrentRow)
   const now = Date.now()
@@ -317,20 +322,6 @@ async function releaseOpenOrder(
   }
 }
 
-function assertNoEscrowedMexasResolutionStake(
-  entries: { row: Row<'contract_bets'>; bet: Bet }[]
-) {
-  const escrowedEntry = entries.find((entry) =>
-    hasMexasEscrowedStake(entry.bet as LimitBet & MexasReservedOrderData)
-  )
-  if (!escrowedEntry) return
-
-  throw new APIError(
-    503,
-    `MEXAS escrowed stake on order ${escrowedEntry.bet.id} cannot be resolved through the internal credit path.`
-  )
-}
-
 async function refreshMexasOpenReservedAmount(
   db: SupabaseClient,
   userId: string
@@ -348,16 +339,14 @@ async function refreshMexasOpenReservedAmount(
 async function applyMexasResolutionCreditsAndReleases(
   db: SupabaseClient,
   entries: { row: Row<'contract_bets'>; bet: Bet }[],
-  creditEvents: { userId: string; amount: number; creditKey: string }[]
+  creditEvents: MexasResolutionCreditEvent[]
 ) {
+  const entryByBetId = new Map(entries.map((entry) => [entry.bet.id, entry]))
   const entriesByUserId = new Map<
     string,
     { row: Row<'contract_bets'>; bet: Bet }[]
   >()
-  const eventsByUserId = new Map<
-    string,
-    { userId: string; amount: number; creditKey: string }[]
-  >()
+  const eventsByUserId = new Map<string, MexasResolutionCreditEvent[]>()
 
   for (const entry of entries) {
     const userEntries = entriesByUserId.get(entry.bet.userId) ?? []
@@ -375,9 +364,37 @@ async function applyMexasResolutionCreditsAndReleases(
   ).sort()
 
   for (const eventUserId of userIds) {
+    const userEvents = eventsByUserId.get(eventUserId) ?? []
+    const escrowedCreditKeys = new Set<string>()
+    for (const event of userEvents) {
+      const bet = entryByBetId.get(event.betId)?.bet as
+        | (LimitBet & MexasReservedOrderData)
+        | undefined
+      if (!bet || !hasMexasEscrowedStake(bet)) continue
+
+      escrowedCreditKeys.add(event.creditKey)
+      const treasuryOutcome = getMexasTreasuryResolutionOutcome(event.outcome)
+      await submitMexasTreasuryTransfer({
+        amount: event.amount,
+        betId: event.betId,
+        contractId: event.contractId,
+        db,
+        idempotencyKey: event.creditKey,
+        metadata: {
+          resolutionOutcome: event.outcome,
+          transferType: event.transferType,
+        },
+        outcome: treasuryOutcome,
+        recipientAddress: await getUserPrivyWalletAddress(db, event.userId),
+        transferType: event.transferType,
+        userId: event.userId,
+      })
+    }
+
     const balanceLockOwner = await acquireMexasUserBalanceLock(db, eventUserId)
     try {
-      for (const event of eventsByUserId.get(eventUserId) ?? []) {
+      for (const event of userEvents) {
+        if (escrowedCreditKeys.has(event.creditKey)) continue
         await updateMexasUserBalanceCas(db, event.userId, event.amount, {
           creditKey: event.creditKey,
         })
@@ -468,7 +485,6 @@ async function resolveMexasMarket(
   assertMexasCanResolveFilledPositions(
     getMexasSettlementAudit(bets.map((entry) => entry.bet))
   )
-  assertNoEscrowedMexasResolutionStake(bets)
   const creditEvents = getMexasResolutionCreditEvents(
     bets.map((entry) => entry.bet),
     outcome

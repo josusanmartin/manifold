@@ -3,6 +3,7 @@ import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import {
   canMexasAcceptLimitOrders,
   canMexasMatchCrossingOrders,
+  hasOperationalMexasEscrow,
   type MexasSettlementSettings,
 } from 'common/mexas-settlement'
 import { convertContract } from 'common/supabase/contracts'
@@ -18,6 +19,7 @@ type ErrorResponse = { message: string; details?: unknown }
 
 type MexasOrderReadinessResponse = {
   canPlaceOrders: boolean
+  escrowCaptureEnabled: boolean
   matchingEngineReady: boolean
   message?: string
 }
@@ -87,6 +89,7 @@ export default async function handler(
     if (contract.closeTime && Date.now() >= contract.closeTime) {
       return res.status(200).json({
         canPlaceOrders: false,
+        escrowCaptureEnabled: false,
         matchingEngineReady: false,
         message: 'El mercado esta cerrado.',
       })
@@ -94,6 +97,7 @@ export default async function handler(
     if (contract.isResolved) {
       return res.status(200).json({
         canPlaceOrders: false,
+        escrowCaptureEnabled: false,
         matchingEngineReady: false,
         message: 'El mercado ya esta resuelto.',
       })
@@ -103,11 +107,15 @@ export default async function handler(
     if (!canMexasAcceptLimitOrders(settings)) {
       return res.status(200).json({
         canPlaceOrders: false,
+        escrowCaptureEnabled: false,
         matchingEngineReady: false,
-        message:
-          'No se pueden abrir órdenes MEXAS en este momento.',
+        message: 'No se pueden abrir órdenes MEXAS en este momento.',
       })
     }
+
+    const escrowCaptureEnabled =
+      process.env.MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS === 'true' &&
+      hasOperationalMexasEscrow(settings)
 
     if (canMexasMatchCrossingOrders(settings)) {
       try {
@@ -115,6 +123,7 @@ export default async function handler(
       } catch (error) {
         return res.status(200).json({
           canPlaceOrders: true,
+          escrowCaptureEnabled,
           matchingEngineReady: false,
           message:
             error instanceof Error
@@ -125,12 +134,14 @@ export default async function handler(
 
       return res.status(200).json({
         canPlaceOrders: true,
+        escrowCaptureEnabled,
         matchingEngineReady: true,
       })
     }
 
     return res.status(200).json({
       canPlaceOrders: true,
+      escrowCaptureEnabled,
       matchingEngineReady: false,
       message:
         'Puedes abrir órdenes límite que agreguen liquidez. Las órdenes que cruzan el libro están pausadas hasta completar la liquidación MEXAS.',

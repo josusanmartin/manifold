@@ -321,9 +321,7 @@ async function checkStaticFile(path: string, required: string[]) {
       : pass(`static copy ${path}`, 'Required static copy is present.')
   )
 
-  const forbidden = FORBIDDEN_VISIBLE_COPY.filter((copy) =>
-    text.includes(copy)
-  )
+  const forbidden = FORBIDDEN_VISIBLE_COPY.filter((copy) => text.includes(copy))
   results.push(
     forbidden.length
       ? fail(`static legacy copy ${path}`, `Found: ${forbidden.join(', ')}`)
@@ -406,11 +404,12 @@ async function checkOrderReadiness(contractId: string) {
       data &&
       typeof data === 'object' &&
       typeof data.canPlaceOrders === 'boolean' &&
+      typeof data.escrowCaptureEnabled === 'boolean' &&
       typeof data.matchingEngineReady === 'boolean'
     return valid
       ? pass(
           `order readiness ${contractId}`,
-          `canPlaceOrders=${data.canPlaceOrders}, matchingEngineReady=${data.matchingEngineReady}`
+          `canPlaceOrders=${data.canPlaceOrders}, escrowCaptureEnabled=${data.escrowCaptureEnabled}, matchingEngineReady=${data.matchingEngineReady}`
         )
       : fail(
           `order readiness ${contractId}`,

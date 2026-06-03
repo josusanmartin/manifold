@@ -39,27 +39,45 @@ export function getMexasBetResolutionCreditKey(
   return `mexas-resolution:${betId}:${outcome}`
 }
 
+export type MexasResolutionCreditEvent = {
+  amount: number
+  betId: string
+  contractId: string
+  creditKey: string
+  outcome?: resolution
+  transferType: 'order-release' | 'resolution-payout' | 'resolution-cancel'
+  userId: string
+}
+
 export function getMexasResolutionCreditEvents(
   bets: Bet[],
   outcome: resolution
 ) {
   return bets.flatMap((bet) => {
-    const events: { userId: string; amount: number; creditKey: string }[] = []
+    const events: MexasResolutionCreditEvent[] = []
     const reservationRefund = getMexasOpenReservationRefund(bet)
     const resolvedPayout = getMexasResolvedBetPayout(bet, outcome)
 
     if (reservationRefund > 0) {
       events.push({
-        userId: bet.userId,
         amount: reservationRefund,
+        betId: bet.id,
+        contractId: bet.contractId,
         creditKey: getMexasOrderReleaseCreditKey(bet.id),
+        transferType: 'order-release',
+        userId: bet.userId,
       })
     }
     if (resolvedPayout > 0) {
       events.push({
-        userId: bet.userId,
         amount: resolvedPayout,
+        betId: bet.id,
+        contractId: bet.contractId,
         creditKey: getMexasBetResolutionCreditKey(bet.id, outcome),
+        outcome,
+        transferType:
+          outcome === 'CANCEL' ? 'resolution-cancel' : 'resolution-payout',
+        userId: bet.userId,
       })
     }
 

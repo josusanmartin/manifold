@@ -1,4 +1,3 @@
-import { APIError } from 'common/api/utils'
 import { LimitBet } from 'common/bet'
 import {
   getMexasRemainingReservedAmount,
@@ -19,6 +18,10 @@ import {
   setMexasUserBalanceCas,
   updateMexasUserBalanceCas,
 } from './mexas-balance'
+import {
+  getUserPrivyWalletAddress,
+  submitMexasTreasuryTransfer,
+} from './mexas-treasury-transfer'
 
 const EXPIRED_ORDER_PAGE_SIZE = 1000
 const OPEN_RESERVED_ORDER_PAGE_SIZE = 1000
@@ -111,9 +114,6 @@ async function prepareOpenMexasOrderRelease(
 ) {
   const bet = convertBet(row) as LimitBet & MexasReservedOrderData
   if (bet.limitProb === undefined || bet.orderAmount === undefined) return
-  if (hasMexasEscrowedStake(bet)) {
-    throw new APIError(503, 'MEXAS escrowed stake release is not implemented.')
-  }
 
   const data = getBetData(row)
   const now = Date.now()
@@ -158,9 +158,6 @@ async function prepareCancelledMexasOrderRelease(
 ) {
   const bet = convertBet(row) as LimitBet & MexasReservedOrderData
   if (bet.limitProb === undefined || bet.orderAmount === undefined) return
-  if (hasMexasEscrowedStake(bet)) {
-    throw new APIError(503, 'MEXAS escrowed stake release is not implemented.')
-  }
 
   const data = getBetData(row)
   const now = Date.now()
@@ -279,6 +276,59 @@ async function completePreparedMexasOrderRelease(
     const shouldRefund =
       bet.mexasFundsReserved === true && bet.mexasFundsReleased !== true
     const refundAmount = shouldRefund ? getMexasRemainingReservedAmount(bet) : 0
+    if (hasMexasEscrowedStake(bet)) {
+      const transfer =
+        refundAmount > EPSILON
+          ? await submitMexasTreasuryTransfer({
+              amount: refundAmount,
+              betId: bet.id,
+              contractId: bet.contractId,
+              db,
+              idempotencyKey: creditKey,
+              metadata: {
+                releaseReason:
+                  typeof data.mexasReleaseReason === 'string'
+                    ? data.mexasReleaseReason
+                    : 'release',
+              },
+              recipientAddress: await getUserPrivyWalletAddress(db, bet.userId),
+              transferType: 'order-release',
+              userId: bet.userId,
+            })
+          : undefined
+
+      const { data: updatedRow, error } = await db
+        .from('contract_bets')
+        .update({
+          data: {
+            ...data,
+            isCancelled: true,
+            mexasFundsReleased: true,
+            mexasReleaseCreditKey: creditKey,
+            mexasReleaseCreditAmount: refundAmount,
+            mexasReleaseReason:
+              typeof data.mexasReleaseReason === 'string'
+                ? data.mexasReleaseReason
+                : 'release',
+            mexasReleasedAt:
+              typeof data.mexasReleasedAt === 'number'
+                ? data.mexasReleasedAt
+                : Date.now(),
+            mexasTreasuryReleaseTxHash: transfer?.tx_hash,
+            mexasTreasuryReleaseTransferId: transfer?.id,
+          } as any,
+        })
+        .eq('bet_id', bet.id)
+        .eq('is_cancelled', true)
+        .eq('is_filled', false)
+        .eq('updated_time', row.updated_time)
+        .select()
+        .maybeSingle()
+
+      if (error) throw error
+      return updatedRow as Row<'contract_bets'> | undefined
+    }
+
     const creditAmount =
       refundAmount > EPSILON
         ? await getBackedMexasReleaseCreditAmount(db, bet.userId, refundAmount)

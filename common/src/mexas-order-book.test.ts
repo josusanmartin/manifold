@@ -319,11 +319,55 @@ describe('MEXAS order book matching', () => {
       timestamp: 10,
     })
 
-    expect(result.matches.map((match) => match.maker.id)).toEqual([
-      'other-ask',
-    ])
+    expect(result.matches.map((match) => match.maker.id)).toEqual(['other-ask'])
     expect(result.takerAmount).toBe(3)
     expect(result.remainingAmount).toBe(7)
+  })
+
+  test('ignores escrowed makers while the current matcher only supports wallet-reserved orders', () => {
+    const escrowedAsk = {
+      ...order({
+        id: 'escrowed-ask',
+        userId: 'trader-2',
+        outcome: 'NO',
+        limitProb: 0.6,
+        createdTime: 1,
+        orderAmount: 2,
+      }),
+      mexasFundsReserved: true,
+      mexasStakeEscrowed: true,
+    } as LimitBet
+    const walletAsk = order({
+      id: 'wallet-ask',
+      userId: 'trader-3',
+      outcome: 'NO',
+      limitProb: 0.7,
+      createdTime: 2,
+      orderAmount: 3,
+    })
+
+    expect(
+      getMexasCrossingOrders({
+        limitProb: 0.8,
+        makers: [escrowedAsk, walletAsk],
+        outcome: 'YES',
+      }).map((o) => o.id)
+    ).toEqual(['wallet-ask'])
+
+    const result = matchMexasLimitOrder({
+      amount: 10,
+      limitProb: 0.8,
+      makers: [escrowedAsk, walletAsk],
+      outcome: 'YES',
+      takerBetId: 'taker',
+      timestamp: 10,
+    })
+
+    expect(result.matches.map((match) => match.maker.id)).toEqual([
+      'wallet-ask',
+    ])
+    expect(result.takerAmount).toBe(7)
+    expect(result.remainingAmount).toBe(3)
   })
 
   test('derives and validates order expiration times', () => {

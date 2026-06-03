@@ -169,8 +169,6 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('updateMexasUserBalanceCas')
     expectMarkersInOrder(ordersSource, [
       'async function prepareOpenMexasOrderRelease',
-      'hasMexasEscrowedStake(bet)',
-      'MEXAS escrowed stake release is not implemented.',
       'mexasReleaseReason: releaseReason',
       ".eq('is_cancelled', false)",
       ".eq('is_filled', false)",
@@ -178,8 +176,6 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expectMarkersInOrder(ordersSource, [
       'async function prepareCancelledMexasOrderRelease',
-      'hasMexasEscrowedStake(bet)',
-      'MEXAS escrowed stake release is not implemented.',
       'const creditKey =',
       'getMexasOrderReleaseCreditKey(bet.id)',
       ".eq('is_cancelled', true)",
@@ -188,6 +184,10 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expectMarkersInOrder(ordersSource, [
       'async function completePreparedMexasOrderRelease',
+      'if (hasMexasEscrowedStake(bet))',
+      'await submitMexasTreasuryTransfer',
+      "transferType: 'order-release'",
+      'mexasTreasuryReleaseTxHash: transfer?.tx_hash',
       'await getBackedMexasReleaseCreditAmount(db, bet.userId, refundAmount)',
       'await updateMexasUserBalanceCas(db, bet.userId, creditAmount',
       'await updateMexasUserBalanceCas(db, bet.userId, 0',
@@ -459,7 +459,10 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('applyMexasResolutionCreditsAndReleases')
     expect(source).toContain('getOpenReservedMexasAmount')
     expectMarkersInOrder(source, [
+      'const escrowedCreditKeys = new Set<string>()',
+      'await submitMexasTreasuryTransfer',
       'const balanceLockOwner = await acquireMexasUserBalanceLock(db, eventUserId)',
+      'if (escrowedCreditKeys.has(event.creditKey)) continue',
       'await updateMexasUserBalanceCas(db, event.userId, event.amount',
       'await releaseOpenOrder(db, entry)',
       'await refreshMexasOpenReservedAmount(db, eventUserId)',
@@ -722,7 +725,7 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('web/components/bet/limit-order-panel.tsx')
 
     expect(source).toContain("{ label: 'Expira inmediatamente', value: 1 }")
-    expect(source).toContain('MEXAS_ONCHAIN_ESCROW_IMPLEMENTED')
+    expect(source).toContain('mexasCanCrossOrders')
     expect(source).toContain('getMexasCrossingOrders')
     expectMarkersInOrder(source, [
       'if (orderBookOnly && selectedExpiration === 1)',
@@ -739,9 +742,11 @@ describe('MEXAS flow safety guardrails', () => {
       'mexasCrossingOrderBlocked',
     ])
     expectMarkersInOrder(source, [
+      'const mexasCanCrossOrders =',
+      'mexasOrderReadiness?.matchingEngineReady === true',
       'const mexasBlockedCrossingOrders =',
       'orderBookOnly',
-      '!MEXAS_ONCHAIN_ESCROW_IMPLEMENTED',
+      '!mexasCanCrossOrders',
       'getMexasCrossingOrders',
       'takerUserId: user?.id',
       'const mexasCrossingOrderBlocked =',
@@ -974,12 +979,15 @@ describe('MEXAS flow safety guardrails', () => {
       ".eq('data->>mexasFundsReserved', 'true')",
       ".eq('data->>mexasFundsReleased', 'false')",
       'bet.userId !== takerUserId',
+      '!hasMexasEscrowedStake',
       'isMexasCrossingOrder(outcome, limitProb, bet as LimitBet)',
     ])
     expect(apiSource).toContain('takerUserId: userId')
     expectMarkersInOrder(bookSource, [
+      'hasMexasEscrowedStake',
       'takerUserId?: string',
       '(!takerUserId || maker.userId !== takerUserId)',
+      '!hasMexasEscrowedStake',
       'takerUserId,',
     ])
     expect(sqlSource).toContain('and b.user_id <> v_taker.user_id')
@@ -989,8 +997,9 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('web/components/bet/limit-order-panel.tsx')
 
     expectMarkersInOrder(source, [
+      'const mexasCanCrossOrders =',
       'const mexasBlockedCrossingOrders =',
-      '!MEXAS_ONCHAIN_ESCROW_IMPLEMENTED',
+      '!mexasCanCrossOrders',
       'getMexasCrossingOrders',
       'const mexasCrossingOrderBlocked =',
       'const displayedError =',
@@ -1007,6 +1016,48 @@ describe('MEXAS flow safety guardrails', () => {
       "'bet'",
     ])
     expect(source).not.toContain('activar escrow on-chain')
+  })
+
+  test('only captures MEXAS order stake on-chain when backend readiness enables it', () => {
+    const panelSource = readRepoFile('web/components/bet/limit-order-panel.tsx')
+    const apiSource = readRepoFile('web/pages/api/v0/bet.ts')
+    const schemaSource = readRepoFile('common/src/api/schema.ts')
+
+    expectMarkersInOrder(panelSource, [
+      'async function captureMexasEscrowStake',
+      'mexasOrderReadiness?.escrowCaptureEnabled',
+      'NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS',
+      'ensureEmbeddedWallet',
+      'wallet.switchChain(MEXAS_TOKEN.chainId)',
+      'eth_sendTransaction',
+      "functionName: 'transfer'",
+      'args: [treasuryAddress, mexasAmountToUnits(amount)]',
+      'const mexasEscrowTxHash = await captureMexasEscrowStake()',
+      'mexasEscrowTxHash,',
+    ])
+    expectMarkersInOrder(apiSource, [
+      'mexasEscrowCaptureEnabled()',
+      'params.mexasEscrowTxHash && !escrowCaptureRequired',
+      'La captura on-chain MEXAS todavía no está habilitada.',
+      'escrowCaptureRequired && !params.mexasEscrowTxHash',
+      'La orden requiere una transferencia MEXAS on-chain a tesorería.',
+      'verifyMexasEscrowCapture',
+      'payerAddress: walletAddress',
+      'requiredAmount: params.amount',
+      'txHash: params.mexasEscrowTxHash',
+      'if (escrowCapture)',
+      'await updateUserBalanceCas(db, userId, 0',
+      'await updateUserBalanceCas(db, userId, -reservedAmount',
+    ])
+    expectMarkersInOrder(apiSource, [
+      'mexasStakeEscrowed: params.escrowCapture ? true : undefined',
+      'mexasEscrowTxHash: params.escrowCapture?.txHash',
+      'mexasEscrowPayerAddress: params.escrowCapture?.payerAddress',
+      'mexasEscrowTreasuryAddress: params.escrowCapture?.treasuryAddress',
+      'mexasEscrowAmount: params.escrowCapture?.capturedAmount',
+    ])
+    expect(apiSource).toContain('escrowCapture,')
+    expect(schemaSource).toContain('mexasEscrowTxHash')
   })
 
   test('preflights MEXAS resolution exposure before the creator can resolve', () => {
@@ -1373,6 +1424,11 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile('web/pages/api/mexas-order-book.ts')
 
     expectMarkersInOrder(source, [
+      'function isVisibleMexasLimitOrder',
+      '!hasMexasEscrowedStake',
+      'getMexasOpenOrderAmount',
+    ])
+    expectMarkersInOrder(source, [
       ".from('contracts')",
       ".eq('id', contractId)",
       'if (!contractRow)',
@@ -1695,6 +1751,7 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(readinessSource, [
       'type MexasOrderReadinessResponse',
       'canPlaceOrders: boolean',
+      'escrowCaptureEnabled: boolean',
       'matchingEngineReady: boolean',
       'escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION',
       'matchingEngineMode: process.env.MEXAS_MATCHING_ENGINE_MODE',
@@ -1702,11 +1759,16 @@ describe('MEXAS flow safety guardrails', () => {
       'if (!isMexasOrderBookOnlyContract(contract))',
       'const settings = getMexasSettlementSettings()',
       'canMexasAcceptLimitOrders(settings)',
+      'const escrowCaptureEnabled =',
+      'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS',
+      'hasOperationalMexasEscrow(settings)',
       'canMexasMatchCrossingOrders(settings)',
       'await assertMexasOrderbookMatchingEngineReady(db)',
       'canPlaceOrders: true',
+      'escrowCaptureEnabled,',
       'matchingEngineReady: true',
       'canPlaceOrders: true',
+      'escrowCaptureEnabled,',
       'matchingEngineReady: false',
       'Puedes abrir órdenes límite que agreguen liquidez.',
     ])
@@ -1727,6 +1789,7 @@ describe('MEXAS flow safety guardrails', () => {
       'MEXAS_ORDER_READINESS_FALLBACK',
       'mexas-order-readiness',
       'canPlaceOrders: false',
+      'escrowCaptureEnabled: false',
       'matchingEngineReady: false',
     ])
     expectMarkersInOrder(orderBookPanelSource, [
@@ -1746,6 +1809,7 @@ describe('MEXAS flow safety guardrails', () => {
       'async function checkOrderReadiness',
       '/mexas-order-readiness',
       'typeof data.canPlaceOrders ===',
+      'typeof data.escrowCaptureEnabled ===',
       'typeof data.matchingEngineReady ===',
       "results.push(await checkOrderReadiness('mexwcwin26a'))",
       "results.push(await checkOrderReadiness('ukrwarend26a'))",
@@ -2051,6 +2115,60 @@ describe('MEXAS flow safety guardrails', () => {
       'cannot be true until treasury release and resolution payout escrow capabilities are implemented',
     ])
     expect(schemaSource).toContain('mexas_escrow_capture_ready')
+  })
+
+  test('treasury transfer helper signs outgoing MEXAS payments behind an idempotent processing claim', () => {
+    const helperSource = readRepoFile('web/lib/api/mexas-treasury-transfer.ts')
+    const processingMigration = readRepoFile(
+      'backend/supabase/migrations/2026060303_add_mexas_treasury_processing_status.sql'
+    )
+    const applySource = readRepoFile(
+      'backend/scripts/apply-mexas-launch-sql.ts'
+    )
+    const schemaSource = readRepoFile('common/src/supabase/schema.ts')
+
+    expectMarkersInOrder(helperSource, [
+      'privateKeyToAccount',
+      'MEXAS_TREASURY_SIGNER_SECRET',
+      'getTreasurySignerAccount',
+      'MEXAS treasury signer does not match the configured treasury wallet.',
+      'insertProcessingTransfer',
+      "status: 'processing'",
+      'claimExistingPendingTransfer',
+      "row.status === 'pending'",
+      'MEXAS treasury transfer is already processing.',
+      "row.status === 'processing'",
+      'markTreasuryTransferSubmitted',
+      "status: 'submitted'",
+      'confirmSubmittedTransfer',
+      'waitForTransactionReceipt',
+      'getConfirmedMexasTransferUnits',
+      "status: 'confirmed'",
+    ])
+    expectMarkersInOrder(helperSource, [
+      'export async function submitMexasTreasuryTransfer',
+      'getMexasEscrowTreasuryAddress()',
+      'claimTreasuryTransfer',
+      'getTreasurySignerAccount(treasuryAddress)',
+      'getMexasBalanceUnits(treasuryAddress)',
+      'Treasury MEXAS balance is insufficient.',
+      'getTreasuryWalletClient().sendTransaction',
+      "functionName: 'transfer'",
+      'markTreasuryTransferSubmitted',
+      'confirmSubmittedTransfer',
+    ])
+    expectMarkersInOrder(processingMigration, [
+      'drop constraint if exists mexas_treasury_transfers_status_check',
+      'add constraint mexas_treasury_transfers_status_check',
+      "'processing'",
+      "'submitted'",
+      "'confirmed'",
+    ])
+    expect(applySource).toContain(
+      '2026060303_add_mexas_treasury_processing_status.sql'
+    )
+    expect(schemaSource).toContain('mexas_treasury_transfers')
+    expect(schemaSource).toContain('recipient_address: string')
   })
 
   test('launch readiness fails any MEXAS contract token mismatch', () => {
@@ -2392,7 +2510,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(settlementSource).toContain('payoutResolvedPositions: false')
   })
 
-  test('keeps escrowed MEXAS stake out of wallet backing checks until treasury release exists', () => {
+  test('keeps escrowed MEXAS stake out of wallet backing checks and releases open stake through treasury', () => {
     const marketSource = readRepoFile('common/src/mexas-market.ts')
     const readinessSource = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'
@@ -2428,20 +2546,38 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expectMarkersInOrder(ordersSource, [
       'hasMexasEscrowedStake',
+      'submitMexasTreasuryTransfer',
       'async function prepareOpenMexasOrderRelease',
-      'MEXAS escrowed stake release is not implemented.',
       'async function prepareCancelledMexasOrderRelease',
-      'MEXAS escrowed stake release is not implemented.',
+      'async function completePreparedMexasOrderRelease',
+      'if (hasMexasEscrowedStake(bet))',
+      "transferType: 'order-release'",
+      'mexasTreasuryReleaseTxHash: transfer?.tx_hash',
     ])
     expectMarkersInOrder(resolveSource, [
       'hasMexasEscrowedStake',
       'async function releaseOpenOrder',
-      'MEXAS escrowed stake resolution release is not implemented.',
-      'function assertNoEscrowedMexasResolutionStake',
-      'cannot be resolved through the internal credit path',
-      'assertNoEscrowedMexasResolutionStake(bets)',
-      'const creditEvents = getMexasResolutionCreditEvents',
+      'const entryByBetId = new Map',
+      'const escrowedCreditKeys = new Set<string>()',
+      'if (!bet || !hasMexasEscrowedStake(bet)) continue',
+      'await submitMexasTreasuryTransfer',
+      'recipientAddress: await getUserPrivyWalletAddress',
+      'transferType: event.transferType',
+      'const balanceLockOwner = await acquireMexasUserBalanceLock',
+      'if (escrowedCreditKeys.has(event.creditKey)) continue',
+      'await updateMexasUserBalanceCas',
     ])
+    expectMarkersInOrder(resolveSource, [
+      'const creditEvents = getMexasResolutionCreditEvents',
+      'await applyMexasResolutionCreditsAndReleases',
+      'mexasResolutionPayoutComplete: true',
+    ])
+    expect(resolveSource).not.toContain(
+      'MEXAS escrowed stake resolution release is not implemented.'
+    )
+    expect(resolveSource).not.toContain(
+      'function assertNoEscrowedMexasResolutionStake'
+    )
     expectMarkersInOrder(matchingSqlSource, [
       "coalesce((v_taker_data ->> 'mexasFundsReleased')::boolean, false)",
       "coalesce((v_taker_data ->> 'mexasStakeEscrowed')::boolean, false)",

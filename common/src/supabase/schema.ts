@@ -771,6 +771,97 @@ export type Database = {
         }
         Relationships: []
       }
+      mexas_treasury_transfers: {
+        Row: {
+          amount: number
+          bet_id: string | null
+          chain_id: number
+          confirmed_time: string | null
+          contract_id: string | null
+          created_time: string
+          error: string | null
+          id: string
+          idempotency_key: string
+          metadata: Json
+          outcome: string | null
+          recipient_address: string
+          status: string
+          submitted_time: string | null
+          token_address: string
+          transfer_type: string
+          treasury_address: string
+          tx_hash: string | null
+          updated_time: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          bet_id?: string | null
+          chain_id: number
+          confirmed_time?: string | null
+          contract_id?: string | null
+          created_time?: string
+          error?: string | null
+          id: string
+          idempotency_key: string
+          metadata?: Json
+          outcome?: string | null
+          recipient_address: string
+          status?: string
+          submitted_time?: string | null
+          token_address: string
+          transfer_type: string
+          treasury_address: string
+          tx_hash?: string | null
+          updated_time?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          bet_id?: string | null
+          chain_id?: number
+          confirmed_time?: string | null
+          contract_id?: string | null
+          created_time?: string
+          error?: string | null
+          id?: string
+          idempotency_key?: string
+          metadata?: Json
+          outcome?: string | null
+          recipient_address?: string
+          status?: string
+          submitted_time?: string | null
+          token_address?: string
+          transfer_type?: string
+          treasury_address?: string
+          tx_hash?: string | null
+          updated_time?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'mexas_treasury_transfers_bet_id_fkey'
+            columns: ['bet_id']
+            isOneToOne: false
+            referencedRelation: 'contract_bets'
+            referencedColumns: ['bet_id']
+          },
+          {
+            foreignKeyName: 'mexas_treasury_transfers_contract_id_fkey'
+            columns: ['contract_id']
+            isOneToOne: false
+            referencedRelation: 'contracts'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'mexas_treasury_transfers_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       creator_portfolio_history: {
         Row: {
           fees_earned: number

@@ -212,14 +212,21 @@ describe('MEXAS resolution payouts', () => {
 
     expect(events).toEqual([
       {
-        userId: 'u1',
         amount: 3,
+        betId: 'partial-open',
+        contractId: 'contract',
         creditKey: 'mexas-order-release:partial-open',
+        transferType: 'order-release',
+        userId: 'u1',
       },
       {
-        userId: 'u1',
         amount: 4,
+        betId: 'partial-open',
+        contractId: 'contract',
         creditKey: 'mexas-resolution:partial-open:YES',
+        outcome: 'YES',
+        transferType: 'resolution-payout',
+        userId: 'u1',
       },
     ])
   })

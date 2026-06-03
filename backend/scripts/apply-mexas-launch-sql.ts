@@ -10,6 +10,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/20260602153551_add_mexas_orderbook_indexes.sql',
   'backend/supabase/migrations/2026060301_add_mexas_treasury_settlement_ledger.sql',
   'backend/supabase/migrations/2026060302_add_mexas_escrow_capture_guard.sql',
+  'backend/supabase/migrations/2026060303_add_mexas_treasury_processing_status.sql',
 ]
 
 const REQUIRED_CONTRACT_IDS = ['mexwcwin26a', 'ukrwarend26a']

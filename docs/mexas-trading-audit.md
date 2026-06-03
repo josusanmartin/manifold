@@ -23,17 +23,19 @@ y Arbitrum para leer balances ERC-20 y verificar recibos de transferencia.
 - El scheduler de expiracion tambien lee Arbitrum antes de liberar reservas
   MEXAS, revalida locks de balance frescos y no acredita saldo interno por
   encima de `walletBalance - reservasAbiertas`.
-- El modelo ya distingue reservas respaldadas por wallet de stake marcado como
-  escrowed en tesoreria; el stake escrowed no cuenta contra backing de wallet y
-  no puede salir por el release path interno hasta que exista pago on-chain de
-  tesoreria.
+- El modelo distingue reservas respaldadas por wallet de stake marcado como
+  escrowed en tesoreria; el stake escrowed no cuenta contra backing de wallet.
 - La validacion pura de captura escrow comprueba recibos ERC-20 confirmados,
   payer, tesoreria y monto minimo requerido.
 - El backend tiene helper de captura escrow que lee el receipt en Arbitrum y
   revalida payer, treasury, monto y tx hash no usado; el SQL de launch crea un
   indice unico para impedir reutilizar el mismo tx hash en dos ordenes.
-- El RPC interno de matching rechaza stake marcado como escrowed y no lo incluye
-  como maker hasta que exista el release/payout on-chain correspondiente.
+- Las cancelaciones, expiraciones y resoluciones ya pueden enviar pagos
+  salientes desde tesoreria mediante un ledger idempotente con estado
+  `processing`, firma backend y verificacion de receipt confirmado.
+- El RPC interno de matching rechaza stake marcado como escrowed y el libro
+  publico no lo muestra como liquidez ejecutable hasta que exista un matcher
+  on-chain completo para ese modo.
 - El matching usa price-time priority: mejor precio primero, luego orden mas vieja,
   luego `bet_id` como desempate determinista.
 - La colocacion de ordenes toma un lock por mercado y usa CAS por fila de orden,
@@ -43,10 +45,16 @@ y Arbitrum para leer balances ERC-20 y verificar recibos de transferencia.
 
 ## Barrera de settlement
 
-El flujo actual no tiene escrow on-chain. Cuando dos ordenes hacen match, el
-codigo cambia saldos internos, pero no transfiere MEX desde la wallet del
-perdedor a una cuenta custodiada ni al ganador. Por eso un usuario podria mover
-sus MEX fuera de su wallet despues de una operacion llena.
+El flujo activo de produccion todavia no debe habilitar escrow on-chain. La
+captura wallet -> tesoreria y el pago tesoreria -> usuario existen como codigo,
+pero `MEXAS_ONCHAIN_ESCROW_CAPABILITIES` sigue en `false` porque el matcher SQL
+actual opera solo con reservas respaldadas por wallet y excluye
+`mexasStakeEscrowed=true`.
+
+Cuando dos ordenes sin escrow hacen match, el codigo cambia saldos internos,
+pero no transfiere MEX desde la wallet del perdedor a una cuenta custodiada ni
+al ganador. Por eso un usuario podria mover sus MEX fuera de su wallet despues
+de una operacion llena.
 
 Para no crear saldos internos no respaldados, el API bloquea:
 
@@ -77,16 +85,16 @@ La auditoria automatica actual pasa estos checks de seguridad:
 
 Los blockers de launch real siguen siendo estructurales:
 
-- aplicar el SQL de launch en Supabase para `contracts.token = 'MEX'`, indices
-  de libro, RPC `mexas_orderbook_matching_engine_ready`, ledger
+- aplicar el SQL de launch en Supabase produccion para `contracts.token = 'MEX'`,
+  indices de libro, RPC `mexas_orderbook_matching_engine_ready`, ledger
   `mexas_treasury_transfers` y guard de captura escrow
   `mexas_escrow_capture_ready`;
-- implementar escrow on-chain real con `captureOrderStake`,
-  `releaseOpenOrderStake` y `payoutResolvedPositions`;
-- conectar el ledger idempotente de pagos salientes a un signer backend de
-  tesoreria antes de activar cancelaciones/resoluciones on-chain;
-- mantener el RPC interno cerrado para stake escrowed hasta que esos pagos
-  salientes existan;
+- configurar y proteger `MEXAS_TREASURY_SIGNER_SECRET` en produccion antes de
+  cualquier pago on-chain saliente;
+- implementar matching SQL para stake escrowed antes de activar
+  `captureOrderStake` y mostrar esas ordenes como liquidez ejecutable;
+- subir `MEXAS_ONCHAIN_ESCROW_CAPABILITIES` solo cuando captura, release y
+  payout esten cubiertos end-to-end en el matcher y las rutas runtime;
 - desplegar/confirmar el scheduler runtime despues de aplicar el SQL.
 
 ## Superficie publica MEXAS

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 export type MexasOrderReadiness = {
   canPlaceOrders: boolean
+  escrowCaptureEnabled: boolean
   matchingEngineReady: boolean
   message?: string
 }
@@ -22,9 +23,7 @@ export function useMexasOrderReadiness(contractId: string, enabled: boolean) {
     setReadiness(undefined)
 
     fetch(
-      `/api/v0/market/${encodeURIComponent(
-        contractId
-      )}/mexas-order-readiness`
+      `/api/v0/market/${encodeURIComponent(contractId)}/mexas-order-readiness`
     )
       .then(async (response) => {
         const data = await response.json()
@@ -40,6 +39,7 @@ export function useMexasOrderReadiness(contractId: string, enabled: boolean) {
         if (cancelled) return
         setReadiness({
           canPlaceOrders: false,
+          escrowCaptureEnabled: false,
           matchingEngineReady: false,
           message:
             error instanceof Error

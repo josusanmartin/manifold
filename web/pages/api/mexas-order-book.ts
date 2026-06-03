@@ -1,5 +1,9 @@
 import { LimitBet, type Bet } from 'common/bet'
-import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+import {
+  hasMexasEscrowedStake,
+  isMexasOrderBookOnlyContract,
+  type MexasReservedOrderData,
+} from 'common/mexas-market'
 import { getMexasOpenOrderAmount } from 'common/mexas-order-book'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
@@ -46,6 +50,7 @@ function isVisibleMexasLimitOrder(bet: Bet): bet is LimitBet {
     !bet.isFilled &&
     !bet.isCancelled &&
     (bet.outcome === 'YES' || bet.outcome === 'NO') &&
+    !hasMexasEscrowedStake(bet as LimitBet & MexasReservedOrderData) &&
     getMexasOpenOrderAmount(bet as LimitBet) > 0
   )
 }

@@ -6,7 +6,9 @@ import { MarketContract } from 'common/contract'
 import {
   getMexasRemainingReservedAmount,
   getMexasSyncedAvailableBalance,
+  hasMexasEscrowedStake,
   isMexasOrderBookOnlyContract,
+  type MexasReservedOrderData,
 } from 'common/mexas-market'
 import {
   getMexasOpenOrderAmount,
@@ -17,6 +19,7 @@ import {
   sortMexasMakersForTaker,
   type MexasOutcome,
 } from 'common/mexas-order-book'
+import { hasOperationalMexasEscrow } from 'common/mexas-settlement'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import {
@@ -44,6 +47,7 @@ import {
   assertMexasCanAcceptLimitOrders,
   assertMexasCanMatchCrossingOrders,
 } from 'web/lib/api/mexas-settlement'
+import { verifyMexasEscrowCapture } from 'web/lib/api/mexas-escrow-capture'
 import { matchMexasOrderbookLimitOrderRpc } from 'web/lib/api/mexas-rpc-matching'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
@@ -120,6 +124,11 @@ function getUserData(row: Row<'users'> | null) {
 function getContractData(row: Row<'contracts'> | null) {
   const data = row?.data
   return data && typeof data === 'object' && !Array.isArray(data) ? data : {}
+}
+
+function getPrivyWalletAddress(row: Row<'users'> | null) {
+  const walletAddress = getUserData(row).privyWalletAddress
+  return typeof walletAddress === 'string' ? walletAddress : undefined
 }
 
 function hasFreshMexasOrderLock(data: Record<string, unknown>) {
@@ -309,6 +318,12 @@ function createMexasOpenLimitBet(
   params: {
     amount: number
     contractId: string
+    escrowCapture?: {
+      capturedAmount: number
+      payerAddress: Address
+      treasuryAddress: Address
+      txHash: string
+    }
     expiresAt?: number
     expiresMillisAfter?: number
     limitProb?: number
@@ -356,9 +371,23 @@ function createMexasOpenLimitBet(
     mexasFundsReserved: true,
     mexasFundsReleased: false,
     mexasReservedAmount: params.amount,
+    mexasStakeEscrowed: params.escrowCapture ? true : undefined,
+    mexasEscrowTxHash: params.escrowCapture?.txHash,
+    mexasEscrowPayerAddress: params.escrowCapture?.payerAddress,
+    mexasEscrowTreasuryAddress: params.escrowCapture?.treasuryAddress,
+    mexasEscrowAmount: params.escrowCapture?.capturedAmount,
     expiresAt,
     silent: params.silent,
   }) as LimitBet
+}
+
+function mexasEscrowCaptureEnabled() {
+  return process.env.MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS === 'true'
+    ? hasOperationalMexasEscrow({
+        escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION,
+        settlementMode: process.env.MEXAS_SETTLEMENT_MODE,
+      })
+    : false
 }
 
 async function refundMexasReservation(
@@ -659,6 +688,7 @@ async function loadMexasCrossingOrderRows(
         bet.orderAmount !== undefined &&
         !bet.isFilled &&
         !bet.isCancelled &&
+        !hasMexasEscrowedStake(bet as LimitBet & MexasReservedOrderData) &&
         getMexasOpenOrderAmount(bet as LimitBet) > EPSILON &&
         isMexasCrossingOrder(outcome, limitProb, bet as LimitBet)
       )
@@ -741,6 +771,19 @@ async function placeBinaryBet(
   if (params.limitProb === undefined) {
     throw new APIError(400, 'Los mercados MEXAS solo aceptan órdenes límite.')
   }
+  const escrowCaptureRequired = mexasEscrowCaptureEnabled()
+  if (params.mexasEscrowTxHash && !escrowCaptureRequired) {
+    throw new APIError(
+      503,
+      'La captura on-chain MEXAS todavía no está habilitada.'
+    )
+  }
+  if (escrowCaptureRequired && !params.mexasEscrowTxHash) {
+    throw new APIError(
+      400,
+      'La orden requiere una transferencia MEXAS on-chain a tesorería.'
+    )
+  }
 
   {
     const balanceLockOwner = await acquireMexasUserBalanceLock(db, userId)
@@ -759,7 +802,7 @@ async function placeBinaryBet(
         skipUserBalanceLock: true,
       })
       const syncedUserRow = await syncMexasWalletBalance(db, userRow)
-      if (syncedUserRow.balance < params.amount) {
+      if (!escrowCaptureRequired && syncedUserRow.balance < params.amount) {
         throw new APIError(403, 'Insufficient balance.')
       }
 
@@ -768,6 +811,14 @@ async function placeBinaryBet(
       let reservedAmount = 0
       let debited = false
       let inserted = false
+      let escrowCapture:
+        | {
+            capturedAmount: number
+            payerAddress: Address
+            treasuryAddress: Address
+            txHash: string
+          }
+        | undefined
 
       try {
         const lockedContract = lock.contract
@@ -797,12 +848,35 @@ async function placeBinaryBet(
         if (lockedContract.isResolved) {
           throw new APIError(403, 'Market is resolved.')
         }
-        if (latestSyncedUserRow.balance < params.amount) {
+        if (
+          !escrowCaptureRequired &&
+          latestSyncedUserRow.balance < params.amount
+        ) {
           throw new APIError(403, 'Insufficient balance.')
+        }
+        if (params.mexasEscrowTxHash) {
+          const walletAddress = getPrivyWalletAddress(
+            latestSyncedUserRow as Row<'users'>
+          )
+          if (!walletAddress) {
+            throw new APIError(
+              403,
+              'Conecta una Wallet Privy antes de abrir órdenes MEX.'
+            )
+          }
+          escrowCapture = await verifyMexasEscrowCapture({
+            db,
+            payerAddress: walletAddress,
+            requiredAmount: params.amount,
+            txHash: params.mexasEscrowTxHash,
+          })
         }
         bet = createMexasOpenLimitBet(
           lockedContract as MarketContract & { prob: number },
-          params,
+          {
+            ...params,
+            escrowCapture,
+          },
           userId
         ) as LimitBet & { outcome: MexasOutcome }
 
@@ -838,10 +912,16 @@ async function placeBinaryBet(
 
         await assertMexasCanAcceptLimitOrders(db)
         reservedAmount = getMexasRemainingReservedAmount(bet)
-        await updateUserBalanceCas(db, userId, -reservedAmount, {
-          lastBetTime: bet.createdTime,
-        })
-        debited = true
+        if (escrowCapture) {
+          await updateUserBalanceCas(db, userId, 0, {
+            lastBetTime: bet.createdTime,
+          })
+        } else {
+          await updateUserBalanceCas(db, userId, -reservedAmount, {
+            lastBetTime: bet.createdTime,
+          })
+          debited = true
+        }
 
         const { error: betError } = await db
           .from('contract_bets')

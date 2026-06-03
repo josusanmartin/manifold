@@ -1,4 +1,8 @@
 import { fill, LimitBet } from './bet'
+import {
+  hasMexasEscrowedStake,
+  type MexasReservedOrderData,
+} from './mexas-market'
 
 const EPSILON = 1e-9
 
@@ -116,6 +120,7 @@ export function getMexasCrossingOrders(params: {
         (!takerUserId || maker.userId !== takerUserId) &&
         !maker.isFilled &&
         !maker.isCancelled &&
+        !hasMexasEscrowedStake(maker as LimitBet & MexasReservedOrderData) &&
         getMexasOpenOrderAmount(maker) > EPSILON &&
         isMexasCrossingOrder(outcome, limitProb, maker)
       )
