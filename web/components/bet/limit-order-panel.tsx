@@ -28,7 +28,7 @@ import { removeUndefinedProps } from 'common/util/object'
 import { DAY_MS, HOUR_MS, MINUTE_MS, MONTH_MS, WEEK_MS } from 'common/util/time'
 import dayjs from 'dayjs'
 import { clamp } from 'lodash'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { encodeFunctionData, isAddress, parseUnits, type Hex } from 'viem'
 import { Input } from 'web/components/widgets/input'
@@ -500,6 +500,7 @@ export default function LimitOrderPanel(props: {
   const selectedExpirationLabel =
     availableExpirationOptions.find((opt) => opt.value === selectedExpiration)
       ?.label ?? availableExpirationOptions[0].label
+  const limitProbInputId = useId()
 
   return (
     <>
@@ -522,8 +523,12 @@ export default function LimitOrderPanel(props: {
           {isPseudoNumeric ? 'Valor' : `Probabilidad (%)`}
         </div>
         <Row>
-          <label className="font-sm md:font-lg relative w-full">
+          <label
+            htmlFor={limitProbInputId}
+            className="font-sm md:font-lg relative w-full"
+          >
             <Input
+              id={limitProbInputId}
               type="number"
               min={isPseudoNumeric ? contract.min : 1}
               max={isPseudoNumeric ? contract.max : 99}
@@ -690,15 +695,15 @@ export default function LimitOrderPanel(props: {
                         setIsEditingPayout(false)
                       }
                     }}
-                    autoFocus
                     min={1}
                     step={1}
                     amount={editablePayout}
                     onChangeAmount={setEditablePayout}
                   />
                 ) : (
-                  <span
-                    className="cursor-pointer hover:underline"
+                  <button
+                    type="button"
+                    className="bg-transparent p-0 hover:underline"
                     onClick={() => {
                       setEditablePayout(Math.floor(currentPayout))
                       setIsEditingPayout(true)
@@ -709,7 +714,7 @@ export default function LimitOrderPanel(props: {
                       isCashContract={isCashContract}
                       token={displayToken}
                     />
-                  </span>
+                  </button>
                 )}
               </span>
               {!isEditingPayout && <>({returnPercent})</>}

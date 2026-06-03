@@ -72,8 +72,8 @@ export function FundsSelector(props: {
       )}
       {pastLimit && !isPurchaseBanned && (
         <AlertBox title="Limite diario" className="my-4">
-          Alcanzaste tu limite diario de{' '}
-          {formatMoneyUSD(DOLLAR_PURCHASE_LIMIT)}. Intentalo de nuevo manana.
+          Alcanzaste tu limite diario de {formatMoneyUSD(DOLLAR_PURCHASE_LIMIT)}
+          . Intentalo de nuevo manana.
         </AlertBox>
       )}
     </Col>

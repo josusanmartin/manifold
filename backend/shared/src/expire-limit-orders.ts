@@ -8,7 +8,6 @@ import { MEXAS_PUBLIC_RPC_URL, MEXAS_TOKEN } from 'common/crypto/mexas'
 import { type SupabaseDirectClient } from 'shared/supabase/init'
 
 const BALANCE_OF_SELECTOR = '0x70a08231'
-const MEXAS_BALANCE_LOCK_TIMEOUT_MS = 2 * 60 * 1000
 const EPSILON = 0.00000001
 
 export async function expireLimitOrders() {

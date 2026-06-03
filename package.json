@@ -12,7 +12,7 @@
     "client-common"
   ],
   "scripts": {
-    "verify": "yarn --cwd=common verify:dir; yarn --cwd=web verify:dir; yarn --cwd=backend/shared verify:dir",
+    "verify": "yarn --cwd=common verify:dir && yarn --cwd=web verify:dir && yarn --cwd=backend/shared verify:dir",
     "typecheck:web": "tsc --pretty --project web/tsconfig.json --noEmit",
     "typecheck:api": "tsc --pretty --project backend/api/tsconfig.json --noEmit --skipLibCheck",
     "typecheck:scheduler": "tsc --pretty --project backend/scheduler/tsconfig.json --noEmit --skipLibCheck",

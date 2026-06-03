@@ -50,10 +50,7 @@ function MarketHeader() {
   )
 }
 
-function PriceButton(props: {
-  side: 'yes' | 'no'
-  href?: string
-}) {
+function PriceButton(props: { side: 'yes' | 'no'; href?: string }) {
   const yes = props.side === 'yes'
   return (
     <Link

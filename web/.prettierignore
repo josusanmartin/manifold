@@ -1,5 +1,6 @@
 # Ignore Next artifacts
 .next/
+.vercel/
 out/
 public/**/*.json
 public/**/*.html

@@ -16,12 +16,13 @@
     "clear-nextjs-cache": "rm -rf ./.next/cache",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "lint-fix": "next lint --fix",
+    "lint": "eslint . --max-warnings 0",
+    "lint:mexas": "eslint --max-warnings 0 lib/api/mexas-*.ts pages/api/mexas-order-book.ts pages/api/v0/bet.ts pages/api/v0/bet/cancel/\\[betId\\].ts pages/api/v0/market/\\[contractId\\]/mexas-order-readiness.ts pages/api/v0/market/\\[contractId\\]/mexas-resolution-readiness.ts components/bet/limit-order-panel.tsx components/contract/order-book-panel.tsx hooks/use-mexas-order-readiness.ts hooks/use-mexas-order-book-mid-price.ts pages/wallet.tsx pages/checkout.tsx pages/login.tsx pages/about.tsx",
+    "lint-fix": "eslint . --fix",
     "format": "npx prettier --write .",
     "format-changed": "cd .. && git diff $(git merge-base --fork-point main) --name-only --diff-filter=d | xargs npx prettier -w",
     "verify": "(cd .. && yarn verify)",
-    "verify:dir": "npx prettier --check .; yarn lint --max-warnings 0; tsc --pretty --project tsconfig.json --noEmit"
+    "verify:dir": "npx prettier --check . && yarn lint:mexas && tsc --pretty --project tsconfig.json --noEmit"
   },
   "dependencies": {
     "@amplitude/analytics-browser": "1.9.4",
@@ -97,7 +98,6 @@
     "autoprefixer": "10.2.6",
     "concurrently": "8.2.2",
     "cross-env": "7.0.3",
-    "eslint-config-next": "15.0.4",
     "eslint-config-prettier": "9.0.0",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "next-sitemap": "^2.5.14",

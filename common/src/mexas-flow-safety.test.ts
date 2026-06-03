@@ -733,7 +733,8 @@ describe('MEXAS flow safety guardrails', () => {
     expect(limitSource).not.toContain("'Shares'")
     expectMarkersInOrder(betPanelSource, [
       "const displayToken = orderBookOnly ? 'MEX'",
-      "error === 'Saldo insuficiente' || error === 'Insufficient balance'",
+      "error === 'Saldo insuficiente'",
+      "error === 'Insufficient balance'",
       'token={displayToken}',
       'Tu saldo MEX',
       'token={displayToken}',
@@ -926,8 +927,8 @@ describe('MEXAS flow safety guardrails', () => {
       ': null',
     ])
     expectMarkersInOrder(source, [
-      'const syncInternalWalletBalance = useCallback(async (options?:',
-      'throwOnError?: boolean',
+      'const syncInternalWalletBalance = useCallback(',
+      'async (options?: { throwOnError?: boolean }) =>',
       'throw new Error(body?.message ??',
       'if (options?.throwOnError) throw error',
     ])

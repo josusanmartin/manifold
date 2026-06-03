@@ -13,12 +13,15 @@ import { createPushNotifications } from 'shared/create-push-notifications'
 import { bulkInsert } from 'shared/supabase/utils'
 import { createMarketMovementNotification } from './create-notification'
 import { truncateText } from './send-unseen-notifications'
-import { createSupabaseDirectClient, SupabaseDirectClient } from './supabase/init'
+import {
+  createSupabaseDirectClient,
+  SupabaseDirectClient,
+} from './supabase/init'
 import { contractColumnsToSelect, isProd, log } from './utils'
 
 const pastPeriodHoursAgoStart = 24
 const TEST_USER_ID = 'AJwLWoo3xue32XIiAVrL5SyR1WB2'
-const TEST_CONTRACT_IDS = `'Ll8LclSZ8C', 'Z8CqLOzRAq', '6A9gSqIzld', 'D5o5fIGpQnjANdl2DxdU'`
+const _TEST_CONTRACT_IDS = `'Ll8LclSZ8C', 'Z8CqLOzRAq', '6A9gSqIzld', 'D5o5fIGpQnjANdl2DxdU'`
 type ProbChange = {
   contract: Contract
   answer?: Answer
@@ -34,7 +37,7 @@ export async function sendMarketMovementNotifications(debug = false) {
   const now = Date.now()
   const nowStart = now - nowPeriodHoursAgoStart * HOUR_MS
   const nowEnd = now
-  // const where = `where c.id = ANY(ARRAY[${TEST_CONTRACT_IDS}])`
+  // const where = `where c.id = ANY(ARRAY[${_TEST_CONTRACT_IDS}])`
   const where = `
   where c.last_bet_time > now() - interval '${nowPeriodHoursAgoStart} hours'
   and c.resolution_time is null

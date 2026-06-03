@@ -11,7 +11,6 @@ import {
   type MexasReservedOrderData,
 } from 'common/mexas-market'
 import {
-  getMexasOpenOrderAmount,
   getMexasLimitOrderExpiresAt,
   hasValidMexasLimitOrderExpiration,
   isMexasExecutableLimitOrder,

@@ -41,10 +41,7 @@ export function mexasOrderBookPriceLabel(price?: number) {
   return price == null ? 'Sin precio' : `${(price * 100).toFixed(1)}c`
 }
 
-export function useMexasOrderBookMidPrice(
-  contractId: string,
-  enabled = true
-) {
+export function useMexasOrderBookMidPrice(contractId: string, enabled = true) {
   const [midPrice, setMidPrice] = useState<number | undefined>()
 
   useEffect(() => {

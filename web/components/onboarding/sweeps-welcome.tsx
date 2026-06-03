@@ -91,9 +91,7 @@ export function SweepsCoinsPage() {
         How MEXAS works
       </div>
 
-      <span className="mt-4 md:mt-6">
-        MEXAS uses MEX for market trading:
-      </span>
+      <span className="mt-4 md:mt-6">MEXAS uses MEX for market trading:</span>
       <span className="coin-offset relative ml-[1.1em] mt-4 inline-flex items-center md:mt-6">
         <ManaCoin className="absolute -left-[var(--coin-offset)] top-[var(--coin-top-offset)] min-h-[1em] min-w-[1em]" />
         <span className="text-primary-700 mr-1.5 font-semibold">

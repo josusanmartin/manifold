@@ -37,14 +37,6 @@ type MexasTreasuryTransferType =
   | 'resolution-cancel'
   | 'withdrawal'
 
-type MexasTreasuryTransferStatus =
-  | 'pending'
-  | 'processing'
-  | 'submitted'
-  | 'confirmed'
-  | 'failed'
-  | 'cancelled'
-
 type MexasTreasuryTransferParams = {
   amount: number
   betId?: string

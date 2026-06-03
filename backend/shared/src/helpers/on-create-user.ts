@@ -12,11 +12,11 @@ export const onCreateUser = async (user: User, privateUser: PrivateUser) => {
   const pg = createSupabaseDirectClient()
   await addNewUserToLeague(pg, user.id)
   // await createReferralsProgramNotification(user.id, pg)
-  // await createIntroHelpMessage(user)
+  // await _createIntroHelpMessage(user)
   await sendWelcomeEmail(user, privateUser)
 }
 
-const createIntroHelpMessage = async (newUser: User) => {
+const _createIntroHelpMessage = async (newUser: User) => {
   const pg = createSupabaseDirectClient()
   const random = Math.floor(Math.random() * NEW_USER_HERLPER_IDS.length)
   const creator = (await getUser(

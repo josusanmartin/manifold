@@ -237,40 +237,41 @@ function MexasWalletPanelInner() {
     refreshBalance()
   }, [refreshBalance])
 
-  const syncInternalWalletBalance = useCallback(async (options?: {
-    throwOnError?: boolean
-  }) => {
-    if (!walletAddress) return undefined
+  const syncInternalWalletBalance = useCallback(
+    async (options?: { throwOnError?: boolean }) => {
+      if (!walletAddress) return undefined
 
-    try {
-      const token = await getAccessToken()
-      if (!token) {
-        throw new Error('No se pudo autenticar la Wallet.')
+      try {
+        const token = await getAccessToken()
+        if (!token) {
+          throw new Error('No se pudo autenticar la Wallet.')
+        }
+
+        const response = await fetch('/api/privy-user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ walletAddress }),
+        })
+        if (!response.ok) {
+          const body = await response.json().catch(() => undefined)
+          throw new Error(body?.message ?? 'No se pudo sincronizar la Wallet.')
+        }
+
+        const syncedUser = (await response.json()) as UserAndPrivateUser
+        setInternalAvailableAmount(syncedUser.user.balance)
+        setOpenReservedAmount(syncedUser.user.mexasWalletOpenReservedAmount)
+        return syncedUser
+      } catch (error) {
+        if (options?.throwOnError) throw error
+        console.error('Failed to sync internal MEX balance', error)
+        return undefined
       }
-
-      const response = await fetch('/api/privy-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ walletAddress }),
-      })
-      if (!response.ok) {
-        const body = await response.json().catch(() => undefined)
-        throw new Error(body?.message ?? 'No se pudo sincronizar la Wallet.')
-      }
-
-      const syncedUser = (await response.json()) as UserAndPrivateUser
-      setInternalAvailableAmount(syncedUser.user.balance)
-      setOpenReservedAmount(syncedUser.user.mexasWalletOpenReservedAmount)
-      return syncedUser
-    } catch (error) {
-      if (options?.throwOnError) throw error
-      console.error('Failed to sync internal MEX balance', error)
-      return undefined
-    }
-  }, [getAccessToken, walletAddress])
+    },
+    [getAccessToken, walletAddress]
+  )
 
   const refreshWalletState = useCallback(async () => {
     const [chainUnits, syncedUser] = await Promise.all([
@@ -469,8 +470,8 @@ function MexasWalletPanelInner() {
             {MEXAS_TOKEN.symbol}
           </div>
           <div className="text-ink-500 text-sm">
-            Reservado en órdenes abiertas: {getDisplayAmount(openReservedAmount)}{' '}
-            {MEXAS_TOKEN.symbol}
+            Reservado en órdenes abiertas:{' '}
+            {getDisplayAmount(openReservedAmount)} {MEXAS_TOKEN.symbol}
           </div>
           <div className="text-ink-500 text-sm">
             Disponible para retirar: {getDisplayBalance(withdrawableUnits)}{' '}

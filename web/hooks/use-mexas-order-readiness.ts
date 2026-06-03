@@ -11,16 +11,18 @@ const MEXAS_ORDER_READINESS_FALLBACK =
   'No se pudo verificar el estado del libro de órdenes MEXAS.'
 
 export function useMexasOrderReadiness(contractId: string, enabled: boolean) {
-  const [readiness, setReadiness] = useState<MexasOrderReadiness | undefined>()
+  const [readiness, setReadiness] = useState<
+    | {
+        contractId: string
+        value: MexasOrderReadiness
+      }
+    | undefined
+  >()
 
   useEffect(() => {
-    if (!enabled) {
-      setReadiness(undefined)
-      return
-    }
+    if (!enabled) return
 
     let cancelled = false
-    setReadiness(undefined)
 
     fetch(
       `/api/v0/market/${encodeURIComponent(contractId)}/mexas-order-readiness`
@@ -33,18 +35,21 @@ export function useMexasOrderReadiness(contractId: string, enabled: boolean) {
         return data as MexasOrderReadiness
       })
       .then((data) => {
-        if (!cancelled) setReadiness(data)
+        if (!cancelled) setReadiness({ contractId, value: data })
       })
       .catch((error) => {
         if (cancelled) return
         setReadiness({
-          canPlaceOrders: false,
-          escrowCaptureEnabled: false,
-          matchingEngineReady: false,
-          message:
-            error instanceof Error
-              ? error.message
-              : MEXAS_ORDER_READINESS_FALLBACK,
+          contractId,
+          value: {
+            canPlaceOrders: false,
+            escrowCaptureEnabled: false,
+            matchingEngineReady: false,
+            message:
+              error instanceof Error
+                ? error.message
+                : MEXAS_ORDER_READINESS_FALLBACK,
+          },
         })
       })
 
@@ -53,5 +58,7 @@ export function useMexasOrderReadiness(contractId: string, enabled: boolean) {
     }
   }, [contractId, enabled])
 
-  return readiness
+  return enabled && readiness?.contractId === contractId
+    ? readiness.value
+    : undefined
 }

@@ -7,13 +7,12 @@ module.exports = {
   },
   plugins: ['lodash', 'unused-imports', 'jsx-a11y'],
   extends: [
-    'next/core-web-vitals',
     'plugin:@typescript-eslint/recommended',
     'plugin:react-hooks/recommended',
     'plugin:react/recommended',
     'plugin:react/jsx-runtime',
     'plugin:jsx-a11y/recommended',
-    'plugin:@next/next/recommended',
+    'plugin:@next/next/core-web-vitals-legacy',
     'prettier',
   ],
   rules: {

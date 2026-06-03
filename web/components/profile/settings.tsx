@@ -52,9 +52,7 @@ export const AccountSettings = (props: {
       <div>
         <label className="mb-1 block">
           Alertas de operación{' '}
-          <InfoTooltip
-            text="Avisos antes de enviar una orden que use una parte grande de tu balance o mueva mucho la probabilidad"
-          />
+          <InfoTooltip text="Avisos antes de enviar una orden que use una parte grande de tu balance o mueva mucho la probabilidad" />
         </label>
         <ShortToggle
           on={betWarnings}
@@ -185,9 +183,7 @@ function MarkSelfAsBotButton(props: { user: User }) {
             <p className="font-semibold">Las cuentas bot:</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>Muestran una etiqueta "Bot" junto al nombre</li>
-              <li>
-                Se excluyen de ligas y se colocan en la división Silicon
-              </li>
+              <li>Se excluyen de ligas y se colocan en la división Silicon</li>
               <li>
                 No cuentan para bonos por operadores únicos de creadores de
                 mercados

@@ -5,6 +5,8 @@ type Redirect = {
   has?: { type: string; key: string; value?: string }[]
 }
 
+// next.config.js is CommonJS and has no declaration file.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const nextConfig = require('../../web/next.config.js') as {
   redirects: () => Promise<Redirect[]>
 }
