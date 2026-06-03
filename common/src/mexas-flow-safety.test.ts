@@ -1464,7 +1464,10 @@ describe('MEXAS flow safety guardrails', () => {
       '<ShortName>MEXAS</ShortName>',
       "path: '/testimonials/testimonials.json'",
       '"testimonials": []',
-      'const BLOCKED_STATIC_PATHS = [...MEXAS_BLOCKED_PUBLIC_PATHS]',
+      'const BLOCKED_STATIC_PATHS = [',
+      '...MEXAS_BLOCKED_PUBLIC_PATHS',
+      "'/%6dana.svg'",
+      "'//mana.svg'",
       'async function checkStaticFile',
       'static legacy copy',
       'async function checkBlockedStaticFile',
@@ -1489,6 +1492,16 @@ describe('MEXAS flow safety guardrails', () => {
     ]) {
       expect(publicSurfaceSource).toContain(blockedPath)
     }
+    expectMarkersInOrder(publicSurfaceSource, [
+      'function decodePathname',
+      'decodeURIComponent(pathname)',
+      'function normalizeMexasPublicPath',
+      "slashPrefixedPath.replace(/\\/+/g, '/')",
+      'trimmedPath.toLowerCase()',
+      'const MEXAS_BLOCKED_PUBLIC_PATH_SET = new Set',
+      'MEXAS_BLOCKED_PUBLIC_PATHS.map(normalizeMexasPublicPath)',
+      'MEXAS_BLOCKED_PUBLIC_PATH_SET.has(normalizeMexasPublicPath(pathname))',
+    ])
     for (const file of [sitemap, robots, opensearch]) {
       expect(file).toContain('mexas-manifold.vercel.app')
       expect(file).not.toContain('manifold.markets')

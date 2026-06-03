@@ -246,7 +246,14 @@ const STATIC_FILES = [
   },
 ]
 
-const BLOCKED_STATIC_PATHS = [...MEXAS_BLOCKED_PUBLIC_PATHS]
+const BLOCKED_STATIC_PATHS = [
+  ...MEXAS_BLOCKED_PUBLIC_PATHS,
+  '/MANA.svg',
+  '/%6dana.svg',
+  '//mana.svg',
+  '/custom-components/%6danaCoin.tsx',
+  '/welcome//manifold-example.gif/',
+]
 
 const JSON_PAYLOADS = [
   {

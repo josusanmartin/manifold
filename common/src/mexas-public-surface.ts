@@ -15,9 +15,30 @@ export const MEXAS_BLOCKED_PUBLIC_PATHS = [
   '/welcome/manifold-example.gif',
 ] as const
 
+function decodePathname(pathname: string) {
+  try {
+    return decodeURIComponent(pathname)
+  } catch {
+    return pathname
+  }
+}
+
+function normalizeMexasPublicPath(pathname: string) {
+  const decodedPath = decodePathname(pathname)
+  const slashPrefixedPath = decodedPath.startsWith('/')
+    ? decodedPath
+    : `/${decodedPath}`
+  const collapsedPath = slashPrefixedPath.replace(/\/+/g, '/')
+  const trimmedPath =
+    collapsedPath.length > 1 ? collapsedPath.replace(/\/+$/, '') : '/'
+
+  return trimmedPath.toLowerCase()
+}
+
+const MEXAS_BLOCKED_PUBLIC_PATH_SET = new Set(
+  MEXAS_BLOCKED_PUBLIC_PATHS.map(normalizeMexasPublicPath)
+)
+
 export function isBlockedMexasPublicPath(pathname: string) {
-  const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`
-  return MEXAS_BLOCKED_PUBLIC_PATHS.includes(
-    normalizedPath as (typeof MEXAS_BLOCKED_PUBLIC_PATHS)[number]
-  )
+  return MEXAS_BLOCKED_PUBLIC_PATH_SET.has(normalizeMexasPublicPath(pathname))
 }
