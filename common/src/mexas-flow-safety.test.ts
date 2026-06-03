@@ -1649,15 +1649,26 @@ describe('MEXAS flow safety guardrails', () => {
       'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-settlement'
     )
     expect(source).toContain(
+      'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-test-unwind'
+    )
+    expect(source).toContain(
+      'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts apply:mexas-test-unwind'
+    )
+    expect(source).toContain(
       'COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts print:mexas-test-unwind-sql > /tmp/mexas-test-unwind.sql'
     )
   })
 
-  test('provides a read-only MEXAS settlement exposure audit script', () => {
+  test('provides read-only and confirmed test-unwind MEXAS settlement scripts', () => {
     const packageJson = readRepoFile('backend/scripts/package.json')
     const source = readRepoFile('backend/scripts/audit-mexas-settlement.ts')
+    const unwindSource = readRepoFile(
+      'backend/scripts/unwind-mexas-test-exposure.ts'
+    )
 
     expect(packageJson).toContain('"audit:mexas-settlement"')
+    expect(packageJson).toContain('"audit:mexas-test-unwind"')
+    expect(packageJson).toContain('"apply:mexas-test-unwind"')
     expect(packageJson).toContain('"print:mexas-test-unwind-sql"')
     expectMarkersInOrder(source, [
       'async function loadMexasOrderbookContracts',
@@ -1691,6 +1702,26 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain(".insert(")
     expect(source).not.toContain(".delete(")
     expect(source).not.toContain(".rpc(")
+    expectMarkersInOrder(unwindSource, [
+      "const TEST_UNWIND_CONTRACT_IDS = ['ukrwarend26a'] as const",
+      "const apply = process.argv.includes('--apply')",
+      "const confirmed = process.argv.includes('--confirm-test-unwind')",
+      'printPlan(exposures)',
+      'if (!apply)',
+      'Dry run only. Pass --apply --confirm-test-unwind to modify data.',
+      'if (!confirmed)',
+      "throw new Error('Refusing to apply without --confirm-test-unwind.')",
+    ])
+    expectMarkersInOrder(unwindSource, [
+      'await updateMexasUserBalanceCas(db, exposure.userId, exposure.cancelCredit',
+      'creditKey',
+      ".from('contract_bets')",
+      '.update({',
+      'mexasTestUnwound: true',
+      ".eq('updated_time', current.row.updated_time)",
+    ])
+    expect(unwindSource).not.toContain('delete()')
+    expect(unwindSource).not.toContain('rpc(')
   })
 
   test('launch readiness cannot be passed by setting the escrow env before escrow code exists', () => {

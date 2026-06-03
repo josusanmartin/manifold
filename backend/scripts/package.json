@@ -7,6 +7,8 @@
   "scripts": {
     "apply:mexas-launch-sql": "ts-node apply-mexas-launch-sql.ts",
     "audit:mexas-settlement": "ts-node audit-mexas-settlement.ts",
+    "audit:mexas-test-unwind": "ts-node unwind-mexas-test-exposure.ts",
+    "apply:mexas-test-unwind": "ts-node unwind-mexas-test-exposure.ts --apply --confirm-test-unwind",
     "check:mexas-launch": "ts-node check-mexas-launch-readiness.ts",
     "check:mexas-smoke": "ts-node check-mexas-production-smoke.ts",
     "print:mexas-test-unwind-sql": "ts-node audit-mexas-settlement.ts --print-test-unwind-sql",
