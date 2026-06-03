@@ -1687,7 +1687,7 @@ describe('MEXAS flow safety guardrails', () => {
       'pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-10 xl:pb-0'
     )
     expect(betPanelSource).toContain(
-      'sticky bottom-[calc(58px+env(safe-area-inset-bottom))]'
+      'fixed inset-x-4 bottom-[calc(66px+env(safe-area-inset-bottom))]'
     )
     expect(betPanelSource).toContain('lg:static')
     expect(contractPageSource).not.toContain(

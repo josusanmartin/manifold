@@ -163,7 +163,7 @@ export function BuyPanel(
               className={clsx(
                 'flex-1',
                 orderBookOnly &&
-                  'sticky bottom-[calc(58px+env(safe-area-inset-bottom))] z-30 bg-canvas-0 py-2 lg:static lg:z-auto lg:bg-transparent lg:py-0'
+                  'fixed inset-x-4 bottom-[calc(66px+env(safe-area-inset-bottom))] z-40 bg-canvas-0 py-2 lg:static lg:inset-auto lg:z-auto lg:bg-transparent lg:py-0'
               )}
               btnClassName="flex-1 px-2 sm:px-6"
               selected={outcome}
