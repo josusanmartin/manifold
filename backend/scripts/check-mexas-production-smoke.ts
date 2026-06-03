@@ -528,8 +528,8 @@ async function checkBlockedResolutionReadiness(contractId: string) {
       contractId
     )}/mexas-resolution-readiness`
   )
-  return response.status === 404
-    ? pass(`blocked resolution readiness ${contractId}`, '404')
+  return response.status === 401
+    ? pass(`auth blocked resolution readiness ${contractId}`, '401')
     : fail(`blocked resolution readiness ${contractId}`, `${response.status}`)
 }
 

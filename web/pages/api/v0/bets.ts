@@ -104,6 +104,22 @@ async function getUserIdFromUsername(db: SupabaseClient, username: string) {
   return data.id
 }
 
+async function runOpenLimitMaintenance(
+  db: SupabaseClient,
+  options: {
+    contractId?: string
+    userId?: string
+  }
+) {
+  try {
+    await releaseClosedMexasMarketOrders(db, options)
+    await releaseExpiredMexasOrders(db, options)
+    await releaseUnbackedMexasOrders(db, options)
+  } catch (error) {
+    console.warn('MEXAS open-limit read maintenance skipped', error)
+  }
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<Bet[] | ErrorResponse>
@@ -142,15 +158,7 @@ export default async function handler(
     const singleContractId =
       mexasContractIds.length === 1 ? mexasContractIds[0] : undefined
     if (params.kinds === 'open-limit' && (singleContractId || userId)) {
-      await releaseClosedMexasMarketOrders(db, {
-        contractId: singleContractId,
-        userId,
-      })
-      await releaseExpiredMexasOrders(db, {
-        contractId: singleContractId,
-        userId,
-      })
-      await releaseUnbackedMexasOrders(db, {
+      await runOpenLimitMaintenance(db, {
         contractId: singleContractId,
         userId,
       })

@@ -238,6 +238,14 @@ describe('MEXAS flow safety guardrails', () => {
       'query = query.in',
     ])
     expectMarkersInOrder(source, [
+      'async function runOpenLimitMaintenance',
+      'try {',
+      'await releaseClosedMexasMarketOrders(db, options)',
+      'await releaseExpiredMexasOrders(db, options)',
+      'await releaseUnbackedMexasOrders(db, options)',
+      "console.warn('MEXAS open-limit read maintenance skipped', error)",
+    ])
+    expectMarkersInOrder(source, [
       'const params = API.bets.props.parse',
       "if (params.kinds !== 'open-limit')",
       "throw new APIError(404, 'Bets history is not available on MEXAS.')",
@@ -1217,13 +1225,18 @@ describe('MEXAS flow safety guardrails', () => {
     )
 
     expectMarkersInOrder(source, [
+      'async function checkBlockedResolutionReadiness',
+      'response.status === 401',
+      'auth blocked resolution readiness',
+    ])
+    expectMarkersInOrder(source, [
       'auth resolution readiness mexwcwin26a',
       '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
       '401',
       'auth resolution readiness ukrwarend26a',
       '/mexas-resolution-readiness',
       '401',
-      "results.push(await checkBlockedResolutionReadiness('not-a-mexas-market'))",
+      "checkBlockedResolutionReadiness('not-a-mexas-market')",
     ])
   })
 
