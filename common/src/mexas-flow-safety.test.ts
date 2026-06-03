@@ -142,6 +142,19 @@ describe('MEXAS flow safety guardrails', () => {
       ".eq('balance', latestUserRow.balance)",
       ".filter('data', 'eq', JSON.stringify(latestUserRow.data))",
     ])
+    expectMarkersInOrder(privySource, [
+      'async function updateExistingUser',
+      '.maybeSingle()',
+      'if (updatedUser) {',
+      'const updatedPrivateUser = await upsertPrivyPrivateUser',
+      'privateUser: convertPrivateUser(updatedPrivateUser)',
+    ])
+    expectMarkersInOrder(privySource, [
+      'async function upsertPrivyPrivateUser',
+      ".from('private_users')",
+      '.upsert(',
+      "{ onConflict: 'id' }",
+    ])
   })
 
   test('cancels MEXAS orders and refunds reserved funds under the user balance lock', () => {
@@ -928,6 +941,12 @@ describe('MEXAS flow safety guardrails', () => {
       'latestBalanceUnits',
       'mexasAmountToUnits(syncedUser.user.balance)',
       'if (parsedWithdrawAmount > latestWithdrawableUnits)',
+    ])
+    expectMarkersInOrder(source, [
+      'const withdraw = async () =>',
+      'if (!wallet || !walletAddress) return',
+      'if (withdrawing) return',
+      'setWithdrawError(null)',
     ])
     expectMarkersInOrder(source, [
       'eth_sendTransaction',
@@ -2253,6 +2272,8 @@ describe('MEXAS flow safety guardrails', () => {
       "has_table_privilege('service_role', ledger, 'SELECT')",
       "not has_table_privilege('anon', ledger, 'SELECT')",
       'c.relrowsecurity = true',
+      "con.conname = 'mexas_treasury_transfers_status_check'",
+      "position('processing' in pg_get_constraintdef(con.oid)) > 0",
       "to_regclass('public.mexas_treasury_transfers_idempotency_key_idx') is not null",
     ])
     expect(compactMigration).toContain(
@@ -2385,9 +2406,15 @@ describe('MEXAS flow safety guardrails', () => {
       "'processing'",
       "'submitted'",
       "'confirmed'",
+      'or replace function public.mexas_treasury_settlement_ledger_ready',
+      "con.conname = 'mexas_treasury_transfers_status_check'",
+      "position('processing' in pg_get_constraintdef(con.oid)) > 0",
     ])
     expect(applySource).toContain(
       '2026060303_add_mexas_treasury_processing_status.sql'
+    )
+    expect(applySource).toContain(
+      "'treasury settlement ledger processing status missing'"
     )
     expect(schemaSource).toContain('mexas_treasury_transfers')
     expect(schemaSource).toContain('recipient_address: string')

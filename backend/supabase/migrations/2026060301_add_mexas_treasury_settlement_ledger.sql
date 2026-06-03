@@ -133,6 +133,16 @@ set
             and c.relname = 'mexas_treasury_transfers'
             and c.relrowsecurity = true
         )
+        and exists (
+          select 1
+          from pg_constraint con
+          join pg_class c on c.oid = con.conrelid
+          join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public'
+            and c.relname = 'mexas_treasury_transfers'
+            and con.conname = 'mexas_treasury_transfers_status_check'
+            and position('processing' in pg_get_constraintdef(con.oid)) > 0
+        )
         and to_regclass('public.mexas_treasury_transfers_idempotency_key_idx') is not null
         and to_regclass('public.mexas_treasury_transfers_tx_hash_idx') is not null
         and to_regclass('public.mexas_treasury_transfers_status_created_idx') is not null

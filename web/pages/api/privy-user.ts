@@ -284,6 +284,28 @@ function buildPrivateUser(params: {
   }
 }
 
+async function upsertPrivyPrivateUser(params: {
+  db: SupabaseClient
+  privateUser: Row<'private_users'>['data']
+  userId: string
+}) {
+  const { data: updatedPrivateUser, error } = await params.db
+    .from('private_users')
+    .upsert(
+      { id: params.userId, data: params.privateUser },
+      { onConflict: 'id' }
+    )
+    .select()
+    .single()
+
+  if (error) throw error
+  if (!updatedPrivateUser) {
+    throw new Error('Could not update Privy user.')
+  }
+
+  return updatedPrivateUser as Row<'private_users'>
+}
+
 async function updateExistingUser(params: {
   db: SupabaseClient
   userRow: Row<'users'>
@@ -319,25 +341,6 @@ async function updateExistingUser(params: {
     privyUserId: userRow.id,
     privyWalletAddress: walletAddress ?? existingWalletAddress,
   } as Row<'private_users'>['data']
-
-  const { data: updatedPrivateUser, error: privateUserError } =
-    params.privateUserRow
-      ? await db
-          .from('private_users')
-          .update({ data: privateUser })
-          .eq('id', userRow.id)
-          .select()
-          .single()
-      : await db
-          .from('private_users')
-          .insert({ id: userRow.id, data: privateUser })
-          .select()
-          .single()
-
-  if (privateUserError) throw privateUserError
-  if (!updatedPrivateUser) {
-    throw new Error('Could not update Privy user.')
-  }
 
   const balanceLockOwner = await acquireMexasUserBalanceLock(db, userRow.id)
   try {
@@ -383,6 +386,11 @@ async function updateExistingUser(params: {
 
       if (userError) throw userError
       if (updatedUser) {
+        const updatedPrivateUser = await upsertPrivyPrivateUser({
+          db,
+          privateUser,
+          userId: userRow.id,
+        })
         return {
           user: convertUser(updatedUser),
           privateUser: convertPrivateUser(updatedPrivateUser),

@@ -166,6 +166,19 @@ begin
     v_failures := array_append(v_failures, 'treasury settlement ledger table missing');
   end if;
 
+  if not exists (
+    select 1
+    from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'mexas_treasury_transfers'
+      and con.conname = 'mexas_treasury_transfers_status_check'
+      and position('processing' in pg_get_constraintdef(con.oid)) > 0
+  ) then
+    v_failures := array_append(v_failures, 'treasury settlement ledger processing status missing');
+  end if;
+
   if to_regprocedure('public.mexas_escrow_capture_ready()') is null then
     v_failures := array_append(v_failures, 'escrow capture health RPC missing');
   elsif public.mexas_escrow_capture_ready() is distinct from true then

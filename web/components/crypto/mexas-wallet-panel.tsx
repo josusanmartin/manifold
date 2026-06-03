@@ -320,6 +320,7 @@ function MexasWalletPanelInner() {
 
   const withdraw = async () => {
     if (!wallet || !walletAddress) return
+    if (withdrawing) return
 
     setWithdrawError(null)
     setWithdrawHash(null)
