@@ -49,7 +49,11 @@ function roundAmount(value: number) {
 }
 
 export function hasMexasFilledExposure(bet: Bet) {
-  return (bet.amount ?? 0) > EPSILON && (bet.shares ?? 0) > EPSILON
+  return (
+    !bet.isCancelled &&
+    (bet.amount ?? 0) > EPSILON &&
+    (bet.shares ?? 0) > EPSILON
+  )
 }
 
 export function getMexasSettlementAudit(bets: Bet[]): MexasSettlementAudit {

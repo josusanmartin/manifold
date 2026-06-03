@@ -6,6 +6,7 @@ import {
 } from './mexas-market'
 
 export function getMexasResolvedBetPayout(bet: Bet, outcome: resolution) {
+  if (bet.isCancelled) return 0
   if (outcome === 'CANCEL') return Math.max(0, bet.amount ?? 0)
   return bet.outcome === outcome ? Math.max(0, bet.shares ?? 0) : 0
 }

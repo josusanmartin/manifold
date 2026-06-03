@@ -89,6 +89,23 @@ describe('MEXAS resolution payouts', () => {
     ).toBe(6)
   })
 
+  test('cancelled filled bets receive no resolution payout', () => {
+    const cancelled = filledBet({
+      id: 'cancelled-filled',
+      userId: 'u1',
+      outcome: 'YES',
+      amount: 6,
+      shares: 20,
+      isCancelled: true,
+    })
+
+    expect(getMexasResolvedBetPayout(cancelled, 'YES')).toBe(0)
+    expect(getMexasResolvedBetPayout(cancelled, 'NO')).toBe(0)
+    expect(getMexasResolvedBetPayout(cancelled, 'CANCEL')).toBe(0)
+    expect(getMexasResolutionPayout(cancelled, 'YES')).toBe(0)
+    expect(getMexasResolutionCreditEvents([cancelled], 'YES')).toEqual([])
+  })
+
   test('refunds only remaining reserved amount on open orders', () => {
     expect(
       getMexasOpenReservationRefund(
@@ -111,6 +128,18 @@ describe('MEXAS resolution payouts', () => {
         })
       )
     ).toBe(0)
+    expect(
+      getMexasOpenReservationRefund(
+        limitOrder({
+          id: 'cancelled-pending-release',
+          userId: 'u1',
+          amount: 3,
+          orderAmount: 10,
+          isCancelled: true,
+          mexasFundsReleased: false,
+        })
+      )
+    ).toBe(7)
   })
 
   test('combines open reservation refund and winning payout', () => {
