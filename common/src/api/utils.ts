@@ -33,6 +33,8 @@ export function pathWithPrefix(path: APIPath) {
 export function getWebsocketUrl() {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return `${formatWebsocketBaseUrl(process.env.NEXT_PUBLIC_API_URL)}/ws`
+  } else if (isMexasBrowserHost()) {
+    return `${formatWebsocketBaseUrl(window.location.origin)}/ws`
   } else {
     const { apiEndpoint } = ENV_CONFIG
     return `wss://${apiEndpoint}/ws`
@@ -55,10 +57,19 @@ export function getApiUrl(path: string) {
   }
 }
 
+export function isMexasBrowserHostname(hostname: string) {
+  const normalized = hostname.toLowerCase()
+  return (
+    normalized === 'mexas-manifold.vercel.app' ||
+    (normalized.startsWith('mexas-manifold-') &&
+      normalized.endsWith('.vercel.app'))
+  )
+}
+
 function isMexasBrowserHost() {
   return (
     typeof window !== 'undefined' &&
-    window.location.hostname === 'mexas-manifold.vercel.app'
+    isMexasBrowserHostname(window.location.hostname)
   )
 }
 
