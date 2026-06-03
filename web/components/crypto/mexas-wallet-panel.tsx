@@ -24,6 +24,10 @@ import {
   type Address,
   type Hex,
 } from 'viem'
+import {
+  getMexasWithdrawButtonLabel,
+  getMexasWithdrawDisabledReason,
+} from 'common/mexas-wallet'
 import { Button } from 'web/components/buttons/button'
 import {
   usePrivyLogin,
@@ -312,6 +316,16 @@ function MexasWalletPanelInner() {
     balanceUnits !== null && internalAvailableUnits !== null
       ? minUnits(balanceUnits, internalAvailableUnits)
       : null
+  const withdrawDisabledReason = getMexasWithdrawDisabledReason({
+    amountUnits: parsedWithdrawAmount,
+    hasWallet: !!wallet && !!walletAddress,
+    isDestinationAddressValid: isAddress(withdrawAddress),
+    withdrawing,
+    withdrawableUnits,
+  })
+  const withdrawButtonLabel = getMexasWithdrawButtonLabel(
+    withdrawDisabledReason
+  )
 
   const setMaxWithdraw = () => {
     if (withdrawableUnits !== null) {
@@ -321,7 +335,7 @@ function MexasWalletPanelInner() {
 
   const withdraw = async () => {
     if (!wallet || !walletAddress) return
-    if (withdrawing) return
+    if (withdrawDisabledReason) return
 
     setWithdrawError(null)
     setWithdrawHash(null)
@@ -600,12 +614,12 @@ function MexasWalletPanelInner() {
           color="none"
           size="lg"
           className="bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
-          disabled={withdrawing}
+          disabled={!!withdrawDisabledReason}
           loading={withdrawing}
           onClick={withdraw}
         >
           <PaperAirplaneIcon className="mr-2 h-4 w-4 rotate-45" />
-          Retirar MEX
+          {withdrawButtonLabel}
         </Button>
       </Col>
 
