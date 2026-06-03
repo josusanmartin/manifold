@@ -3090,4 +3090,15 @@ describe('MEXAS flow safety guardrails', () => {
       'verifyAccessToken(payload)',
     ])
   })
+
+  test('launch docs include the interactive Vercel firewall recovery step', () => {
+    const source = readRepoFile('backend/scripts/README.md')
+
+    expectMarkersInOrder(source, [
+      'Vercel Firewall challenge active',
+      'Vercel WAF challenge rule',
+      '$ vercel firewall attack-mode disable',
+      'Re-run `check:mexas-launch`',
+    ])
+  })
 })

@@ -69,7 +69,15 @@ Current launch blockers should be resolved in this order:
    `MEX`, the matching RPC is installed, escrow capture is guarded, and the
    backend-only treasury ledger exists.
 
-4. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
+4. If site checks report `Vercel Firewall challenge active`, disable Attack
+   Challenge Mode or adjust the Vercel WAF challenge rule before launch. Vercel
+   requires this to be done interactively; run:
+
+   ```shell
+   $ vercel firewall attack-mode disable
+   ```
+
+5. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
    markets until every launch-readiness line is `PASS`.
 
 To apply the required MEXAS SQL migrations and normalize every contract row
