@@ -15,9 +15,9 @@ export const MEXAS_ONCHAIN_ESCROW_CAPABILITIES: Record<
   MexasEscrowCapability,
   boolean
 > = {
-  captureOrderStake: false,
-  releaseOpenOrderStake: false,
-  payoutResolvedPositions: false,
+  captureOrderStake: true,
+  releaseOpenOrderStake: true,
+  payoutResolvedPositions: true,
 }
 
 export const MEXAS_ONCHAIN_ESCROW_IMPLEMENTED = Object.values(

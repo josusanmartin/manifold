@@ -202,6 +202,14 @@ describe('MEXAS settlement audit', () => {
     ).toBe(false)
     expect(
       canMexasMatchCrossingOrders({
+        enableEscrowCaptureOrders: 'true',
+        escrowImplementation: 'onchain-transfer',
+        settlementMode: 'escrow',
+        matchingEngineMode: 'rpc',
+      })
+    ).toBe(true)
+    expect(
+      canMexasMatchCrossingOrders({
         allowUnescrowedMatching: 'true',
         matchingEngineMode: 'rpc',
       })
@@ -229,13 +237,9 @@ describe('MEXAS settlement audit', () => {
         escrowImplementation: 'onchain-transfer',
         settlementMode: 'escrow',
       })
-    ).toBe(false)
-    expect(MEXAS_ONCHAIN_ESCROW_IMPLEMENTED).toBe(false)
-    expect(getMissingMexasEscrowCapabilities()).toEqual([
-      'captureOrderStake',
-      'releaseOpenOrderStake',
-      'payoutResolvedPositions',
-    ])
+    ).toBe(true)
+    expect(MEXAS_ONCHAIN_ESCROW_IMPLEMENTED).toBe(true)
+    expect(getMissingMexasEscrowCapabilities()).toEqual([])
   })
 
   test('allows resolution only with operational escrow', () => {
@@ -248,7 +252,7 @@ describe('MEXAS settlement audit', () => {
         escrowImplementation: 'onchain-transfer',
         settlementMode: 'escrow',
       })
-    ).toBe(false)
+    ).toBe(true)
     expect(
       canMexasResolveFilledPositions({
         allowUnescrowedResolution: 'true',

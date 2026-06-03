@@ -267,11 +267,7 @@ begin
       )
     );
 
-    if v_maker_unused_refund > v_epsilon then
-      if v_maker_escrowed then
-        raise exception 'Escrowed maker price-improvement refund requires treasury transfer' using errcode = '25006';
-      end if;
-
+    if v_maker_unused_refund > v_epsilon and not v_maker_escrowed then
       v_maker_refund_credit_key := 'mexas-order-price-improvement:' || v_maker.bet_id;
 
       select
@@ -326,12 +322,12 @@ begin
       v_maker_remaining_amount <= v_epsilon,
       'mexasFundsReleased',
       case
-        when v_maker_remaining_amount <= v_epsilon then true
+        when v_maker_remaining_amount <= v_epsilon and not v_maker_escrowed then true
         else coalesce((v_maker_data ->> 'mexasFundsReleased')::boolean, false)
       end
     );
 
-    if v_maker_unused_refund > v_epsilon then
+    if v_maker_unused_refund > v_epsilon and not v_maker_escrowed then
       v_maker_data := v_maker_data || jsonb_build_object(
         'mexasReleaseCreditKey',
         v_maker_refund_credit_key,
@@ -418,11 +414,7 @@ begin
     else 0
   end;
 
-  if v_taker_unused_refund > v_epsilon then
-    if v_taker_escrowed then
-      raise exception 'Escrowed taker price-improvement refund requires treasury transfer' using errcode = '25006';
-    end if;
-
+  if v_taker_unused_refund > v_epsilon and not v_taker_escrowed then
     v_taker_refund_credit_key := 'mexas-order-price-improvement:' || v_taker.bet_id;
 
     select
@@ -466,12 +458,12 @@ begin
     v_remaining_amount <= v_epsilon,
     'mexasFundsReleased',
     case
-      when v_remaining_amount <= v_epsilon then true
+      when v_remaining_amount <= v_epsilon and not v_taker_escrowed then true
       else coalesce((v_taker_data ->> 'mexasFundsReleased')::boolean, false)
     end
   );
 
-  if v_taker_unused_refund > v_epsilon then
+  if v_taker_unused_refund > v_epsilon and not v_taker_escrowed then
     v_taker_data := v_taker_data || jsonb_build_object(
       'mexasReleaseCreditKey',
       v_taker_refund_credit_key,

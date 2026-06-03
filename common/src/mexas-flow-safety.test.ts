@@ -809,7 +809,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(smokeSource).toContain('MEXAS_BLOCKED_API_SMOKE_PATHS')
   })
 
-  test('does not overstate live MEXAS execution before escrow is implemented', () => {
+  test('does not overstate live MEXAS execution before escrow capture is enabled', () => {
     const checkoutSource = readRepoFile('web/pages/checkout.tsx')
     const aboutSource = readRepoFile('web/components/about-manifold.tsx')
     const explainerSource = readRepoFile('web/components/explainer-panel.tsx')
@@ -935,9 +935,9 @@ describe('MEXAS flow safety guardrails', () => {
 
     expectMarkersInOrder(source, [
       'export const MEXAS_ONCHAIN_ESCROW_CAPABILITIES',
-      'captureOrderStake: false',
-      'releaseOpenOrderStake: false',
-      'payoutResolvedPositions: false',
+      'captureOrderStake: true',
+      'releaseOpenOrderStake: true',
+      'payoutResolvedPositions: true',
       'export const MEXAS_ONCHAIN_ESCROW_IMPLEMENTED',
       'export function hasTransactionalMexasMatchingEngine',
       "return settings.matchingEngineMode === 'rpc'",
@@ -1001,7 +1001,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(sqlSource).toContain('and b.user_id <> v_taker.user_id')
   })
 
-  test('blocks pre-escrow MEXAS crossing orders without promising instant execution', () => {
+  test('blocks MEXAS crossing orders unless escrow capture readiness is enabled', () => {
     const source = readRepoFile('web/components/bet/limit-order-panel.tsx')
 
     expectMarkersInOrder(source, [
@@ -2144,7 +2144,9 @@ describe('MEXAS flow safety guardrails', () => {
       'Escrow capture idempotency guard reports ready.',
       'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS',
       "'escrow capture flag'",
+      'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS=true.',
       'cannot be true until treasury release and resolution payout escrow capabilities are implemented',
+      'must be true before launch so crossing orders can capture stake on-chain',
     ])
     expect(schemaSource).toContain('mexas_escrow_capture_ready')
   })
@@ -2537,7 +2539,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(unwindSource).not.toContain('rpc(')
   })
 
-  test('launch readiness cannot be passed by setting the escrow env before escrow code exists', () => {
+  test('launch readiness verifies escrow capabilities before accepting the escrow env', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'
     )
@@ -2557,9 +2559,9 @@ describe('MEXAS flow safety guardrails', () => {
     expect(settlementSource).toContain(
       'export const MEXAS_ONCHAIN_ESCROW_CAPABILITIES'
     )
-    expect(settlementSource).toContain('captureOrderStake: false')
-    expect(settlementSource).toContain('releaseOpenOrderStake: false')
-    expect(settlementSource).toContain('payoutResolvedPositions: false')
+    expect(settlementSource).toContain('captureOrderStake: true')
+    expect(settlementSource).toContain('releaseOpenOrderStake: true')
+    expect(settlementSource).toContain('payoutResolvedPositions: true')
   })
 
   test('keeps escrowed MEXAS stake out of wallet backing checks and releases open stake through treasury', () => {
@@ -2635,9 +2637,17 @@ describe('MEXAS flow safety guardrails', () => {
       "v_taker_escrowed := coalesce((v_taker_data ->> 'mexasStakeEscrowed')::boolean, false)",
       'Escrowed taker reserved amount must equal order amount',
       "coalesce((b.data ->> 'mexasStakeEscrowed')::boolean, false) = v_taker_escrowed",
-      'Escrowed maker price-improvement refund requires treasury transfer',
-      'Escrowed taker price-improvement refund requires treasury transfer',
+      'v_maker_unused_refund > v_epsilon and not v_maker_escrowed',
+      'when v_maker_remaining_amount <= v_epsilon and not v_maker_escrowed then true',
+      'v_taker_unused_refund > v_epsilon and not v_taker_escrowed',
+      'when v_remaining_amount <= v_epsilon and not v_taker_escrowed then true',
     ])
+    expect(matchingSqlSource).not.toContain(
+      'Escrowed maker price-improvement refund requires treasury transfer'
+    )
+    expect(matchingSqlSource).not.toContain(
+      'Escrowed taker price-improvement refund requires treasury transfer'
+    )
     expect(indexSqlSource).toContain(
       "coalesce((data ->> 'mexasStakeEscrowed')::boolean, false) = false"
     )

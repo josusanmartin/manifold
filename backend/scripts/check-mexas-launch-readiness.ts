@@ -1720,6 +1720,10 @@ async function runChecks() {
     'MEXAS_ESCROW_IMPLEMENTATION',
     vercelEnvValues
   )
+  const escrowCaptureOrders = getEnvOrVercelValue(
+    'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS',
+    vercelEnvValues
+  )
   const hasOperationalEscrow = hasOperationalMexasEscrow({
     escrowImplementation,
     settlementMode,
@@ -1768,17 +1772,16 @@ async function runChecks() {
         )
   )
   checks.push(
-    getEnvOrVercelValue(
-      'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS',
-      vercelEnvValues
-    ) === 'true' && !hasOperationalEscrow
+    escrowCaptureOrders === 'true' && hasOperationalEscrow
+      ? pass('escrow capture flag', 'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS=true.')
+      : escrowCaptureOrders === 'true'
       ? fail(
           'escrow capture flag',
           'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS cannot be true until treasury release and resolution payout escrow capabilities are implemented.'
         )
-      : pass(
+      : fail(
           'escrow capture flag',
-          'On-chain order capture is not enabled ahead of complete treasury release/payout support.'
+          'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS must be true before launch so crossing orders can capture stake on-chain.'
         )
   )
   checks.push(
