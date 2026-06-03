@@ -1323,10 +1323,24 @@ describe('MEXAS flow safety guardrails', () => {
       'bets mexwcwin26a open-limit',
       '/api/v0/bets?contractSlug=ganara-mexico-la-copa-mundial-2026&kinds=open-limit',
       'bets mexico slug open-limit',
+      'for (const payload of JSON_PAYLOADS)',
+      'checkJsonPayloadCopy(payload.name, payload.path)',
       'blocked bets unknown username',
       '/api/v0/bets?username=__mexas_missing_user__',
       'unknown api fail closed',
       '/api/v0/not-a-real-mexas-api',
+    ])
+    expectMarkersInOrder(source, [
+      'const FORBIDDEN_JSON_COPY = [',
+      "'MANA'",
+      "'Manifold'",
+      'const JSON_PAYLOADS = [',
+      "name: 'json orderbook mexwcwin26a'",
+      "name: 'json resolution readiness ukrwarend26a'",
+      'async function checkJsonPayloadCopy',
+      'JSON.parse(text)',
+      'Forbidden JSON copy:',
+      'No forbidden legacy copy in JSON payload.',
     ])
     expectMarkersInOrder(source, [
       'async function checkExpectedStatus',
@@ -2126,7 +2140,7 @@ describe('MEXAS flow safety guardrails', () => {
       'needsLaunchSql = true',
       'if (needsLaunchSql)',
       'Launch SQL is missing and no local Postgres connection env is set.',
-      'apply:mexas-launch-sql --print-sql',
+      'print:mexas-launch-sql > /tmp/mexas-launch.sql',
       'Service-role REST cannot apply this',
     ])
     expect(source).toContain('contracts_token_check still needs the launch SQL')

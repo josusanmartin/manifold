@@ -125,7 +125,8 @@ Los blockers de launch real siguen siendo estructurales:
 - aplicar el SQL de launch en Supabase produccion para `contracts.token = 'MEX'`,
   indices de libro, RPC `mexas_orderbook_matching_engine_ready`, ledger
   `mexas_treasury_transfers` y guard de captura escrow
-  `mexas_escrow_capture_ready`;
+  `mexas_escrow_capture_ready`. El SQL manual se imprime con
+  `COREPACK_ENABLE_STRICT=0 corepack yarn --silent --cwd backend/scripts print:mexas-launch-sql > /tmp/mexas-launch.sql`;
 - configurar y proteger `MEXAS_TREASURY_SIGNER_SECRET` en produccion antes de
   cualquier pago on-chain saliente;
 - aunque `MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS` este configurado, el runtime debe

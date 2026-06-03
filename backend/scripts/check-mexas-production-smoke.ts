@@ -40,6 +40,24 @@ const FORBIDDEN_VISIBLE_COPY = [
   'Open options',
 ]
 
+const FORBIDDEN_JSON_COPY = [
+  'MANA',
+  'Mana',
+  'M$',
+  'Manifold',
+  'manifold.markets',
+  'manifoldmarkets',
+  'Verify your identity',
+  'Cartera',
+  'Contexto del mercado',
+  'Comments',
+  'Boost',
+  'Prize Drawain',
+  'Predictle',
+  'Preedictle',
+  'Open options',
+]
+
 const PAGES = [
   {
     path: '/about',
@@ -229,6 +247,37 @@ const STATIC_FILES = [
 ]
 
 const BLOCKED_STATIC_PATHS = [...MEXAS_BLOCKED_PUBLIC_PATHS]
+
+const JSON_PAYLOADS = [
+  {
+    name: 'json orderbook mexwcwin26a',
+    path: '/api/mexas-order-book?contractId=mexwcwin26a',
+  },
+  {
+    name: 'json orderbook ukrwarend26a',
+    path: '/api/mexas-order-book?contractId=ukrwarend26a',
+  },
+  {
+    name: 'json bets mexwcwin26a',
+    path: '/api/v0/bets?contractId=mexwcwin26a&kinds=open-limit',
+  },
+  {
+    name: 'json order readiness mexwcwin26a',
+    path: '/api/v0/market/mexwcwin26a/mexas-order-readiness',
+  },
+  {
+    name: 'json order readiness ukrwarend26a',
+    path: '/api/v0/market/ukrwarend26a/mexas-order-readiness',
+  },
+  {
+    name: 'json resolution readiness mexwcwin26a',
+    path: '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
+  },
+  {
+    name: 'json resolution readiness ukrwarend26a',
+    path: '/api/v0/market/ukrwarend26a/mexas-resolution-readiness',
+  },
+]
 
 function pass(name: string, details: string): SmokeResult {
   return { details, name, status: 'pass' }
@@ -592,6 +641,25 @@ async function checkBetsArray(path: string, name: string) {
   }
 }
 
+async function checkJsonPayloadCopy(name: string, path: string) {
+  const { response, text } = await fetchText(path)
+  if (response.status < 200 || response.status >= 400) {
+    return fail(name, `${response.status}`)
+  }
+
+  try {
+    JSON.parse(text)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return fail(name, `Invalid JSON: ${message}`)
+  }
+
+  const forbidden = FORBIDDEN_JSON_COPY.filter((copy) => text.includes(copy))
+  return forbidden.length
+    ? fail(name, `Forbidden JSON copy: ${forbidden.join(', ')}`)
+    : pass(name, 'No forbidden legacy copy in JSON payload.')
+}
+
 async function checkExpectedStatus(
   name: string,
   path: string,
@@ -650,6 +718,9 @@ async function runSmoke() {
       'bets mexico slug open-limit'
     )
   )
+  for (const payload of JSON_PAYLOADS) {
+    results.push(await checkJsonPayloadCopy(payload.name, payload.path))
+  }
   results.push(await checkBlockedOrderBook('not-a-mexas-market'))
   results.push(await checkBlockedBets('not-a-mexas-market'))
   results.push(

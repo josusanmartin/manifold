@@ -1993,7 +1993,7 @@ async function runChecks() {
             'launch SQL apply access',
             `Launch SQL is missing and no local Postgres connection env is set. Set one of ${LAUNCH_SQL_APPLY_ENVS.join(
               ', '
-            )}, or run "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts apply:mexas-launch-sql --print-sql" and paste it into Supabase SQL Editor. Service-role REST cannot apply this because contracts_token_check and RPC/index DDL require Postgres SQL access.`
+            )}, or run "COREPACK_ENABLE_STRICT=0 corepack yarn --silent --cwd backend/scripts print:mexas-launch-sql > /tmp/mexas-launch.sql" and paste /tmp/mexas-launch.sql into Supabase SQL Editor. Service-role REST cannot apply this because contracts_token_check and RPC/index DDL require Postgres SQL access.`
           )
     )
   } else {
