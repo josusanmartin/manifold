@@ -174,19 +174,19 @@ describe('MEXAS settlement audit', () => {
         matchingEngineMode: 'rpc',
       })
     ).toBe(true)
-    expect(canMexasAcceptLimitOrders({})).toBe(false)
+    expect(canMexasAcceptLimitOrders({})).toBe(true)
     expect(
       canMexasAcceptLimitOrders({
         matchingEngineMode: 'rpc',
       })
-    ).toBe(false)
+    ).toBe(true)
     expect(
       canMexasAcceptLimitOrders({
         escrowImplementation: 'onchain-transfer',
         matchingEngineMode: 'rpc',
         settlementMode: 'escrow',
       })
-    ).toBe(false)
+    ).toBe(true)
     expect(
       hasOperationalMexasEscrow({
         escrowImplementation: 'onchain-transfer',

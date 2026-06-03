@@ -108,6 +108,11 @@ export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
   const primaryBook = getBookForMarket(openOrders, primaryMarket)
   const hasOpenOrders = openOrders.length > 0
   const ordersPaused = orderBookOnly && orderReadiness?.canPlaceOrders === false
+  const matchingPaused =
+    orderBookOnly &&
+    orderReadiness !== undefined &&
+    orderReadiness.canPlaceOrders &&
+    !orderReadiness.matchingEngineReady
 
   return (
     <Col className="border-ink-200 bg-canvas-0 mt-4 overflow-hidden rounded-md border">
@@ -130,6 +135,13 @@ export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
           Nuevas órdenes pausadas mientras se completa la liquidación MEXAS.
           Puedes consultar el libro y cancelar tus órdenes abiertas; no se
           reservará MEX nuevo.
+        </div>
+      )}
+
+      {matchingPaused && (
+        <div className="border-ink-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+          Puedes abrir órdenes límite que agreguen liquidez. Las órdenes que
+          cruzan el libro están pausadas hasta completar la liquidación MEXAS.
         </div>
       )}
 

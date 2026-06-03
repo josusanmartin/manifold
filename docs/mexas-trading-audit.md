@@ -36,6 +36,9 @@ Para no crear saldos internos no respaldados, el API bloquea:
 - nuevos cruces de ordenes siempre, hasta que exista un motor atomico de
   settlement; los flags de entorno no deben poder activar el matcher local
   porque actualiza filas maker/taker fuera de una unica transaccion;
+- el boton solo debe bloquear una orden si el precio cruza liquidez existente;
+  una orden limite que descansa en el libro puede reservar MEX y quedarse
+  abierta;
 - resoluciones con posiciones llenadas si no existe `MEXAS_SETTLEMENT_MODE=escrow`,
   `MEXAS_ESCROW_IMPLEMENTATION=onchain-transfer` y capacidades reales de escrow
   implementadas. Los flags de override no deben permitir launch sin escrow.

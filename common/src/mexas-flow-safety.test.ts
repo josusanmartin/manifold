@@ -792,6 +792,8 @@ describe('MEXAS flow safety guardrails', () => {
       'export function hasOperationalMexasEscrow',
       'MEXAS_ONCHAIN_ESCROW_IMPLEMENTED',
       "settings.escrowImplementation === 'onchain-transfer'",
+      'export function canMexasAcceptLimitOrders',
+      'return true',
       'export function canMexasMatchCrossingOrders',
       'hasOperationalMexasEscrow(settings)',
       'export function canMexasResolveFilledPositions',
@@ -1517,8 +1519,7 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'export async function assertMexasCanAcceptLimitOrders',
       'canMexasAcceptLimitOrders(getMexasSettlementSettings())',
-      'await assertMexasOrderbookMatchingEngineReady(db)',
-      'Las nuevas órdenes están pausadas mientras se completa la liquidación MEXAS.',
+      'No se pueden abrir órdenes MEXAS en este momento.',
     ])
     expectMarkersInOrder(source, [
       'export async function assertMexasCanMatchCrossingOrders',
@@ -1540,11 +1541,15 @@ describe('MEXAS flow safety guardrails', () => {
       'matchingEngineMode: process.env.MEXAS_MATCHING_ENGINE_MODE',
       'settlementMode: process.env.MEXAS_SETTLEMENT_MODE',
       'if (!isMexasOrderBookOnlyContract(contract))',
-      'canMexasAcceptLimitOrders(getMexasSettlementSettings())',
-      'Las nuevas órdenes están pausadas mientras se completa la liquidación MEXAS.',
+      'const settings = getMexasSettlementSettings()',
+      'canMexasAcceptLimitOrders(settings)',
+      'canMexasMatchCrossingOrders(settings)',
       'await assertMexasOrderbookMatchingEngineReady(db)',
       'canPlaceOrders: true',
       'matchingEngineReady: true',
+      'canPlaceOrders: true',
+      'matchingEngineReady: false',
+      'Puedes abrir órdenes límite que agreguen liquidez.',
     ])
     expectMarkersInOrder(panelSource, [
       'const mexasOrderReadiness = useMexasOrderReadiness(',
@@ -1568,9 +1573,12 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(orderBookPanelSource, [
       'useMexasOrderReadiness(contract.id, orderBookOnly)',
       'const ordersPaused =',
+      'const matchingPaused =',
       'Nuevas órdenes pausadas mientras se completa la liquidación MEXAS.',
       'no se',
       'reservará MEX nuevo.',
+      'Puedes abrir órdenes límite que agreguen liquidez.',
+      'cruzan el libro están pausadas',
     ])
     expect(proxySource).toContain(
       '^v0\\/market\\/[^/]+\\/mexas-order-readiness$'

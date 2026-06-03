@@ -115,11 +115,10 @@ export function hasOperationalMexasEscrow(settings: MexasSettlementSettings) {
   )
 }
 
-export function canMexasAcceptLimitOrders(settings: MexasSettlementSettings) {
-  return (
-    hasTransactionalMexasMatchingEngine(settings) &&
-    hasOperationalMexasEscrow(settings)
-  )
+export function canMexasAcceptLimitOrders(_settings: MexasSettlementSettings) {
+  // Resting limit orders can be reserved and later released/cancelled without
+  // settling a filled trade. Crossing orders are gated separately.
+  return true
 }
 
 export function getMissingMexasEscrowCapabilities() {

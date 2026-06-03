@@ -35,15 +35,14 @@ export async function assertMexasCanMatchCrossingOrders(
   )
 }
 
-export async function assertMexasCanAcceptLimitOrders(db: SupabaseClient) {
+export async function assertMexasCanAcceptLimitOrders(_db: SupabaseClient) {
   if (canMexasAcceptLimitOrders(getMexasSettlementSettings())) {
-    await assertMexasOrderbookMatchingEngineReady(db)
     return
   }
 
   throw new APIError(
     503,
-    'Las nuevas órdenes están pausadas mientras se completa la liquidación MEXAS. No se reservará MEX nuevo.'
+    'No se pueden abrir órdenes MEXAS en este momento.'
   )
 }
 

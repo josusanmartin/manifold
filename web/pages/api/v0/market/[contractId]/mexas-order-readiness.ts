@@ -2,6 +2,7 @@ import { APIError } from 'common/api/utils'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import {
   canMexasAcceptLimitOrders,
+  canMexasMatchCrossingOrders,
   type MexasSettlementSettings,
 } from 'common/mexas-settlement'
 import { convertContract } from 'common/supabase/contracts'
@@ -98,31 +99,41 @@ export default async function handler(
       })
     }
 
-    if (!canMexasAcceptLimitOrders(getMexasSettlementSettings())) {
+    const settings = getMexasSettlementSettings()
+    if (!canMexasAcceptLimitOrders(settings)) {
       return res.status(200).json({
         canPlaceOrders: false,
         matchingEngineReady: false,
         message:
-          'Las nuevas órdenes están pausadas mientras se completa la liquidación MEXAS. No se reservará MEX nuevo.',
+          'No se pueden abrir órdenes MEXAS en este momento.',
       })
     }
 
-    try {
-      await assertMexasOrderbookMatchingEngineReady(db)
-    } catch (error) {
+    if (canMexasMatchCrossingOrders(settings)) {
+      try {
+        await assertMexasOrderbookMatchingEngineReady(db)
+      } catch (error) {
+        return res.status(200).json({
+          canPlaceOrders: true,
+          matchingEngineReady: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'No se pudo verificar el motor de ordenes MEXAS.',
+        })
+      }
+
       return res.status(200).json({
-        canPlaceOrders: false,
-        matchingEngineReady: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : 'No se pudo verificar el motor de ordenes MEXAS.',
+        canPlaceOrders: true,
+        matchingEngineReady: true,
       })
     }
 
     return res.status(200).json({
       canPlaceOrders: true,
-      matchingEngineReady: true,
+      matchingEngineReady: false,
+      message:
+        'Puedes abrir órdenes límite que agreguen liquidez. Las órdenes que cruzan el libro están pausadas hasta completar la liquidación MEXAS.',
     })
   } catch (error) {
     console.error('MEXAS order readiness failed', error)
