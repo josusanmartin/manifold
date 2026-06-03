@@ -1,3 +1,4 @@
+import { PrivyClient } from '@privy-io/node'
 import { APIError } from 'common/api/utils'
 import { Bet } from 'common/bet'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
@@ -32,6 +33,18 @@ type MexasResolutionReadinessResponse = {
 }
 
 const CONTRACT_BETS_PAGE_SIZE = 1000
+let privyClient: PrivyClient | undefined
+
+function getPrivyClient() {
+  const appId = process.env.PRIVY_APP_ID || process.env.NEXT_PUBLIC_PRIVY_APP_ID
+  const appSecret = process.env.PRIVY_APP_SECRET
+  if (!appId || !appSecret) {
+    throw new APIError(500, 'Privy server credentials are not configured.')
+  }
+
+  privyClient ??= new PrivyClient({ appId, appSecret })
+  return privyClient
+}
 
 function getSupabaseAdminClient() {
   const key =
@@ -53,6 +66,26 @@ function getSupabaseAdminClient() {
 
 function getSingleQueryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
+}
+
+function getBearerToken(req: NextApiRequest) {
+  const header = req.headers.authorization
+  if (!header) return undefined
+
+  const [scheme, token] = header.split(' ')
+  if (scheme !== 'Bearer' || !token) return undefined
+  return token
+}
+
+async function getPrivyUserId(req: NextApiRequest) {
+  const token = getBearerToken(req)
+  if (!token) throw new APIError(401, 'Missing Privy token.')
+
+  const verified = await getPrivyClient()
+    .utils()
+    .auth()
+    .verifyAccessToken(token)
+  return verified.user_id
 }
 
 async function loadContractRow(db: SupabaseClient, contractId: string) {
@@ -99,11 +132,18 @@ export default async function handler(
     const contractId = getSingleQueryValue(req.query.contractId)
     if (!contractId) throw new APIError(400, 'Missing contractId.')
 
+    const userId = await getPrivyUserId(req)
     const db = getSupabaseAdminClient()
     const row = await loadContractRow(db, contractId)
     const contract = convertContract(row)
     if (!isMexasOrderBookOnlyContract(contract)) {
       throw new APIError(404, 'Market is not available on MEXAS.')
+    }
+    if (contract.creatorId !== userId) {
+      throw new APIError(
+        403,
+        'Only the market creator can check resolution readiness.'
+      )
     }
 
     await releaseClosedMexasMarketOrders(db, { contractId })

@@ -269,14 +269,6 @@ const JSON_PAYLOADS = [
     name: 'json order readiness ukrwarend26a',
     path: '/api/v0/market/ukrwarend26a/mexas-order-readiness',
   },
-  {
-    name: 'json resolution readiness mexwcwin26a',
-    path: '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
-  },
-  {
-    name: 'json resolution readiness ukrwarend26a',
-    path: '/api/v0/market/ukrwarend26a/mexas-resolution-readiness',
-  },
 ]
 
 function pass(name: string, details: string): SmokeResult {
@@ -465,62 +457,6 @@ async function checkOrderBook(contractId: string) {
   }
 }
 
-async function checkResolutionReadiness(contractId: string) {
-  const { response, text } = await fetchText(
-    `/api/v0/market/${encodeURIComponent(
-      contractId
-    )}/mexas-resolution-readiness`
-  )
-  if (response.status < 200 || response.status >= 400) {
-    return fail(`resolution readiness ${contractId}`, `${response.status}`)
-  }
-
-  try {
-    const data = JSON.parse(text)
-    const valid =
-      data &&
-      typeof data === 'object' &&
-      typeof data.canResolve === 'boolean' &&
-      typeof data.requiresEscrow === 'boolean' &&
-      Number.isFinite(data.filledBetCount)
-    if (!valid) {
-      return fail(
-        `resolution readiness ${contractId}`,
-        'Response does not include readiness booleans.'
-      )
-    }
-
-    const hasMessage =
-      typeof data.message === 'string' && data.message.trim().length > 0
-    if (data.requiresEscrow && data.canResolve) {
-      return fail(
-        `resolution readiness ${contractId}`,
-        'requiresEscrow=true cannot be canResolve=true.'
-      )
-    }
-    if (data.requiresEscrow && !hasMessage) {
-      return fail(
-        `resolution readiness ${contractId}`,
-        'Escrow-blocked resolution is missing an operator message.'
-      )
-    }
-    if (data.filledBetCount <= 0 && data.requiresEscrow) {
-      return fail(
-        `resolution readiness ${contractId}`,
-        'Empty filled exposure cannot require escrow.'
-      )
-    }
-
-    return pass(
-      `resolution readiness ${contractId}`,
-      `canResolve=${data.canResolve}, requiresEscrow=${data.requiresEscrow}, filled=${data.filledBetCount}`
-    )
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    return fail(`resolution readiness ${contractId}`, message)
-  }
-}
-
 async function checkOrderReadiness(contractId: string) {
   const { response, text } = await fetchText(
     `/api/v0/market/${encodeURIComponent(contractId)}/mexas-order-readiness`
@@ -704,8 +640,20 @@ async function runSmoke() {
   results.push(await checkOrderBook('ukrwarend26a'))
   results.push(await checkOrderReadiness('mexwcwin26a'))
   results.push(await checkOrderReadiness('ukrwarend26a'))
-  results.push(await checkResolutionReadiness('mexwcwin26a'))
-  results.push(await checkResolutionReadiness('ukrwarend26a'))
+  results.push(
+    await checkExpectedStatus(
+      'auth resolution readiness mexwcwin26a',
+      '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
+      401
+    )
+  )
+  results.push(
+    await checkExpectedStatus(
+      'auth resolution readiness ukrwarend26a',
+      '/api/v0/market/ukrwarend26a/mexas-resolution-readiness',
+      401
+    )
+  )
   results.push(
     await checkBetsArray(
       '/api/v0/bets?contractId=mexwcwin26a&kinds=open-limit',

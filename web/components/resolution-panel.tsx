@@ -23,6 +23,7 @@ import { linkClass } from 'web/components/widgets/site-link'
 import Link from 'next/link'
 import { XIcon } from '@heroicons/react/solid'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+import { usePrivyLogin } from './crypto/privy-wallet-providers'
 
 type MexasResolutionReadiness = {
   canResolve: boolean
@@ -69,6 +70,7 @@ export function ResolutionPanel(props: {
   const { contract, inModal, onClose } = props
   const isCreator = useUser()?.id === contract.creatorId
   const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)
+  const { getAccessToken } = usePrivyLogin()
 
   const [outcome, setOutcome] = useState<resolution | undefined>()
 
@@ -87,16 +89,26 @@ export function ResolutionPanel(props: {
 
   useEffect(() => {
     if (!isMexasOrderBookOnly) return
+    if (!isCreator) return
 
     let cancelled = false
     setMexasReadiness(undefined)
     setMexasReadinessError(undefined)
 
-    fetch(
-      `/api/v0/market/${encodeURIComponent(
-        contract.id
-      )}/mexas-resolution-readiness`
-    )
+    getAccessToken()
+      .then(async (token) => {
+        if (!token) throw new Error('No se pudo autenticar con Privy.')
+        return await fetch(
+          `/api/v0/market/${encodeURIComponent(
+            contract.id
+          )}/mexas-resolution-readiness`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        )
+      })
       .then(async (res) => {
         const body = await res.json().catch(() => undefined)
         if (!res.ok) {
@@ -121,7 +133,7 @@ export function ResolutionPanel(props: {
     return () => {
       cancelled = true
     }
-  }, [contract.id, isMexasOrderBookOnly])
+  }, [contract.id, getAccessToken, isCreator, isMexasOrderBookOnly])
 
   const mexasReadinessLoading =
     isMexasOrderBookOnly && !mexasReadiness && !mexasReadinessError

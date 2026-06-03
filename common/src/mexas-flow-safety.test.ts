@@ -1130,8 +1130,16 @@ describe('MEXAS flow safety guardrails', () => {
     )
 
     expectMarkersInOrder(apiSource, [
+      'async function loadContractRow',
       '.maybeSingle()',
       "throw new APIError(404, 'Contract not found.')",
+    ])
+    expectMarkersInOrder(apiSource, [
+      'const userId = await getPrivyUserId(req)',
+      'const db = getSupabaseAdminClient()',
+      'const row = await loadContractRow(db, contractId)',
+      'if (contract.creatorId !== userId)',
+      "'Only the market creator can check resolution readiness.'",
       'await releaseClosedMexasMarketOrders(db, { contractId })',
       'await releaseExpiredMexasOrders(db, { contractId })',
       'await releaseUnbackedMexasOrders(db, {',
@@ -1150,7 +1158,9 @@ describe('MEXAS flow safety guardrails', () => {
 
     expectMarkersInOrder(panelSource, [
       'const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)',
+      'const { getAccessToken } = usePrivyLogin()',
       '/mexas-resolution-readiness',
+      'Authorization: `Bearer ${token}`',
       'const mexasResolutionBlocked =',
       'mexasReadinessLoading',
       'mexasReadiness?.requiresEscrow === true',
@@ -1201,22 +1211,18 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
-  test('production smoke covers the local MEXAS resolution preflight endpoint', () => {
+  test('production smoke keeps MEXAS resolution preflight creator-only', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'
     )
 
     expectMarkersInOrder(source, [
-      'async function checkResolutionReadiness',
+      'auth resolution readiness mexwcwin26a',
+      '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
+      '401',
+      'auth resolution readiness ukrwarend26a',
       '/mexas-resolution-readiness',
-      'typeof data.canResolve ===',
-      'typeof data.requiresEscrow ===',
-      'Number.isFinite(data.filledBetCount)',
-      'requiresEscrow=true cannot be canResolve=true.',
-      'Escrow-blocked resolution is missing an operator message.',
-      'Empty filled exposure cannot require escrow.',
-      "results.push(await checkResolutionReadiness('mexwcwin26a'))",
-      "results.push(await checkResolutionReadiness('ukrwarend26a'))",
+      '401',
       "results.push(await checkBlockedResolutionReadiness('not-a-mexas-market'))",
     ])
   })
@@ -1344,7 +1350,7 @@ describe('MEXAS flow safety guardrails', () => {
       "'Manifold'",
       'const JSON_PAYLOADS = [',
       "name: 'json orderbook mexwcwin26a'",
-      "name: 'json resolution readiness ukrwarend26a'",
+      "name: 'json order readiness ukrwarend26a'",
       'async function checkJsonPayloadCopy',
       'JSON.parse(text)',
       'Forbidden JSON copy:',
