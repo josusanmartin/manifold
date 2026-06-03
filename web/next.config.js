@@ -237,8 +237,7 @@ module.exports = {
       },
       {
         source: '/umami',
-        destination:
-          'https://analytics.umami.is/share/ARwUIC9GWLNyowjq/Manifold%20Markets',
+        destination: '/checkout',
         permanent: false,
       },
       {

@@ -91,35 +91,75 @@ const REDIRECTS = [
   { destination: '/checkout', path: '/' },
   { destination: '/checkout', path: '/activity' },
   { destination: '/checkout', path: '/admin' },
+  { destination: '/checkout', path: '/admin/cash-stats' },
+  { destination: '/checkout', path: '/ai/test' },
+  { destination: '/checkout', path: '/analytics' },
   { destination: '/checkout', path: '/browse' },
+  { destination: '/checkout', path: '/browse/for-you' },
+  { destination: '/checkout', path: '/browse/politics' },
   { destination: '/checkout', path: '/calibration' },
   { destination: '/checkout', path: '/charity' },
+  { destination: '/checkout', path: '/charity/1' },
   { destination: '/checkout', path: '/calculator' },
   { destination: '/checkout', path: '/complexsystems' },
   { destination: '/checkout', path: '/cowp' },
   { destination: '/checkout', path: '/create' },
+  { destination: '/checkout', path: '/create-post' },
+  { destination: '/checkout', path: '/dashboard' },
+  { destination: '/checkout', path: '/dashboard/test' },
   { destination: '/checkout', path: '/discord-bot' },
+  { destination: '/checkout', path: '/election/needle' },
+  { destination: '/checkout', path: '/elections' },
   { destination: '/checkout', path: '/explore' },
   { destination: '/checkout', path: '/feed' },
+  { destination: '/checkout', path: '/find' },
+  { destination: '/checkout', path: '/groups' },
+  { destination: '/checkout', path: '/group/test' },
+  { destination: '/checkout', path: '/home' },
   { destination: '/checkout', path: '/lab' },
   { destination: '/checkout', path: '/labs' },
   { destination: '/checkout', path: '/leagues' },
+  { destination: '/checkout', path: '/leagues/test' },
   { destination: '/checkout', path: '/live' },
   { destination: '/checkout', path: '/membership' },
   { destination: '/checkout', path: '/messages' },
+  { destination: '/checkout', path: '/messages/test' },
+  { destination: '/checkout', path: '/my-calibration' },
   { destination: '/checkout', path: '/news' },
+  { destination: '/checkout', path: '/news/test' },
+  { destination: '/checkout', path: '/notifications' },
   { destination: '/checkout', path: '/old-charity' },
+  { destination: '/checkout', path: '/old-charity/test' },
+  { destination: '/checkout', path: '/old-posts/test' },
+  { destination: '/checkout', path: '/og-test/test' },
+  { destination: '/checkout', path: '/pakman' },
+  { destination: '/checkout', path: '/politics' },
   { destination: '/checkout', path: '/post/test' },
   { destination: '/checkout', path: '/posts' },
   { destination: '/checkout', path: '/press' },
+  { destination: '/checkout', path: '/public-messages/test' },
+  { destination: '/checkout', path: '/questions' },
   { destination: '/checkout', path: '/redeem' },
   { destination: '/checkout', path: '/referrals' },
+  { destination: '/checkout', path: '/register-on-discord' },
   { destination: '/checkout', path: '/reports' },
+  { destination: '/checkout', path: '/reports/test' },
+  { destination: '/checkout', path: '/search' },
+  { destination: '/checkout', path: '/server-sitemap.xml' },
   { destination: '/checkout', path: '/sports' },
   { destination: '/checkout', path: '/stats' },
   { destination: '/checkout', path: '/styles' },
+  { destination: '/checkout', path: '/supporter' },
+  { destination: '/checkout', path: '/this-month' },
+  { destination: '/checkout', path: '/todo' },
   { destination: '/checkout', path: '/topic/test' },
+  { destination: '/checkout', path: '/twitch' },
   { destination: '/checkout', path: '/tv' },
+  { destination: '/checkout', path: '/tv/test' },
+  { destination: '/checkout', path: '/umami' },
+  { destination: '/checkout', path: '/versus' },
+  { destination: '/checkout', path: '/websocket-live' },
+  { destination: '/checkout', path: '/welcomeoffer' },
   { destination: '/checkout', path: '/wrapped' },
   { destination: '/checkout', path: '/yc-s23' },
   { destination: '/wallet', path: '/payments' },
@@ -257,6 +297,17 @@ async function fetchManual(path: string, init?: RequestInit) {
 async function checkRedirect(path: string, destination: string) {
   const response = await smokeFetch(path, { redirect: 'manual' })
   const location = response.headers.get('location') ?? ''
+  const decodedLocation = decodeEntities(decodeURIComponentSafe(location))
+  const forbiddenLocation = FORBIDDEN_VISIBLE_COPY.filter((copy) =>
+    decodedLocation.includes(copy)
+  )
+  if (forbiddenLocation.length) {
+    return fail(
+      `redirect ${path}`,
+      `Forbidden destination copy: ${forbiddenLocation.join(', ')}`
+    )
+  }
+
   const locationUrl = location ? new URL(location, SITE_URL) : undefined
   const actualDestination = locationUrl
     ? destination.includes('?')
@@ -272,6 +323,14 @@ async function checkRedirect(path: string, destination: string) {
         `redirect ${path}`,
         `${response.status} -> ${location || 'no location'}`
       )
+}
+
+function decodeURIComponentSafe(value: string) {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
 }
 
 async function checkPage(path: string, required: string[]) {

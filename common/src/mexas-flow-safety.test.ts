@@ -1227,6 +1227,56 @@ describe('MEXAS flow safety guardrails', () => {
     expect(countOccurrences(source, 'fetch(`${SITE_URL}${path}`')).toBe(1)
   })
 
+  test('production smoke covers broad legacy page redirects and rejects legacy redirect destinations', () => {
+    const smokeSource = readRepoFile(
+      'backend/scripts/check-mexas-production-smoke.ts'
+    )
+    const nextConfigSource = readRepoFile('web/next.config.js')
+
+    expectMarkersInOrder(smokeSource, [
+      'async function checkRedirect',
+      'const decodedLocation = decodeEntities(decodeURIComponentSafe(location))',
+      'const forbiddenLocation = FORBIDDEN_VISIBLE_COPY.filter',
+      'Forbidden destination copy:',
+      'new URL(location, SITE_URL)',
+    ])
+    expect(smokeSource).toContain('function decodeURIComponentSafe')
+    for (const path of [
+      "path: '/admin/cash-stats'",
+      "path: '/ai/test'",
+      "path: '/analytics'",
+      "path: '/browse/for-you'",
+      "path: '/charity/1'",
+      "path: '/create-post'",
+      "path: '/dashboard'",
+      "path: '/dashboard/test'",
+      "path: '/election/needle'",
+      "path: '/groups'",
+      "path: '/group/test'",
+      "path: '/home'",
+      "path: '/messages/test'",
+      "path: '/notifications'",
+      "path: '/og-test/test'",
+      "path: '/public-messages/test'",
+      "path: '/server-sitemap.xml'",
+      "path: '/supporter'",
+      "path: '/todo'",
+      "path: '/twitch'",
+      "path: '/umami'",
+      "path: '/versus'",
+      "path: '/websocket-live'",
+      "path: '/welcomeoffer'",
+    ]) {
+      expect(smokeSource).toContain(path)
+    }
+    expectMarkersInOrder(nextConfigSource, [
+      "source: '/umami'",
+      "destination: '/checkout'",
+    ])
+    expect(nextConfigSource).not.toContain('analytics.umami.is')
+    expect(nextConfigSource).not.toContain('Manifold%20Markets')
+  })
+
   test('MEXAS market static props bypass legacy comments and related-market prefetches', () => {
     const source = readRepoFile('common/src/contract-params.ts')
 
