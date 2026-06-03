@@ -75,11 +75,12 @@ La auditoria automatica actual pasa estos checks de seguridad:
 Los blockers de launch real siguen siendo estructurales:
 
 - aplicar el SQL de launch en Supabase para `contracts.token = 'MEX'`, indices
-  de libro y RPC `mexas_orderbook_matching_engine_ready`;
+  de libro, RPC `mexas_orderbook_matching_engine_ready` y ledger
+  `mexas_treasury_transfers`;
 - implementar escrow on-chain real con `captureOrderStake`,
   `releaseOpenOrderStake` y `payoutResolvedPositions`;
-- agregar un ledger idempotente para pagos salientes de tesoreria antes de
-  activar cancelaciones/resoluciones on-chain;
+- conectar el ledger idempotente de pagos salientes a un signer backend de
+  tesoreria antes de activar cancelaciones/resoluciones on-chain;
 - mantener el RPC interno cerrado para stake escrowed hasta que esos pagos
   salientes existan;
 - desplegar/confirmar el scheduler runtime despues de aplicar el SQL.

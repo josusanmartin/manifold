@@ -1833,6 +1833,19 @@ describe('MEXAS flow safety guardrails', () => {
     )
     expect(source).toContain("'NO ask orderbook index missing'")
     expect(source).toContain("'YES bid orderbook index missing'")
+    expect(source).toContain(
+      '2026060301_add_mexas_treasury_settlement_ledger.sql'
+    )
+    expect(source).toContain(
+      'public.mexas_treasury_settlement_ledger_ready() is distinct from true'
+    )
+    expect(source).toContain("'treasury settlement ledger table missing'")
+    expect(source).toContain(
+      "'service_role cannot execute treasury settlement ledger health RPC'"
+    )
+    expect(source).toContain(
+      "'public clients can execute treasury settlement ledger health RPC'"
+    )
     expect(compact).toContain(
       "has_function_privilege( 'service_role', 'public.mexas_match_orderbook_limit_order(text,bigint,integer)', 'execute' )"
     )
@@ -1903,6 +1916,8 @@ describe('MEXAS flow safety guardrails', () => {
       'let needsLaunchSql = false',
       'if (contractFailures.length) needsLaunchSql = true',
       'if (matchingReadyError || matchingReady !== true) needsLaunchSql = true',
+      'if (treasuryLedgerReadyError || treasuryLedgerReady !== true)',
+      'needsLaunchSql = true',
       'if (needsLaunchSql)',
       'Launch SQL is missing and no local Postgres connection env is set.',
       'apply:mexas-launch-sql --print-sql',
@@ -1910,6 +1925,73 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(source).toContain('contracts_token_check still needs the launch SQL')
     expect(source).toContain('RPC/index DDL require Postgres SQL access')
+  })
+
+  test('launch SQL creates a backend-only idempotent MEXAS treasury settlement ledger', () => {
+    const migration = readRepoFile(
+      'backend/supabase/migrations/2026060301_add_mexas_treasury_settlement_ledger.sql'
+    )
+    const compactMigration = compactWhitespace(migration)
+    const readinessSource = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+    const schemaSource = readRepoFile('common/src/supabase/schema.ts')
+
+    expectMarkersInOrder(migration, [
+      'create table if not exists',
+      'public.mexas_treasury_transfers',
+      'idempotency_key text not null',
+      'transfer_type text not null',
+      'status text not null default',
+      'user_id text not null references public.users',
+      'amount numeric(38, 8) not null',
+      'token_address text not null',
+      'chain_id integer not null',
+      'treasury_address text not null',
+      'recipient_address text not null',
+      'tx_hash text null',
+      'metadata jsonb not null default',
+    ])
+    expect(migration).toContain(
+      'constraint mexas_treasury_transfers_amount_positive check (amount > 0)'
+    )
+    expect(migration).toContain(
+      'constraint mexas_treasury_transfers_chain_id_check check (chain_id = 42161)'
+    )
+    expect(migration).toContain(
+      'create unique index if not exists mexas_treasury_transfers_idempotency_key_idx'
+    )
+    expect(migration).toContain(
+      'create unique index if not exists mexas_treasury_transfers_tx_hash_idx'
+    )
+    expectMarkersInOrder(migration, [
+      'alter table public.mexas_treasury_transfers enable row level security',
+      'revoke all on table public.mexas_treasury_transfers',
+      'public,',
+      'anon,',
+      'authenticated',
+      'update on table public.mexas_treasury_transfers to service_role',
+      'or replace function public.mexas_treasury_settlement_ledger_ready',
+      "has_table_privilege('service_role', ledger, 'SELECT')",
+      "not has_table_privilege('anon', ledger, 'SELECT')",
+      'c.relrowsecurity = true',
+      "to_regclass('public.mexas_treasury_transfers_idempotency_key_idx') is not null",
+    ])
+    expect(compactMigration).toContain(
+      'grant select , insert, update on table public.mexas_treasury_transfers to service_role'
+    )
+    expect(compactMigration).toContain(
+      'revoke execute on function public.mexas_treasury_settlement_ledger_ready () from public, anon, authenticated'
+    )
+    expect(compactMigration).toContain(
+      'grant execute on function public.mexas_treasury_settlement_ledger_ready () to service_role'
+    )
+    expectMarkersInOrder(readinessSource, [
+      "db.rpc('mexas_treasury_settlement_ledger_ready')",
+      "fail(\n            'treasury settlement ledger'",
+      'Treasury settlement ledger health RPC reports ready.',
+    ])
+    expect(schemaSource).toContain('mexas_treasury_settlement_ledger_ready')
   })
 
   test('launch readiness fails any MEXAS contract token mismatch', () => {

@@ -8,6 +8,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql',
   'backend/supabase/migrations/2026060203_add_mexas_matching_health.sql',
   'backend/supabase/migrations/20260602153551_add_mexas_orderbook_indexes.sql',
+  'backend/supabase/migrations/2026060301_add_mexas_treasury_settlement_ledger.sql',
 ]
 
 const REQUIRED_CONTRACT_IDS = ['mexwcwin26a', 'ukrwarend26a']
@@ -145,6 +146,16 @@ begin
     v_failures := array_append(v_failures, 'YES bid orderbook index missing');
   end if;
 
+  if to_regprocedure('public.mexas_treasury_settlement_ledger_ready()') is null then
+    v_failures := array_append(v_failures, 'treasury settlement ledger health RPC missing');
+  elsif public.mexas_treasury_settlement_ledger_ready() is distinct from true then
+    v_failures := array_append(v_failures, 'treasury settlement ledger health RPC returned false');
+  end if;
+
+  if to_regclass('public.mexas_treasury_transfers') is null then
+    v_failures := array_append(v_failures, 'treasury settlement ledger table missing');
+  end if;
+
   if not has_function_privilege(
     'service_role',
     'public.mexas_match_orderbook_limit_order(text,bigint,integer)',
@@ -159,6 +170,14 @@ begin
     'execute'
   ) then
     v_failures := array_append(v_failures, 'service_role cannot execute matching health RPC');
+  end if;
+
+  if not has_function_privilege(
+    'service_role',
+    'public.mexas_treasury_settlement_ledger_ready()',
+    'execute'
+  ) then
+    v_failures := array_append(v_failures, 'service_role cannot execute treasury settlement ledger health RPC');
   end if;
 
   if has_function_privilege(
@@ -183,6 +202,18 @@ begin
     'execute'
   ) then
     v_failures := array_append(v_failures, 'public clients can execute matching health RPC');
+  end if;
+
+  if has_function_privilege(
+    'anon',
+    'public.mexas_treasury_settlement_ledger_ready()',
+    'execute'
+  ) or has_function_privilege(
+    'authenticated',
+    'public.mexas_treasury_settlement_ledger_ready()',
+    'execute'
+  ) then
+    v_failures := array_append(v_failures, 'public clients can execute treasury settlement ledger health RPC');
   end if;
 
   if array_length(v_failures, 1) is not null then
@@ -238,6 +269,9 @@ async function verify(client: any) {
   const health = await client.query(
     `select public.mexas_orderbook_matching_engine_ready() as ready`
   )
+  const ledgerHealth = await client.query(
+    `select public.mexas_treasury_settlement_ledger_ready() as ready`
+  )
 
   const failures: string[] = []
   for (const id of REQUIRED_CONTRACT_IDS) {
@@ -254,6 +288,9 @@ async function verify(client: any) {
   }
   if (health.rows[0]?.ready !== true) {
     failures.push('matching health RPC returned false')
+  }
+  if (ledgerHealth.rows[0]?.ready !== true) {
+    failures.push('treasury settlement ledger health RPC returned false')
   }
 
   const mismatches = await client.query(

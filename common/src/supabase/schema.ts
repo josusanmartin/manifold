@@ -4086,6 +4086,10 @@ export type Database = {
         Args: never
         Returns: boolean
       }
+      mexas_treasury_settlement_ledger_ready: {
+        Args: never
+        Returns: boolean
+      }
       get_non_empty_private_message_channel_ids:
         | {
             Args: {

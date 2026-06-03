@@ -1562,6 +1562,30 @@ async function runChecks() {
         : fail('matching RPC health', 'Matching health RPC returned false.')
     )
 
+    const { data: treasuryLedgerReady, error: treasuryLedgerReadyError } =
+      await db.rpc('mexas_treasury_settlement_ledger_ready')
+    if (treasuryLedgerReadyError || treasuryLedgerReady !== true) {
+      needsLaunchSql = true
+    }
+    checks.push(
+      treasuryLedgerReadyError
+        ? fail(
+            'treasury settlement ledger',
+            `Health RPC is not callable: ${formatDiagnosticError(
+              treasuryLedgerReadyError
+            )}`
+          )
+        : treasuryLedgerReady === true
+        ? pass(
+            'treasury settlement ledger',
+            'Treasury settlement ledger health RPC reports ready.'
+          )
+        : fail(
+            'treasury settlement ledger',
+            'Treasury settlement ledger health RPC returned false.'
+          )
+    )
+
     const tokenAlignment = await checkMexasContractTokenAlignment(db)
     if (tokenAlignment.needsLaunchSql) needsLaunchSql = true
     checks.push(tokenAlignment.result)
