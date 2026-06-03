@@ -29,6 +29,7 @@ import { clamp } from 'lodash'
 import { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Input } from 'web/components/widgets/input'
+import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
 import { useMexasOrderReadiness } from 'web/hooks/use-mexas-order-readiness'
 import { usePersistentLocalState } from 'web/hooks/use-persistent-local-state'
 import { api } from 'web/lib/api/api'
@@ -135,10 +136,8 @@ export default function LimitOrderPanel(props: {
     usePersistentLocalState<number>(0, 'limit-order-expiration')
 
   const [lastBetDetails, setLastBetDetails] = useState<Bet | null>(null)
-  const mexasOrderReadiness = useMexasOrderReadiness(
-    contract.id,
-    orderBookOnly
-  )
+  const privy = usePrivyLogin()
+  const mexasOrderReadiness = useMexasOrderReadiness(contract.id, orderBookOnly)
 
   useEffect(() => {
     if (orderBookOnly && selectedExpiration === 1) {
@@ -532,9 +531,7 @@ export default function LimitOrderPanel(props: {
         <DropdownMenu
           buttonContent={
             <Row className="items-center gap-1">
-              <span>
-                {selectedExpirationLabel}
-              </span>
+              <span>{selectedExpirationLabel}</span>
               <SelectorIcon className="text-ink-400 h-4 w-4" />
             </Row>
           }
@@ -737,12 +734,20 @@ export default function LimitOrderPanel(props: {
             <Button
               color={outcome === 'NO' ? 'red' : 'green'}
               size="xl"
-              onClick={withTracking(firebaseLogin, 'login from bet panel', {
-                token: contract.token,
-              })}
+              onClick={withTracking(
+                orderBookOnly ? privy.login : firebaseLogin,
+                orderBookOnly
+                  ? 'privy login from bet panel'
+                  : 'login from bet panel',
+                {
+                  token: contract.token,
+                }
+              )}
               className="mb-2 flex-grow"
             >
-              Inicia sesión para operar
+              {orderBookOnly
+                ? 'Conectar Wallet Privy'
+                : 'Inicia sesión para operar'}
             </Button>
           )}
         </Col>

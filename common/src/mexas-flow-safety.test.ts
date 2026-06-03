@@ -592,6 +592,26 @@ describe('MEXAS flow safety guardrails', () => {
     )
   })
 
+  test('uses Privy login for MEXAS order entry instead of Firebase signup', () => {
+    const source = readRepoFile('web/components/bet/limit-order-panel.tsx')
+    const compact = compactWhitespace(source)
+
+    expect(source).toContain(
+      "import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'"
+    )
+    expectMarkersInOrder(source, [
+      'const orderBookOnly = isMexasOrderBookOnlyContract(contract)',
+      'const privy = usePrivyLogin()',
+      'orderBookOnly ? privy.login : firebaseLogin',
+    ])
+    expect(compact).toContain(
+      "orderBookOnly ? 'privy login from bet panel' : 'login from bet panel'"
+    )
+    expect(compact).toContain(
+      "orderBookOnly ? 'Conectar Wallet Privy' : 'Inicia sesión para operar'"
+    )
+  })
+
   test('does not offer immediate expiration for MEXAS orderbook markets', () => {
     const source = readRepoFile('web/components/bet/limit-order-panel.tsx')
 
