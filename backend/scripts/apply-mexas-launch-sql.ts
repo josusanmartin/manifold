@@ -9,6 +9,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060203_add_mexas_matching_health.sql',
   'backend/supabase/migrations/20260602153551_add_mexas_orderbook_indexes.sql',
   'backend/supabase/migrations/2026060301_add_mexas_treasury_settlement_ledger.sql',
+  'backend/supabase/migrations/2026060302_add_mexas_escrow_capture_guard.sql',
 ]
 
 const REQUIRED_CONTRACT_IDS = ['mexwcwin26a', 'ukrwarend26a']
@@ -156,6 +157,16 @@ begin
     v_failures := array_append(v_failures, 'treasury settlement ledger table missing');
   end if;
 
+  if to_regprocedure('public.mexas_escrow_capture_ready()') is null then
+    v_failures := array_append(v_failures, 'escrow capture health RPC missing');
+  elsif public.mexas_escrow_capture_ready() is distinct from true then
+    v_failures := array_append(v_failures, 'escrow capture health RPC returned false');
+  end if;
+
+  if to_regclass('public.contract_bets_mexas_escrow_tx_hash_idx') is null then
+    v_failures := array_append(v_failures, 'escrow capture tx hash index missing');
+  end if;
+
   if not has_function_privilege(
     'service_role',
     'public.mexas_match_orderbook_limit_order(text,bigint,integer)',
@@ -178,6 +189,14 @@ begin
     'execute'
   ) then
     v_failures := array_append(v_failures, 'service_role cannot execute treasury settlement ledger health RPC');
+  end if;
+
+  if not has_function_privilege(
+    'service_role',
+    'public.mexas_escrow_capture_ready()',
+    'execute'
+  ) then
+    v_failures := array_append(v_failures, 'service_role cannot execute escrow capture health RPC');
   end if;
 
   if has_function_privilege(
@@ -214,6 +233,18 @@ begin
     'execute'
   ) then
     v_failures := array_append(v_failures, 'public clients can execute treasury settlement ledger health RPC');
+  end if;
+
+  if has_function_privilege(
+    'anon',
+    'public.mexas_escrow_capture_ready()',
+    'execute'
+  ) or has_function_privilege(
+    'authenticated',
+    'public.mexas_escrow_capture_ready()',
+    'execute'
+  ) then
+    v_failures := array_append(v_failures, 'public clients can execute escrow capture health RPC');
   end if;
 
   if array_length(v_failures, 1) is not null then
@@ -272,6 +303,9 @@ async function verify(client: any) {
   const ledgerHealth = await client.query(
     `select public.mexas_treasury_settlement_ledger_ready() as ready`
   )
+  const escrowCaptureHealth = await client.query(
+    `select public.mexas_escrow_capture_ready() as ready`
+  )
 
   const failures: string[] = []
   for (const id of REQUIRED_CONTRACT_IDS) {
@@ -291,6 +325,9 @@ async function verify(client: any) {
   }
   if (ledgerHealth.rows[0]?.ready !== true) {
     failures.push('treasury settlement ledger health RPC returned false')
+  }
+  if (escrowCaptureHealth.rows[0]?.ready !== true) {
+    failures.push('escrow capture health RPC returned false')
   }
 
   const mismatches = await client.query(

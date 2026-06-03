@@ -4,7 +4,7 @@
 
 Este flujo aplica a mercados binarios MEXAS con libro de ordenes. El sitio usa
 Privy para identidad y wallet, Supabase para persistir contratos/ordenes/saldos,
-y Arbitrum solo para leer el balance ERC-20 del usuario.
+y Arbitrum para leer balances ERC-20 y verificar recibos de transferencia.
 
 ## Garantias actuales
 
@@ -29,6 +29,9 @@ y Arbitrum solo para leer el balance ERC-20 del usuario.
   tesoreria.
 - La validacion pura de captura escrow comprueba recibos ERC-20 confirmados,
   payer, tesoreria y monto minimo requerido.
+- El backend tiene helper de captura escrow que lee el receipt en Arbitrum y
+  revalida payer, treasury, monto y tx hash no usado; el SQL de launch crea un
+  indice unico para impedir reutilizar el mismo tx hash en dos ordenes.
 - El RPC interno de matching rechaza stake marcado como escrowed y no lo incluye
   como maker hasta que exista el release/payout on-chain correspondiente.
 - El matching usa price-time priority: mejor precio primero, luego orden mas vieja,
@@ -75,8 +78,9 @@ La auditoria automatica actual pasa estos checks de seguridad:
 Los blockers de launch real siguen siendo estructurales:
 
 - aplicar el SQL de launch en Supabase para `contracts.token = 'MEX'`, indices
-  de libro, RPC `mexas_orderbook_matching_engine_ready` y ledger
-  `mexas_treasury_transfers`;
+  de libro, RPC `mexas_orderbook_matching_engine_ready`, ledger
+  `mexas_treasury_transfers` y guard de captura escrow
+  `mexas_escrow_capture_ready`;
 - implementar escrow on-chain real con `captureOrderStake`,
   `releaseOpenOrderStake` y `payoutResolvedPositions`;
 - conectar el ledger idempotente de pagos salientes a un signer backend de

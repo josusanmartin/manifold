@@ -1994,6 +1994,65 @@ describe('MEXAS flow safety guardrails', () => {
     expect(schemaSource).toContain('mexas_treasury_settlement_ledger_ready')
   })
 
+  test('escrow capture verification is idempotent and stays behind launch readiness', () => {
+    const helperSource = readRepoFile('web/lib/api/mexas-escrow-capture.ts')
+    const migrationSource = readRepoFile(
+      'backend/supabase/migrations/2026060302_add_mexas_escrow_capture_guard.sql'
+    )
+    const applySource = readRepoFile(
+      'backend/scripts/apply-mexas-launch-sql.ts'
+    )
+    const readinessSource = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+    const schemaSource = readRepoFile('common/src/supabase/schema.ts')
+
+    expectMarkersInOrder(helperSource, [
+      'MEXAS_ESCROW_TX_HASH_PATTERN',
+      'function normalizeTxHash',
+      'export function getMexasEscrowTreasuryAddress',
+      'MEXAS_TREASURY_WALLET_ADDRESS',
+      'NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS',
+      'export async function assertMexasEscrowTxUnused',
+      ".ilike('data->>mexasEscrowTxHash', txHash)",
+      'export async function verifyMexasEscrowCapture',
+      'getTransactionReceipt({ hash: txHash })',
+      'getMexasEscrowCaptureCheck',
+      "receipt.status === 'success' ? '0x1' : '0x0'",
+      'capture.sufficient',
+      'await assertMexasEscrowTxUnused(params.db, txHash)',
+    ])
+    expectMarkersInOrder(migrationSource, [
+      'contract_bets_mexas_escrow_tx_hash_idx',
+      "lower(data ->> 'mexasEscrowTxHash')",
+      "data ->> 'mexasEscrowTxHash' ~* '^0x[0-9a-f]{64}$'",
+      "coalesce((data ->> 'mexasStakeEscrowed')::boolean, false) = true",
+      'public.mexas_escrow_capture_ready',
+      'revoke',
+      'public,',
+      'anon,',
+      'authenticated',
+      'grant',
+      'service_role',
+    ])
+    expect(applySource).toContain(
+      '2026060302_add_mexas_escrow_capture_guard.sql'
+    )
+    expect(applySource).toContain(
+      'public.mexas_escrow_capture_ready() is distinct from true'
+    )
+    expect(applySource).toContain('contract_bets_mexas_escrow_tx_hash_idx')
+    expectMarkersInOrder(readinessSource, [
+      "await db.rpc('mexas_escrow_capture_ready')",
+      "fail(\n            'escrow capture guard'",
+      'Escrow capture idempotency guard reports ready.',
+      'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS',
+      "'escrow capture flag'",
+      'cannot be true until treasury release and resolution payout escrow capabilities are implemented',
+    ])
+    expect(schemaSource).toContain('mexas_escrow_capture_ready')
+  })
+
   test('launch readiness fails any MEXAS contract token mismatch', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-launch-readiness.ts'

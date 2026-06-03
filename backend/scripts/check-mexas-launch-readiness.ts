@@ -1586,6 +1586,30 @@ async function runChecks() {
           )
     )
 
+    const { data: escrowCaptureReady, error: escrowCaptureReadyError } =
+      await db.rpc('mexas_escrow_capture_ready')
+    if (escrowCaptureReadyError || escrowCaptureReady !== true) {
+      needsLaunchSql = true
+    }
+    checks.push(
+      escrowCaptureReadyError
+        ? fail(
+            'escrow capture guard',
+            `Health RPC is not callable: ${formatDiagnosticError(
+              escrowCaptureReadyError
+            )}`
+          )
+        : escrowCaptureReady === true
+        ? pass(
+            'escrow capture guard',
+            'Escrow capture idempotency guard reports ready.'
+          )
+        : fail(
+            'escrow capture guard',
+            'Escrow capture idempotency guard returned false.'
+          )
+    )
+
     const tokenAlignment = await checkMexasContractTokenAlignment(db)
     if (tokenAlignment.needsLaunchSql) needsLaunchSql = true
     checks.push(tokenAlignment.result)
@@ -1675,6 +1699,20 @@ async function runChecks() {
                 ', '
               )}.`
             : 'MEXAS_ESCROW_IMPLEMENTATION must be onchain-transfer before live matching or resolving filled MEXAS positions.'
+        )
+  )
+  checks.push(
+    getEnvOrVercelValue(
+      'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS',
+      vercelEnvValues
+    ) === 'true' && !hasOperationalEscrow
+      ? fail(
+          'escrow capture flag',
+          'MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS cannot be true until treasury release and resolution payout escrow capabilities are implemented.'
+        )
+      : pass(
+          'escrow capture flag',
+          'On-chain order capture is not enabled ahead of complete treasury release/payout support.'
         )
   )
   checks.push(
