@@ -239,7 +239,7 @@ function BookSide(props: { levels: Level[]; side: 'bid' | 'ask' }) {
       }
     >
       <Row className="text-ink-500 bg-canvas-50 border-ink-200 border-b px-4 py-2 text-xs font-medium uppercase">
-        <span className="flex-1">{isBid ? 'Compras' : 'Ventas'}</span>
+        <span className="flex-1">{isBid ? 'Compras SÍ' : 'Ventas SÍ'}</span>
         <span className="w-20 text-right">Precio</span>
         <span className="w-20 text-right">Tamaño</span>
       </Row>
@@ -283,7 +283,7 @@ function BookLevel(props: { level: Level; side: 'bid' | 'ask' }) {
             : 'text-scarlet-600 relative flex-1 font-semibold'
         }
       >
-        {isBid ? 'SÍ' : 'NO'}
+        {isBid ? 'Compra' : 'Venta'}
       </span>
       <span
         className={

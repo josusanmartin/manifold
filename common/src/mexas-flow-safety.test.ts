@@ -666,6 +666,8 @@ describe('MEXAS flow safety guardrails', () => {
 
     expect(checkoutSource).toContain('Abre órdenes límite desde tu Wallet')
     expect(checkoutSource).toContain('Órdenes límite')
+    expect(checkoutSource).toContain('Vol.</span> MEX 0')
+    expect(checkoutSource).not.toContain('MEX 1.39B')
     expect(checkoutSource).not.toContain('Opera mercados desde tu Wallet')
     expect(checkoutSource).not.toContain('Libro de órdenes activo')
     expect(aboutSource).toContain('Abre órdenes límite con MEX')
@@ -1124,6 +1126,8 @@ describe('MEXAS flow safety guardrails', () => {
     const orderBookSource = readRepoFile('web/components/bet/order-book.tsx')
 
     expect(panelSource).toContain('getMexasOpenOrderAmount')
+    expect(panelSource).toContain("isBid ? 'Compras SÍ' : 'Ventas SÍ'")
+    expect(panelSource).toContain("isBid ? 'Compra' : 'Venta'")
     expect(panelSource).not.toContain('sumBy(bet.fills')
     expectMarkersInOrder(checkoutSource, [
       'function remainingOrderAmount',

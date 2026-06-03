@@ -65,15 +65,21 @@ const PAGES = [
     required: [
       '¿Ganará México la Copa Mundial 2026?',
       'Libro de órdenes',
-      'Compras',
-      'Ventas',
+      'Compras SÍ',
+      'Ventas SÍ',
       'Orden SÍ',
       'Orden NO',
     ],
   },
   {
     path: '/mexas-test/will-the-russia-ukraine-war-end-by-december-31-2026',
-    required: ['Libro de órdenes', 'Compras', 'Ventas', 'Orden SÍ', 'Orden NO'],
+    required: [
+      'Libro de órdenes',
+      'Compras SÍ',
+      'Ventas SÍ',
+      'Orden SÍ',
+      'Orden NO',
+    ],
   },
 ]
 

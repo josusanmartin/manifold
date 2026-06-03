@@ -324,11 +324,11 @@ export default function LimitOrderPanel(props: {
         setBetAmount(amount)
         setError(undefined)
       } else {
-        toast.error('Could not calculate bet for that payout amount')
+        toast.error('No se pudo calcular la orden para ese pago.')
       }
     } catch (err) {
-      console.error('Error calculating bet amount from payout:', err)
-      toast.error('Error calculating bet amount')
+      console.error('Error al calcular la cantidad desde el pago:', err)
+      toast.error('Error al calcular la cantidad.')
     } finally {
       setIsEditingPayout(false)
     }
@@ -359,7 +359,7 @@ export default function LimitOrderPanel(props: {
       )
       console.log(`placed ${TRADE_TERM}. Result:`, bet)
       if (expiresMillisAfter === 1) {
-        toast.success('La orden expirara inmediatamente despues de enviarse')
+        toast.success('La orden expirará inmediatamente después de enviarse.')
       }
       const fullBet: Bet = {
         ...(bet as CandidateBet<LimitBet>),

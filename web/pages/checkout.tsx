@@ -113,7 +113,7 @@ function MarketHeader() {
         </Col>
         <Row className="divide-ink-200 border-ink-200 text-ink-700 overflow-hidden rounded-md border bg-white text-xs font-medium dark:bg-slate-950">
           <div className="px-3 py-2">
-            <span className="text-ink-500 mr-1">Vol.</span> MEX 1.39B
+            <span className="text-ink-500 mr-1">Vol.</span> MEX 0
           </div>
           <div className="border-ink-200 border-l px-3 py-2">
             <span className="text-ink-500 mr-1">Cierra</span> 20 jul 2026
