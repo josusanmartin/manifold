@@ -302,11 +302,18 @@ describe('MEXAS flow safety guardrails', () => {
     )
 
     expect(source).toContain('applyMexasResolutionCreditsAndReleases')
+    expect(source).toContain('getOpenReservedMexasAmount')
     expectMarkersInOrder(source, [
       'const balanceLockOwner = await acquireMexasUserBalanceLock(db, eventUserId)',
       'await updateMexasUserBalanceCas(db, event.userId, event.amount',
       'await releaseOpenOrder(db, entry)',
+      'await refreshMexasOpenReservedAmount(db, eventUserId)',
       'await releaseMexasUserBalanceLock(db, eventUserId, balanceLockOwner)',
+    ])
+    expectMarkersInOrder(source, [
+      'async function refreshMexasOpenReservedAmount',
+      '[MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]:',
+      'await getOpenReservedMexasAmount(db, { userId })',
     ])
     expectMarkersInOrder(source, [
       'async function releaseOpenOrder',

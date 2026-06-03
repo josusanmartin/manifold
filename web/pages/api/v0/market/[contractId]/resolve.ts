@@ -27,6 +27,7 @@ import {
   updateMexasUserBalanceCas,
 } from 'web/lib/api/mexas-balance'
 import {
+  getOpenReservedMexasAmount,
   releaseClosedMexasMarketOrders,
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
@@ -39,6 +40,8 @@ type ErrorResponse = { message: string; details?: unknown }
 const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
 const CONTRACT_BETS_PAGE_SIZE = 1000
 const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000
+const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY =
+  'mexasWalletOpenReservedAmount'
 
 let privyClient: PrivyClient | undefined
 
@@ -297,6 +300,18 @@ async function releaseOpenOrder(
   if (error) throw error
 }
 
+async function refreshMexasOpenReservedAmount(
+  db: SupabaseClient,
+  userId: string
+) {
+  await updateMexasUserBalanceCas(db, userId, 0, {
+    dataPatch: {
+      [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]:
+        await getOpenReservedMexasAmount(db, { userId }),
+    },
+  })
+}
+
 async function applyMexasResolutionCreditsAndReleases(
   db: SupabaseClient,
   entries: { row: Row<'contract_bets'>; bet: Bet }[],
@@ -336,6 +351,9 @@ async function applyMexasResolutionCreditsAndReleases(
       }
       for (const entry of entriesByUserId.get(eventUserId) ?? []) {
         await releaseOpenOrder(db, entry)
+      }
+      if ((entriesByUserId.get(eventUserId) ?? []).length) {
+        await refreshMexasOpenReservedAmount(db, eventUserId)
       }
     } finally {
       await releaseMexasUserBalanceLock(db, eventUserId, balanceLockOwner)
