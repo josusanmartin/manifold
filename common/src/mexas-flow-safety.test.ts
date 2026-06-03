@@ -1193,6 +1193,9 @@ describe('MEXAS flow safety guardrails', () => {
       'web/components/bet/limit-orders-table.tsx'
     )
     const orderBookSource = readRepoFile('web/components/bet/order-book.tsx')
+    const depthChartSource = readRepoFile(
+      'web/components/charts/contract/depth-chart.tsx'
+    )
 
     expect(panelSource).toContain('getMexasOpenOrderAmount')
     expect(panelSource).toContain("isBid ? 'Compras SÍ' : 'Ventas SÍ'")
@@ -1223,6 +1226,18 @@ describe('MEXAS flow safety guardrails', () => {
       'const filled = bet.isFilled || openAmount <= 1e-9',
       'amount={openAmount}',
       'token={displayToken}',
+    ])
+    expect(orderBookSource).toContain('const getOpenAmount = (bet: LimitBet)')
+    expect(orderBookSource).toContain('const total = sumBy(bets, getOpenAmount)')
+    expect(orderBookSource).toContain('amount={getOpenAmount(b)}')
+    expectMarkersInOrder(depthChartSource, [
+      "import { isMexasOrderBookOnlyContract } from 'common/mexas-market'",
+      "import { getMexasOpenOrderAmount } from 'common/mexas-order-book'",
+      'const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)',
+      'const yesData = cumulative(yesBets, isMexasOrderBookOnly)',
+      'const openAmount = isMexasOrderBookOnly',
+      '? getMexasOpenOrderAmount(bet)',
+      ': bet.orderAmount - bet.amount',
     ])
   })
 

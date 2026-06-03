@@ -12,6 +12,8 @@ import { curveStepAfter } from 'd3-shape'
 import { axisBottom, axisRight } from 'd3-axis'
 import { formatLargeNumber } from 'common/util/format'
 import { Answer } from 'common/answer'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+import { getMexasOpenOrderAmount } from 'common/mexas-order-book'
 import { DEM_COLOR, REP_COLOR } from 'web/components/usa-map/state-election-map'
 
 function getColor(color: string) {
@@ -43,8 +45,9 @@ export function DepthChart(props: {
 }) {
   const { contract, answer, yesBets, noBets, width, height, pseudonym } = props
 
-  const yesData = cumulative(yesBets)
-  const noData = cumulative(noBets)
+  const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(contract)
+  const yesData = cumulative(yesBets, isMexasOrderBookOnly)
+  const noData = cumulative(noBets, isMexasOrderBookOnly)
   if (yesData.length === 0 || noData.length === 0) {
     return null
   }
@@ -112,19 +115,25 @@ export function DepthChart(props: {
 // Converts a list of LimitBets into a list of coordinates to render into a depth chart.
 // The y value accumulates each order's amount.
 // Note this means YES bets are in reverse probability order
-function cumulative(bets: LimitBet[]): HistoryPoint[] {
+function cumulative(
+  bets: LimitBet[],
+  isMexasOrderBookOnly: boolean
+): HistoryPoint[] {
   const result: HistoryPoint[] = []
   let totalAmount = 0
 
   for (const bet of bets) {
-    totalAmount += orderSize(bet)
+    totalAmount += orderSize(bet, isMexasOrderBookOnly)
     result.push({ x: bet.limitProb, y: totalAmount })
   }
 
   return result
 }
 
-function orderSize(bet: LimitBet) {
+function orderSize(bet: LimitBet, isMexasOrderBookOnly: boolean) {
   const price = bet.outcome === 'YES' ? bet.limitProb : 1 - bet.limitProb
-  return (bet.orderAmount - bet.amount) / price
+  const openAmount = isMexasOrderBookOnly
+    ? getMexasOpenOrderAmount(bet)
+    : bet.orderAmount - bet.amount
+  return openAmount / price
 }

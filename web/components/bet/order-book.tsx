@@ -539,8 +539,12 @@ function CollapsedOrderRow(props: {
   const { outcome } = bets[0]
   const isPseudoNumeric = contract.outcomeType === 'PSEUDO_NUMERIC'
   const isBinaryMC = isBinaryMulti(contract)
+  const getOpenAmount = (bet: LimitBet) =>
+    isMexasOrderBookOnlyContract(contract)
+      ? getMexasOpenOrderAmount(bet)
+      : bet.orderAmount - bet.amount
 
-  const total = sumBy(bets, (b) => b.orderAmount - b.amount)
+  const total = sumBy(bets, getOpenAmount)
 
   const allUsers = useUsers(uniq(bets.map((b) => b.userId)))?.filter(
     (a) => a != null
@@ -550,8 +554,7 @@ function CollapsedOrderRow(props: {
   // find 3 largest users
   const userBets = groupBy(bets, (b) => b.userId)
   const userSums = Object.entries(userBets).map(
-    ([userId, bets]) =>
-      [userId, sumBy(bets, (b) => b.orderAmount - b.amount)] as const
+    ([userId, bets]) => [userId, sumBy(bets, getOpenAmount)] as const
   )
   const largest = sortBy(userSums, ([, sum]) => -sum)
     .slice(0, 3)
@@ -628,7 +631,7 @@ function CollapsedOrderRow(props: {
               </div>
               <div className="text-right">
                 <MoneyDisplay
-                  amount={b.orderAmount - b.amount}
+                  amount={getOpenAmount(b)}
                   isCashContract={contract.token === 'CASH'}
                 />
               </div>
@@ -863,8 +866,12 @@ function OrderBookRow(props: {
   const { outcome } = bets[0]
   const isPseudoNumeric = contract.outcomeType === 'PSEUDO_NUMERIC'
   const isBinaryMC = isBinaryMulti(contract)
+  const getOpenAmount = (bet: LimitBet) =>
+    isMexasOrderBookOnlyContract(contract)
+      ? getMexasOpenOrderAmount(bet)
+      : bet.orderAmount - bet.amount
 
-  const total = sumBy(bets, (b) => b.orderAmount - b.amount)
+  const total = sumBy(bets, getOpenAmount)
 
   const allUsers = useUsers(uniq(bets.map((b) => b.userId)))?.filter(
     (a) => a != null
@@ -873,8 +880,7 @@ function OrderBookRow(props: {
 
   const userBets = groupBy(bets, (b) => b.userId)
   const userSums = Object.entries(userBets).map(
-    ([userId, bets]) =>
-      [userId, sumBy(bets, (b) => b.orderAmount - b.amount)] as const
+    ([userId, bets]) => [userId, sumBy(bets, getOpenAmount)] as const
   )
   const largest = sortBy(userSums, ([, sum]) => -sum)
     .slice(0, 3)
@@ -956,7 +962,7 @@ function OrderBookRow(props: {
                 </Row>
                 <span className="text-ink-600">
                   <MoneyDisplay
-                    amount={b.orderAmount - b.amount}
+                    amount={getOpenAmount(b)}
                     isCashContract={contract.token === 'CASH'}
                   />
                 </span>
