@@ -48,6 +48,12 @@ const CONTRACT_BETS_PAGE_SIZE = 1000
 const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000
 const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY = 'mexasWalletOpenReservedAmount'
 
+type MexasTreasuryTransferRow = Row<'mexas_treasury_transfers'>
+
+type MexasResolutionReleaseOptions = {
+  treasuryTransfersByCreditKey?: Map<string, MexasTreasuryTransferRow>
+}
+
 let privyClient: PrivyClient | undefined
 
 function getPrivyClient() {
@@ -266,7 +272,8 @@ async function loadContractBets(db: SupabaseClient, contractId: string) {
 
 async function releaseOpenOrder(
   db: SupabaseClient,
-  entry: { row: Row<'contract_bets'>; bet: Bet }
+  entry: { row: Row<'contract_bets'>; bet: Bet },
+  options: MexasResolutionReleaseOptions = {}
 ) {
   const entryBet = entry.bet as LimitBet & MexasReservedOrderData
   if (entryBet.limitProb === undefined || entryBet.orderAmount === undefined) {
@@ -294,6 +301,9 @@ async function releaseOpenOrder(
   if (currentBet.isCancelled && currentBet.mexasFundsReleased === true) return
 
   const data = getRowData(typedCurrentRow)
+  const releaseCreditKey = getMexasOrderReleaseCreditKey(currentBet.id)
+  const treasuryTransfer =
+    options.treasuryTransfersByCreditKey?.get(releaseCreditKey)
   const now = Date.now()
   const { data: updatedRow, error } = await db
     .from('contract_bets')
@@ -303,9 +313,13 @@ async function releaseOpenOrder(
         ...data,
         isCancelled: currentBet.isFilled ? currentBet.isCancelled : true,
         mexasFundsReleased: true,
-        mexasReleaseCreditKey: getMexasOrderReleaseCreditKey(currentBet.id),
+        mexasReleaseCreditKey: releaseCreditKey,
         mexasReleaseReason: 'resolution',
         mexasReleasedAt: now,
+        mexasTreasuryReleaseTransferId:
+          treasuryTransfer?.id ?? data.mexasTreasuryReleaseTransferId,
+        mexasTreasuryReleaseTxHash:
+          treasuryTransfer?.tx_hash ?? data.mexasTreasuryReleaseTxHash,
       } as any,
     })
     .eq('bet_id', currentBet.id)
@@ -366,6 +380,10 @@ async function applyMexasResolutionCreditsAndReleases(
   for (const eventUserId of userIds) {
     const userEvents = eventsByUserId.get(eventUserId) ?? []
     const escrowedCreditKeys = new Set<string>()
+    const escrowedTransfersByCreditKey = new Map<
+      string,
+      MexasTreasuryTransferRow
+    >()
     for (const event of userEvents) {
       const bet = entryByBetId.get(event.betId)?.bet as
         | (LimitBet & MexasReservedOrderData)
@@ -374,7 +392,7 @@ async function applyMexasResolutionCreditsAndReleases(
 
       escrowedCreditKeys.add(event.creditKey)
       const treasuryOutcome = getMexasTreasuryResolutionOutcome(event.outcome)
-      await submitMexasTreasuryTransfer({
+      const transfer = await submitMexasTreasuryTransfer({
         amount: event.amount,
         betId: event.betId,
         contractId: event.contractId,
@@ -389,6 +407,9 @@ async function applyMexasResolutionCreditsAndReleases(
         transferType: event.transferType,
         userId: event.userId,
       })
+      if (transfer) {
+        escrowedTransfersByCreditKey.set(event.creditKey, transfer)
+      }
     }
 
     const balanceLockOwner = await acquireMexasUserBalanceLock(db, eventUserId)
@@ -400,7 +421,9 @@ async function applyMexasResolutionCreditsAndReleases(
         })
       }
       for (const entry of entriesByUserId.get(eventUserId) ?? []) {
-        await releaseOpenOrder(db, entry)
+        await releaseOpenOrder(db, entry, {
+          treasuryTransfersByCreditKey: escrowedTransfersByCreditKey,
+        })
       }
       if ((entriesByUserId.get(eventUserId) ?? []).length) {
         await refreshMexasOpenReservedAmount(db, eventUserId)
