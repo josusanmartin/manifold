@@ -23,10 +23,32 @@ export type MexasReservedOrderData = {
   mexasReservedAmount?: number
   mexasFundsReserved?: boolean
   mexasFundsReleased?: boolean
+  mexasStakeEscrowed?: boolean
+  mexasEscrowTxHash?: string
+  mexasEscrowPayerAddress?: string
+  mexasEscrowTreasuryAddress?: string
+  mexasEscrowAmount?: number
 }
 
 export function hasActiveMexasReservation(order: MexasReservedOrderData) {
   return order.mexasFundsReserved === true && order.mexasFundsReleased !== true
+}
+
+export function hasActiveMexasWalletReservation(order: MexasReservedOrderData) {
+  return hasActiveMexasReservation(order) && order.mexasStakeEscrowed !== true
+}
+
+export function hasMexasEscrowedStake(order: MexasReservedOrderData) {
+  return hasActiveMexasReservation(order) && order.mexasStakeEscrowed === true
+}
+
+export function hasMexasEscrowCaptureMetadata(order: MexasReservedOrderData) {
+  return (
+    hasMexasEscrowedStake(order) &&
+    typeof order.mexasEscrowTxHash === 'string' &&
+    typeof order.mexasEscrowPayerAddress === 'string' &&
+    typeof order.mexasEscrowTreasuryAddress === 'string'
+  )
 }
 
 export function getMexasRemainingReservedAmount(order: MexasReservedOrderData) {
@@ -45,7 +67,7 @@ export function getTotalMexasRemainingReservedAmount(
   return orders.reduce(
     (total, order) =>
       total +
-      (hasActiveMexasReservation(order)
+      (hasActiveMexasWalletReservation(order)
         ? getMexasRemainingReservedAmount(order)
         : 0),
     0
@@ -95,7 +117,7 @@ export function getUnbackedMexasOrderIds(
   const newestFirst = [...orders]
     .filter(
       (order) =>
-        hasActiveMexasReservation(order) &&
+        hasActiveMexasWalletReservation(order) &&
         getMexasRemainingReservedAmount(order) > 1e-9
     )
     .sort((a, b) => {

@@ -193,6 +193,7 @@ async function loadExpiredMexasReleaseCandidates(
     where coalesce(b.is_filled, false) = false
       and coalesce((b.data->>'mexasFundsReserved')::boolean, false) = true
       and coalesce((b.data->>'mexasFundsReleased')::boolean, false) = false
+      and coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = false
       and not (
         coalesce((u.data->>'mexasBalanceLock')::boolean, false) = true
         and coalesce((u.data->>'mexasBalanceLockSince')::bigint, 0) > $1::bigint - 120000

@@ -1,9 +1,11 @@
+import { APIError } from 'common/api/utils'
 import { LimitBet } from 'common/bet'
 import {
   getMexasRemainingReservedAmount,
   getMexasSyncedAvailableBalance,
   getTotalMexasRemainingReservedAmount,
   getUnbackedMexasOrderIds,
+  hasMexasEscrowedStake,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
 import { getMexasOrderReleaseCreditKey } from 'common/mexas-resolution'
@@ -109,6 +111,9 @@ async function prepareOpenMexasOrderRelease(
 ) {
   const bet = convertBet(row) as LimitBet & MexasReservedOrderData
   if (bet.limitProb === undefined || bet.orderAmount === undefined) return
+  if (hasMexasEscrowedStake(bet)) {
+    throw new APIError(503, 'MEXAS escrowed stake release is not implemented.')
+  }
 
   const data = getBetData(row)
   const now = Date.now()
@@ -153,6 +158,9 @@ async function prepareCancelledMexasOrderRelease(
 ) {
   const bet = convertBet(row) as LimitBet & MexasReservedOrderData
   if (bet.limitProb === undefined || bet.orderAmount === undefined) return
+  if (hasMexasEscrowedStake(bet)) {
+    throw new APIError(503, 'MEXAS escrowed stake release is not implemented.')
+  }
 
   const data = getBetData(row)
   const now = Date.now()

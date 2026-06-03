@@ -169,6 +169,8 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain('updateMexasUserBalanceCas')
     expectMarkersInOrder(ordersSource, [
       'async function prepareOpenMexasOrderRelease',
+      'hasMexasEscrowedStake(bet)',
+      'MEXAS escrowed stake release is not implemented.',
       'mexasReleaseReason: releaseReason',
       ".eq('is_cancelled', false)",
       ".eq('is_filled', false)",
@@ -176,6 +178,8 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expectMarkersInOrder(ordersSource, [
       'async function prepareCancelledMexasOrderRelease',
+      'hasMexasEscrowedStake(bet)',
+      'MEXAS escrowed stake release is not implemented.',
       'const creditKey =',
       'getMexasOrderReleaseCreditKey(bet.id)',
       ".eq('is_cancelled', true)",
@@ -358,6 +362,7 @@ describe('MEXAS flow safety guardrails', () => {
       'join users u on u.id = b.user_id',
       "coalesce((b.data->>'mexasFundsReserved')::boolean, false) = true",
       "coalesce((b.data->>'mexasFundsReleased')::boolean, false) = false",
+      "coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = false",
       "coalesce((u.data->>'mexasBalanceLock')::boolean, false) = true",
       "coalesce((u.data->>'mexasBalanceLockSince')::bigint, 0) > $1::bigint - 120000",
       "and (c.token = 'MEX' or c.data->>'token' = 'MEX')",
@@ -2243,6 +2248,43 @@ describe('MEXAS flow safety guardrails', () => {
     expect(settlementSource).toContain('captureOrderStake: false')
     expect(settlementSource).toContain('releaseOpenOrderStake: false')
     expect(settlementSource).toContain('payoutResolvedPositions: false')
+  })
+
+  test('keeps escrowed MEXAS stake out of wallet backing checks until treasury release exists', () => {
+    const marketSource = readRepoFile('common/src/mexas-market.ts')
+    const readinessSource = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+    const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')
+    const schedulerSource = readRepoFile(
+      'backend/shared/src/expire-limit-orders.ts'
+    )
+
+    expectMarkersInOrder(marketSource, [
+      'mexasStakeEscrowed?: boolean',
+      'export function hasActiveMexasWalletReservation',
+      'hasActiveMexasReservation(order)',
+      'order.mexasStakeEscrowed !== true',
+      'export function hasMexasEscrowedStake',
+      'order.mexasStakeEscrowed === true',
+      'export function hasMexasEscrowCaptureMetadata',
+      'typeof order.mexasEscrowTxHash',
+    ])
+    expectMarkersInOrder(readinessSource, [
+      'hasActiveMexasWalletReservation',
+      'if (!hasActiveMexasWalletReservation(bet as any)) continue',
+      'const remainingReservedAmount = getMexasRemainingReservedAmount',
+    ])
+    expectMarkersInOrder(ordersSource, [
+      'hasMexasEscrowedStake',
+      'async function prepareOpenMexasOrderRelease',
+      'MEXAS escrowed stake release is not implemented.',
+      'async function prepareCancelledMexasOrderRelease',
+      'MEXAS escrowed stake release is not implemented.',
+    ])
+    expect(schedulerSource).toContain(
+      "coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = false"
+    )
   })
 
   test('legacy MEXAS treasury purchase endpoint fails closed', () => {

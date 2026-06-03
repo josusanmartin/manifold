@@ -9,6 +9,7 @@ import {
 } from 'common/mexas-settlement'
 import { MEXAS_PUBLIC_RPC_URL, MEXAS_TOKEN } from 'common/crypto/mexas'
 import {
+  hasActiveMexasWalletReservation,
   getMexasRemainingReservedAmount,
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
@@ -664,6 +665,7 @@ async function loadOpenReservedMexasOrders(
     for (const row of (data ?? []) as Row<'contract_bets'>[]) {
       const bet = convertBet(row)
       if ((bet as any).mexasFundsReleased === true) continue
+      if (!hasActiveMexasWalletReservation(bet as any)) continue
 
       const remainingReservedAmount = getMexasRemainingReservedAmount(
         bet as any

@@ -23,6 +23,12 @@ y Arbitrum solo para leer el balance ERC-20 del usuario.
 - El scheduler de expiracion tambien lee Arbitrum antes de liberar reservas
   MEXAS, revalida locks de balance frescos y no acredita saldo interno por
   encima de `walletBalance - reservasAbiertas`.
+- El modelo ya distingue reservas respaldadas por wallet de stake marcado como
+  escrowed en tesoreria; el stake escrowed no cuenta contra backing de wallet y
+  no puede salir por el release path interno hasta que exista pago on-chain de
+  tesoreria.
+- La validacion pura de captura escrow comprueba recibos ERC-20 confirmados,
+  payer, tesoreria y monto minimo requerido.
 - El matching usa price-time priority: mejor precio primero, luego orden mas vieja,
   luego `bet_id` como desempate determinista.
 - La colocacion de ordenes toma un lock por mercado y usa CAS por fila de orden,
@@ -70,6 +76,8 @@ Los blockers de launch real siguen siendo estructurales:
   de libro y RPC `mexas_orderbook_matching_engine_ready`;
 - implementar escrow on-chain real con `captureOrderStake`,
   `releaseOpenOrderStake` y `payoutResolvedPositions`;
+- agregar un ledger idempotente para pagos salientes de tesoreria antes de
+  activar cancelaciones/resoluciones on-chain;
 - desplegar/confirmar el scheduler runtime despues de aplicar el SQL.
 
 ## Superficie publica MEXAS

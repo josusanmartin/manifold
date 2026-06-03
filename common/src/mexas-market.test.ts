@@ -2,6 +2,9 @@ import {
   getMexasAvailableBalance,
   getMexasSyncedAvailableBalance,
   hasActiveMexasReservation,
+  hasActiveMexasWalletReservation,
+  hasMexasEscrowCaptureMetadata,
+  hasMexasEscrowedStake,
   isMexasOrderBookOnlyContract,
   getTotalMexasRemainingReservedAmount,
   getUnbackedMexasOrderIds,
@@ -88,6 +91,43 @@ describe('MEXAS reserved order backing', () => {
     expect(getUnbackedMexasOrderIds([active, released, unreserved], 0)).toEqual(
       ['active']
     )
+  })
+
+  test('excludes escrowed stake from wallet reservation backing', () => {
+    const walletReserved = order({
+      id: 'wallet-reserved',
+      orderAmount: 10,
+      amount: 3,
+    })
+    const escrowed = order({
+      id: 'escrowed',
+      orderAmount: 10,
+      amount: 3,
+      mexasStakeEscrowed: true,
+      mexasEscrowTxHash:
+        '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      mexasEscrowPayerAddress: '0x1111111111111111111111111111111111111111',
+      mexasEscrowTreasuryAddress: '0x2222222222222222222222222222222222222222',
+      mexasEscrowAmount: 10,
+    })
+
+    expect(hasActiveMexasReservation(escrowed)).toBe(true)
+    expect(hasActiveMexasWalletReservation(walletReserved)).toBe(true)
+    expect(hasActiveMexasWalletReservation(escrowed)).toBe(false)
+    expect(hasMexasEscrowedStake(escrowed)).toBe(true)
+    expect(hasMexasEscrowCaptureMetadata(escrowed)).toBe(true)
+    expect(
+      getTotalMexasRemainingReservedAmount([walletReserved, escrowed])
+    ).toBe(7)
+    expect(getUnbackedMexasOrderIds([walletReserved, escrowed], 0)).toEqual([
+      'wallet-reserved',
+    ])
+    expect(
+      hasMexasEscrowCaptureMetadata({
+        ...escrowed,
+        mexasEscrowTxHash: undefined,
+      })
+    ).toBe(false)
   })
 
   test('does not cancel orders when on-chain backing covers reserves', () => {
