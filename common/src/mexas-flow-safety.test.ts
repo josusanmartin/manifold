@@ -671,6 +671,7 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('renders and validates MEX order amounts as MEX, not MANA or M$', () => {
     const amountSource = readRepoFile('web/components/widgets/amount-input.tsx')
+    const sliderSource = readRepoFile('web/components/bet/bet-slider.tsx')
     const limitSource = readRepoFile('web/components/bet/limit-order-panel.tsx')
     const betPanelSource = readRepoFile('web/components/bet/bet-panel.tsx')
 
@@ -680,6 +681,14 @@ describe('MEXAS flow safety guardrails', () => {
       'MEX</span>',
       "allowFloat={token === 'CASH' || token === 'MEX'}",
     ])
+    expect(amountSource).toContain("aria-label={ariaLabel ?? 'Cantidad'}")
+    expect(amountSource).toContain("fieldLabel = 'Cantidad'")
+    expect(amountSource).toContain('Saldo insuficiente.')
+    expect(amountSource).toContain('Abrir Wallet')
+    expect(amountSource).not.toContain('Bet amount')
+    expect(amountSource).not.toContain('Open wallet')
+    expect(sliderSource).toContain("ariaLabel={ariaLabel ?? 'Cantidad'}")
+    expect(sliderSource).not.toContain('Bet amount')
     expectMarkersInOrder(limitSource, [
       "const displayToken = orderBookOnly ? 'MEX'",
       'token={displayToken}',

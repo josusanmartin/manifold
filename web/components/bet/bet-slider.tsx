@@ -107,7 +107,7 @@ export const BetSlider = (props: {
           : 'gray'
       }
       amount={sliderIndex}
-      ariaLabel={ariaLabel ?? 'Bet amount'}
+      ariaLabel={ariaLabel ?? 'Cantidad'}
       ariaValueText={formatWithToken({
         amount: sliderAmounts[sliderIndex] ?? sliderAmounts[0],
         token,

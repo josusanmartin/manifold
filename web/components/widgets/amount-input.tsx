@@ -92,7 +92,7 @@ export function AmountInput(
       >
         <Input
           {...rest}
-          aria-label={ariaLabel ?? 'Bet amount'}
+          aria-label={ariaLabel ?? 'Cantidad'}
           className={clsx(label && 'pl-9', 'text-lg', inputClassName)}
           style={inputStyle}
           ref={inputRef}
@@ -124,7 +124,7 @@ export function AmountInput(
             amount !== undefined && (
               <button
                 type="button"
-                aria-label="Clear bet amount"
+                aria-label="Borrar cantidad"
                 className="text-ink-400 hover:text-ink-500 active:text-ink-500 absolute right-4 top-1/2 -translate-y-1/2"
                 onClick={() => onChangeAmount(undefined)}
               >
@@ -184,7 +184,7 @@ export function BuyAmountInput(props: {
     disableQuickButtons,
     token = 'M$',
     sliderColor,
-    fieldLabel = 'Bet amount',
+    fieldLabel = 'Cantidad',
   } = props
   const user = useUser()
 
@@ -295,8 +295,8 @@ export function BuyAmountInput(props: {
                 type="button"
                 aria-label={
                   v > 0
-                    ? `Increase ${fieldLabel.toLowerCase()} by ${v}`
-                    : `Decrease ${fieldLabel.toLowerCase()} by ${Math.abs(v)}`
+                    ? `Aumentar ${fieldLabel.toLowerCase()} en ${v}`
+                    : `Disminuir ${fieldLabel.toLowerCase()} en ${Math.abs(v)}`
                 }
                 className={incrementButtonsClassName}
                 key={v}
