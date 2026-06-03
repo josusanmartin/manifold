@@ -12,14 +12,12 @@ import { InfoTooltip } from '../widgets/info-tooltip'
 import { Input } from '../widgets/input'
 import ShortToggle from '../widgets/short-toggle'
 import { Title } from '../widgets/title'
-import { canReceiveBonuses, PrivateUser, User } from 'common/user'
+import { PrivateUser, User } from 'common/user'
 import { useEffect, useState } from 'react'
 import { generateNewApiKey } from 'web/lib/api/api-key'
 import { api } from 'web/lib/api/api'
-import { track } from 'web/lib/service/analytics'
 import { DeleteYourselfButton } from './delete-yourself'
-import { capitalize } from 'lodash'
-import { ENV_CONFIG, isAdminId, TRADE_TERM } from 'common/envs/constants'
+import { ENV_CONFIG, isAdminId } from 'common/envs/constants'
 import { useNativeInfo } from '../native-message-provider'
 import { postMessageToNative } from 'web/lib/native/post-message'
 import { useRouter } from 'next/router'
@@ -51,12 +49,11 @@ export const AccountSettings = (props: {
 
   return (
     <Col className="gap-5">
-      {!canReceiveBonuses(user) && <IdentityVerificationSetting />}
       <div>
         <label className="mb-1 block">
-          {capitalize(TRADE_TERM)} warnings{' '}
+          Alertas de operación{' '}
           <InfoTooltip
-            text={`Warnings before you place a ${TRADE_TERM} that is either 1. a large portion of your balance, or 2. going to move the probability by a large amount`}
+            text="Avisos antes de enviar una orden que use una parte grande de tu balance o mueva mucho la probabilidad"
           />
         </label>
         <ShortToggle
@@ -69,9 +66,9 @@ export const AccountSettings = (props: {
       </div>
 
       <div>
-        <label className="mb-1 block">Notifications & Emails </label>
+        <label className="mb-1 block">Notificaciones y correos</label>
         <Link href="/notifications?tab=settings">
-          <Button>Edit settings</Button>
+          <Button>Editar ajustes</Button>
         </Link>
       </div>
       {isAdmin && isNative && (
@@ -82,11 +79,11 @@ export const AccountSettings = (props: {
         </div>
       )}
       <div>
-        <label className="mb-1 block">API key</label>
+        <label className="mb-1 block">Clave API</label>
         <Row className="items-stretch gap-3">
           <Input
             type="text"
-            placeholder="Click refresh to generate key"
+            placeholder="Genera una clave"
             value={apiKey}
             readOnly
             className={'w-24'}
@@ -96,7 +93,7 @@ export const AccountSettings = (props: {
             color={'indigo'}
             onClick={() => {
               copyToClipboard(apiKey)
-              toast.success('Copied to clipboard')
+              toast.success('Copiado al portapapeles')
             }}
           >
             <AiOutlineCopy className="h-5 w-5" />
@@ -109,7 +106,7 @@ export const AccountSettings = (props: {
               color: 'red',
             }}
             submitBtn={{
-              label: 'Update key',
+              label: 'Actualizar clave',
             }}
             onSubmitWithSuccess={async () => {
               updateApiKey()
@@ -117,10 +114,10 @@ export const AccountSettings = (props: {
             }}
           >
             <Col>
-              <Title>Are you sure?</Title>
+              <Title>¿Actualizar clave API?</Title>
               <div>
-                Updating your API key will break ALL existing applications
-                connected to your account!
+                Al actualizarla, las aplicaciones conectadas a tu cuenta tendrán
+                que usar la nueva clave.
               </div>
             </Col>
           </ConfirmationButton>
@@ -128,50 +125,17 @@ export const AccountSettings = (props: {
       </div>
       {!user.isBot && (
         <div>
-          <label className="mb-1 block">Bot status</label>
+          <label className="mb-1 block">Estado de bot</label>
           <MarkSelfAsBotButton user={user} />
         </div>
       )}
       <div>
-        <label className="mb-1 block">Delete Account </label>
+        <label className="mb-1 block">Eliminar cuenta</label>
         <div className="flex  items-center  ">
           <DeleteYourselfButton username={user.username} />
         </div>
       </div>
     </Col>
-  )
-}
-
-function IdentityVerificationSetting() {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleVerify = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      track('identity verification: started from settings')
-      const response = await api('create-idenfy-session', {})
-      window.location.href = response.redirectUrl
-    } catch (e) {
-      console.error('Failed to start verification:', e)
-      setError('Failed to start verification. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div>
-      <label className="mb-1 block">Identity Verification</label>
-      <div className="text-ink-600 mb-2 text-sm">
-        Verify your identity to be eligible for bonuses and cash prize raffles.
-      </div>
-      {error && <div className="text-scarlet-500 mb-2 text-sm">{error}</div>}
-      <Button onClick={handleVerify} loading={loading} disabled={loading}>
-        Verify Identity
-      </Button>
-    </div>
   )
 }
 
@@ -196,10 +160,10 @@ function MarkSelfAsBotButton(props: { user: User }) {
     setSubmitting(true)
     try {
       await api('set-bot-status', { userId: user.id, isBot: true })
-      toast.success('Account marked as bot')
+      toast.success('Cuenta marcada como bot')
       router.reload()
     } catch (e: any) {
-      toast.error(e.message ?? 'Failed to update bot status')
+      toast.error(e.message ?? 'No se pudo actualizar el estado de bot')
     } finally {
       setSubmitting(false)
     }
@@ -208,36 +172,37 @@ function MarkSelfAsBotButton(props: { user: User }) {
   return (
     <>
       <Button color="yellow" size="xs" onClick={() => setShowModal(true)}>
-        Mark my account as a bot
+        Marcar mi cuenta como bot
       </Button>
       <Modal open={showModal} setOpen={setShowModal} size="md">
         <Col className="bg-canvas-0 gap-4 rounded-xl p-6">
-          <Title className="!mb-0">Mark account as bot</Title>
+          <Title className="!mb-0">Marcar cuenta como bot</Title>
           <div className="text-ink-700 space-y-3 text-sm leading-relaxed">
             <p>
-              This will <b>permanently</b> mark your account as a bot. This
-              action <b>cannot be undone</b> without contacting a moderator.
+              Esto marcará tu cuenta como bot de forma <b>permanente</b>. La
+              acción <b>no se puede deshacer</b> sin contactar a moderación.
             </p>
-            <p className="font-semibold">Bot accounts:</p>
+            <p className="font-semibold">Las cuentas bot:</p>
             <ul className="list-disc space-y-1 pl-5">
-              <li>Display a "Bot" badge next to your name</li>
+              <li>Muestran una etiqueta "Bot" junto al nombre</li>
               <li>
-                Are excluded from leagues and placed in the Silicon division
+                Se excluyen de ligas y se colocan en la división Silicon
               </li>
               <li>
-                Do not count toward unique bettor bonuses for market creators
+                No cuentan para bonos por operadores únicos de creadores de
+                mercados
               </li>
-              <li>Are excluded from importance score calculations</li>
-              <li>Cannot earn bettor bonuses for other users</li>
+              <li>Se excluyen del cálculo de importancia</li>
+              <li>No pueden generar bonos de operador para otros usuarios</li>
             </ul>
             <p>
-              Only do this if your account is operated by an automated system
-              (trading bot, API script, etc.), not a human.
+              Usa esto solo si tu cuenta opera mediante un sistema automatizado
+              (bot de trading, script API, etc.), no una persona.
             </p>
           </div>
           <Row className="mt-2 justify-end gap-3">
             <Button color="gray" onClick={() => setShowModal(false)}>
-              Cancel
+              Cancelar
             </Button>
             <Button
               color="red"
@@ -246,8 +211,8 @@ function MarkSelfAsBotButton(props: { user: User }) {
               onClick={handleConfirm}
             >
               {countdown > 0
-                ? `I understand (${countdown}s)`
-                : 'Mark as bot permanently'}
+                ? `Entiendo (${countdown}s)`
+                : 'Marcar como bot permanentemente'}
             </Button>
           </Row>
         </Col>

@@ -482,6 +482,7 @@ describe('MEXAS flow safety guardrails', () => {
     const checkedDropdownSource = readRepoFile(
       'web/components/widgets/checked-dropdown.tsx'
     )
+    const settingsSource = readRepoFile('web/components/profile/settings.tsx')
 
     expectMarkersInOrder(profileSource, [
       "title: 'Resumen'",
@@ -526,6 +527,14 @@ describe('MEXAS flow safety guardrails', () => {
     expect(checkedDropdownSource).toContain('Abrir opciones')
     expect(dropdownSource).not.toContain('Open options')
     expect(checkedDropdownSource).not.toContain('Open options')
+    expect(settingsSource).toContain('Alertas de operación')
+    expect(settingsSource).toContain('Notificaciones y correos')
+    expect(settingsSource).toContain('Clave API')
+    expect(settingsSource).toContain('Estado de bot')
+    expect(settingsSource).toContain('Eliminar cuenta')
+    expect(settingsSource).not.toContain('Identity Verification')
+    expect(settingsSource).not.toContain('Verify your identity')
+    expect(settingsSource).not.toContain('cash prize raffles')
   })
 
   test('renders and validates MEX order amounts as MEX, not MANA or M$', () => {
@@ -1340,6 +1349,10 @@ describe('MEXAS flow safety guardrails', () => {
       'web/pages/api/v0/market/[contractId]/mexas-order-readiness.ts'
     )
     const panelSource = readRepoFile('web/components/bet/limit-order-panel.tsx')
+    const hookSource = readRepoFile('web/hooks/use-mexas-order-readiness.ts')
+    const orderBookPanelSource = readRepoFile(
+      'web/components/contract/order-book-panel.tsx'
+    )
     const proxySource = readRepoFile('web/proxy.ts')
     const smokeSource = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'
@@ -1353,7 +1366,7 @@ describe('MEXAS flow safety guardrails', () => {
       'export async function assertMexasCanAcceptLimitOrders',
       'canMexasAcceptLimitOrders(getMexasSettlementSettings())',
       'await assertMexasOrderbookMatchingEngineReady(db)',
-      'Las ordenes MEXAS requieren escrow on-chain y el motor transaccional',
+      'Las nuevas órdenes están pausadas mientras se completa la liquidación MEXAS.',
     ])
     expectMarkersInOrder(source, [
       'export async function assertMexasCanMatchCrossingOrders',
@@ -1376,22 +1389,36 @@ describe('MEXAS flow safety guardrails', () => {
       'settlementMode: process.env.MEXAS_SETTLEMENT_MODE',
       'if (!isMexasOrderBookOnlyContract(contract))',
       'canMexasAcceptLimitOrders(getMexasSettlementSettings())',
-      'Las ordenes MEXAS requieren escrow on-chain y el motor transaccional',
+      'Las nuevas órdenes están pausadas mientras se completa la liquidación MEXAS.',
       'await assertMexasOrderbookMatchingEngineReady(db)',
       'canPlaceOrders: true',
       'matchingEngineReady: true',
     ])
     expectMarkersInOrder(panelSource, [
-      'type MexasOrderReadiness',
-      'mexas-order-readiness',
+      'const mexasOrderReadiness = useMexasOrderReadiness(',
+      'contract.id',
       'const mexasOrderReadinessLoading =',
       'const mexasOrderReadinessBlocked =',
       'mexasOrderReadinessBlocked',
-      'El libro de ordenes MEXAS no esta listo.',
+      'Las nuevas órdenes están pausadas mientras se completa la liquidación MEXAS.',
       'mexasOrderReadinessLoading',
       'Verificando libro...',
       'mexasOrderReadinessBlocked',
-      'Libro no disponible',
+      'Órdenes pausadas',
+    ])
+    expectMarkersInOrder(hookSource, [
+      'export type MexasOrderReadiness',
+      'MEXAS_ORDER_READINESS_FALLBACK',
+      'mexas-order-readiness',
+      'canPlaceOrders: false',
+      'matchingEngineReady: false',
+    ])
+    expectMarkersInOrder(orderBookPanelSource, [
+      'useMexasOrderReadiness(contract.id, orderBookOnly)',
+      'const ordersPaused =',
+      'Nuevas órdenes pausadas mientras se completa la liquidación MEXAS.',
+      'no se',
+      'reservará MEX nuevo.',
     ])
     expect(proxySource).toContain(
       '^v0\\/market\\/[^/]+\\/mexas-order-readiness$'

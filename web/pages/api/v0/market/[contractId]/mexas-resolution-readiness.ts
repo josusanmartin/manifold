@@ -141,7 +141,7 @@ export default async function handler(
       noPayout: audit.noPayout,
       cancelPayout: audit.cancelPayout,
       message: requiresEscrow
-        ? `La resolucion MEXAS tiene ${audit.filledBetCount} posiciones llenadas y requiere escrow on-chain antes de pagar saldos internos.`
+        ? `La resolución MEXAS tiene ${audit.filledBetCount} posiciones llenadas y queda pausada hasta completar la liquidación segura.`
         : undefined,
     })
   } catch (error) {

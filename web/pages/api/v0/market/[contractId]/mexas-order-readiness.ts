@@ -103,7 +103,7 @@ export default async function handler(
         canPlaceOrders: false,
         matchingEngineReady: false,
         message:
-          'Las ordenes MEXAS requieren escrow on-chain y el motor transaccional de libro de ordenes antes de reservar MEX.',
+          'Las nuevas órdenes están pausadas mientras se completa la liquidación MEXAS. No se reservará MEX nuevo.',
       })
     }
 

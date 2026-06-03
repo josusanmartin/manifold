@@ -511,8 +511,8 @@ function MexasResolutionReadinessNotice(props: {
     return (
       <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
         Este mercado tiene {readiness.filledBetCount} posiciones llenadas y la
-        resolución queda bloqueada hasta activar escrow on-chain. Esto evita
-        crear saldos internos MEX sin respaldo.
+        resolución queda pausada hasta completar la liquidación segura. Esto
+        evita crear saldos internos MEX sin respaldo.
       </div>
     )
   }

@@ -8,6 +8,7 @@ import { orderBy, sumBy } from 'lodash'
 import { useEffect, useState } from 'react'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { getMexasOpenOrderAmount } from 'common/mexas-order-book'
+import { useMexasOrderReadiness } from 'web/hooks/use-mexas-order-readiness'
 import { Col } from '../layout/col'
 import { Row } from '../layout/row'
 
@@ -98,13 +99,15 @@ export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
   const markets = getMarkets(contract)
   const { data, loading } = useMexasOpenOrders(contract.id)
   const openOrders = (data ?? []).filter(isOpenLimitBet)
+  const orderBookOnly = isMexasOrderBookOnlyContract(contract)
+  const orderReadiness = useMexasOrderReadiness(contract.id, orderBookOnly)
 
   if (!markets.length) return null
 
   const primaryMarket = markets[0]
   const primaryBook = getBookForMarket(openOrders, primaryMarket)
   const hasOpenOrders = openOrders.length > 0
-  const orderBookOnly = isMexasOrderBookOnlyContract(contract)
+  const ordersPaused = orderBookOnly && orderReadiness?.canPlaceOrders === false
 
   return (
     <Col className="border-ink-200 bg-canvas-0 mt-4 overflow-hidden rounded-md border">
@@ -121,6 +124,14 @@ export function MarketOrderBookPanel(props: { contract: OrderBookContract }) {
           {loading ? 'Cargando' : `${openOrders.length} abiertas`}
         </span>
       </Row>
+
+      {ordersPaused && (
+        <div className="border-ink-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+          Nuevas órdenes pausadas mientras se completa la liquidación MEXAS.
+          Puedes consultar el libro y cancelar tus órdenes abiertas; no se
+          reservará MEX nuevo.
+        </div>
+      )}
 
       {'answers' in contract ? (
         <MultiMarketBook markets={markets} openOrders={openOrders} />

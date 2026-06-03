@@ -31,7 +31,7 @@ export async function assertMexasCanMatchCrossingOrders(
 
   throw new APIError(
     503,
-    'El matching MEXAS requiere escrow on-chain y un motor transaccional atomico. Puedes abrir ordenes limite, pero los cruces estan desactivados hasta implementar el motor de settlement.'
+    'Las órdenes que cruzan el libro están pausadas mientras se completa la liquidación MEXAS. No se ejecutará ni reservará MEX nuevo.'
   )
 }
 
@@ -43,7 +43,7 @@ export async function assertMexasCanAcceptLimitOrders(db: SupabaseClient) {
 
   throw new APIError(
     503,
-    'Las ordenes MEXAS requieren escrow on-chain y el motor transaccional de libro de ordenes antes de reservar MEX.'
+    'Las nuevas órdenes están pausadas mientras se completa la liquidación MEXAS. No se reservará MEX nuevo.'
   )
 }
 
@@ -55,6 +55,6 @@ export function assertMexasCanResolveFilledPositions(
 
   throw new APIError(
     503,
-    `La resolucion MEXAS tiene ${audit.filledBetCount} posiciones llenadas y requiere escrow on-chain antes de pagar saldos internos. Configura MEXAS_SETTLEMENT_MODE=escrow cuando exista custodia real.`
+    `La resolución MEXAS tiene ${audit.filledBetCount} posiciones llenadas y queda pausada hasta completar la liquidación segura.`
   )
 }
