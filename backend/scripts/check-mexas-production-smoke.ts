@@ -278,6 +278,15 @@ const JSON_PAYLOADS = [
   },
 ]
 
+const NEXT_DATA_LEGACY_REDIRECT_PATHS = [
+  '/comments',
+  '/mana-auction',
+  '/manachan',
+  '/predictle',
+  '/prize',
+  '/shop',
+]
+
 function pass(name: string, details: string): SmokeResult {
   return { details, name, status: 'pass' }
 }
@@ -681,6 +690,167 @@ async function checkExpectedStatus(
     : fail(name, describeResponseStatus(response))
 }
 
+function extractNextBuildId(html: string) {
+  const nextDataMatch = html.match(
+    /<script\b[^>]*\bid=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i
+  )
+  if (nextDataMatch) {
+    try {
+      const data = JSON.parse(decodeEntities(nextDataMatch[1]))
+      if (typeof data?.buildId === 'string' && data.buildId.length) {
+        return data.buildId
+      }
+    } catch {
+      // Fall through to the raw HTML search below.
+    }
+  }
+
+  const buildIdMatch = html.match(/"buildId"\s*:\s*"([^"]+)"/)
+  return buildIdMatch?.[1]
+}
+
+function extractLocalNextScriptPaths(html: string) {
+  const paths = new Set<string>()
+  const siteOrigin = new URL(SITE_URL).origin
+  const scriptRegex = /<script\b[^>]*\bsrc=(["'])(.*?)\1/gi
+  let match: RegExpExecArray | null
+
+  while ((match = scriptRegex.exec(html))) {
+    try {
+      const scriptUrl = new URL(decodeEntities(match[2]), SITE_URL)
+      if (
+        scriptUrl.origin === siteOrigin &&
+        scriptUrl.pathname.startsWith('/_next/static/') &&
+        scriptUrl.pathname.endsWith('.js')
+      ) {
+        paths.add(`${scriptUrl.pathname}${scriptUrl.search}`)
+      }
+    } catch {
+      // Ignore malformed script URLs; the page status/copy checks catch broken HTML.
+    }
+  }
+
+  return [...paths]
+}
+
+async function checkProductionSourceMapsDisabled() {
+  const { response, text } = await fetchText('/checkout')
+  if (isVercelChallenge(response)) {
+    return fail('production source maps', describeResponseStatus(response))
+  }
+  if (response.status < 200 || response.status >= 400) {
+    return fail('production source maps', describeResponseStatus(response))
+  }
+
+  const scriptPaths = extractLocalNextScriptPaths(text)
+  if (!scriptPaths.length) {
+    return fail('production source maps', 'No local Next.js scripts found.')
+  }
+
+  const referencedMaps: string[] = []
+  const accessibleMaps: string[] = []
+  const failedScripts: string[] = []
+  const sourceMapCommentPattern =
+    /(?:\/\/[#@]\s*sourceMappingURL=|\/\*#\s*sourceMappingURL=)/
+
+  for (const scriptPath of scriptPaths) {
+    const script = await fetchText(scriptPath)
+    if (script.response.status < 200 || script.response.status >= 400) {
+      failedScripts.push(`${scriptPath}=${script.response.status}`)
+      continue
+    }
+
+    if (sourceMapCommentPattern.test(script.text)) {
+      referencedMaps.push(scriptPath)
+    }
+
+    const scriptUrl = new URL(scriptPath, SITE_URL)
+    const mapPath = `${scriptUrl.pathname}.map`
+    const mapResponse = await smokeFetch(mapPath, { redirect: 'manual' })
+    if (mapResponse.status >= 200 && mapResponse.status < 400) {
+      accessibleMaps.push(mapPath)
+    }
+  }
+
+  if (failedScripts.length) {
+    return fail(
+      'production source maps',
+      `Could not fetch scripts: ${failedScripts.slice(0, 5).join(', ')}`
+    )
+  }
+
+  if (referencedMaps.length || accessibleMaps.length) {
+    return fail(
+      'production source maps',
+      [
+        referencedMaps.length
+          ? `sourceMappingURL in ${referencedMaps.slice(0, 5).join(', ')}`
+          : '',
+        accessibleMaps.length
+          ? `accessible maps ${accessibleMaps.slice(0, 5).join(', ')}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('; ')
+    )
+  }
+
+  return pass(
+    'production source maps',
+    `${scriptPaths.length} Next.js scripts checked; no public maps found.`
+  )
+}
+
+function getNextDataPath(buildId: string, pagePath: string) {
+  const pathname = new URL(pagePath, SITE_URL).pathname.replace(/\/+$/, '')
+  const normalizedPath = pathname === '' ? '/index' : pathname
+  return `/_next/data/${buildId}${normalizedPath}.json`
+}
+
+async function checkNextDataLegacyRedirect(path: string, buildId: string) {
+  const dataPath = getNextDataPath(buildId, path)
+  const response = await smokeFetch(dataPath, { redirect: 'manual' })
+  if (isVercelChallenge(response)) {
+    return fail(`next data redirect ${path}`, describeResponseStatus(response))
+  }
+
+  const location = response.headers.get('location') ?? ''
+  const locationUrl = location ? new URL(location, SITE_URL) : undefined
+  const actualDestination = locationUrl ? locationUrl.pathname : ''
+
+  return response.status >= 300 &&
+    response.status < 400 &&
+    actualDestination === '/checkout'
+    ? pass(`next data redirect ${path}`, `${response.status} -> /checkout`)
+    : fail(
+        `next data redirect ${path}`,
+        `${response.status} -> ${location || 'no location'}`
+      )
+}
+
+async function checkNextDataLegacyRedirects() {
+  const { response, text } = await fetchText('/checkout')
+  if (isVercelChallenge(response)) {
+    return [fail('next data build id', describeResponseStatus(response))]
+  }
+  if (response.status < 200 || response.status >= 400) {
+    return [fail('next data build id', describeResponseStatus(response))]
+  }
+
+  const buildId = extractNextBuildId(text)
+  if (!buildId) {
+    return [fail('next data build id', 'Could not extract Next.js build id.')]
+  }
+
+  const results: SmokeResult[] = [
+    pass('next data build id', `buildId=${buildId}`),
+  ]
+  for (const path of NEXT_DATA_LEGACY_REDIRECT_PATHS) {
+    results.push(await checkNextDataLegacyRedirect(path, buildId))
+  }
+  return results
+}
+
 async function checkBlockedApi(path: string) {
   const response = await smokeFetch(path, { redirect: 'manual' })
   return response.status === 404
@@ -698,6 +868,9 @@ async function runSmoke() {
   for (const file of STATIC_FILES) {
     results.push(...(await checkStaticFile(file.path, file.required)))
   }
+
+  results.push(await checkProductionSourceMapsDisabled())
+  results.push(...(await checkNextDataLegacyRedirects()))
 
   for (const path of BLOCKED_STATIC_PATHS) {
     results.push(await checkBlockedStaticFile(path))

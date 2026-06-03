@@ -97,7 +97,7 @@ const MEXAS_ONLY_REDIRECTS = [
 /** @type {import('next').NextConfig} */
 module.exports = {
   outputFileTracingRoot: path.join(__dirname, '..'),
-  productionBrowserSourceMaps: true,
+  productionBrowserSourceMaps: false,
   reactStrictMode: true,
   // eslint config moved - run `next lint` separately in CI
   modularizeImports: {
