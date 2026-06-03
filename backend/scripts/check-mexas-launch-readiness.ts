@@ -71,6 +71,7 @@ const OPEN_ORDER_PAGE_SIZE = 1000
 const ORDER_LOCK_TIMEOUT_MS = 2 * 60 * 1000
 const RESOLUTION_LOCK_TIMEOUT_MS = 10 * 60 * 1000
 const TRANSFER_PROCESSING_TIMEOUT_MS = 2 * 60 * 1000
+const DEFAULT_TREASURY_MIN_GAS_WEI = 100_000_000_000_000n
 const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
 const TREASURY_SIGNER_SECRET_PATTERN = /^0x[0-9a-fA-F]{64}$/
 const ZERO_EVM_ADDRESS = '0x0000000000000000000000000000000000000000'
@@ -563,6 +564,16 @@ function formatMexasUnits(units: bigint) {
   return `${whole}.${padded.replace(/0+$/, '')}`
 }
 
+function formatWeiAsEth(wei: bigint) {
+  const divisor = 10n ** 18n
+  const whole = wei / divisor
+  const fraction = wei % divisor
+  if (fraction === 0n) return whole.toString()
+
+  const padded = fraction.toString().padStart(18, '0')
+  return `${whole}.${padded.replace(/0+$/, '')}`
+}
+
 function subtractUnitsFloorZero(units: bigint, amount: bigint) {
   return units > amount ? units - amount : 0n
 }
@@ -611,6 +622,88 @@ async function readMexasWalletBalanceUnits(address: string) {
   }
 
   return BigInt(payload.result)
+}
+
+async function readArbitrumNativeBalanceWei(address: string) {
+  const response = await fetch(
+    process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL || MEXAS_PUBLIC_RPC_URL,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        id: 1,
+        jsonrpc: '2.0',
+        method: 'eth_getBalance',
+        params: [address, 'latest'],
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(`Arbitrum RPC returned HTTP ${response.status}`)
+  }
+
+  const payload = (await response.json()) as {
+    error?: { message?: string }
+    result?: string
+  }
+  if (payload.error) {
+    throw new Error(payload.error.message ?? 'Arbitrum RPC returned an error')
+  }
+  if (!payload.result || !/^0x[0-9a-fA-F]+$/.test(payload.result)) {
+    throw new Error('Arbitrum RPC returned an invalid native balance result')
+  }
+
+  return BigInt(payload.result)
+}
+
+function getTreasuryMinGasWei(vercelEnvValues: Map<string, string>) {
+  const raw = getEnvOrVercelValue('MEXAS_TREASURY_MIN_GAS_WEI', vercelEnvValues)
+  if (!raw) return DEFAULT_TREASURY_MIN_GAS_WEI
+  if (!/^\d+$/.test(raw)) {
+    throw new Error('MEXAS_TREASURY_MIN_GAS_WEI must be an integer wei value')
+  }
+  return BigInt(raw)
+}
+
+async function checkTreasuryGasFunding(
+  vercelEnvValues: Map<string, string>
+): Promise<CheckResult> {
+  try {
+    const treasuryAddress = getEnvOrVercelValue(
+      'MEXAS_TREASURY_WALLET_ADDRESS',
+      vercelEnvValues
+    )
+    if (!treasuryAddress || !EVM_ADDRESS_PATTERN.test(treasuryAddress)) {
+      return fail(
+        'treasury gas funding',
+        'MEXAS_TREASURY_WALLET_ADDRESS must be valid before checking treasury gas.'
+      )
+    }
+
+    const normalizedTreasury = normalizeEvmAddress(treasuryAddress)
+    const minGasWei = getTreasuryMinGasWei(vercelEnvValues)
+    const balanceWei = await readArbitrumNativeBalanceWei(normalizedTreasury)
+    if (balanceWei < minGasWei) {
+      return fail(
+        'treasury gas funding',
+        `Treasury has ${formatWeiAsEth(
+          balanceWei
+        )} ETH on Arbitrum, below required ${formatWeiAsEth(
+          minGasWei
+        )} ETH for outgoing MEX transfers. Fund the treasury with Arbitrum ETH or tune MEXAS_TREASURY_MIN_GAS_WEI.`
+      )
+    }
+
+    return pass(
+      'treasury gas funding',
+      `Treasury has ${formatWeiAsEth(
+        balanceWei
+      )} ETH on Arbitrum for outgoing MEX transfers.`
+    )
+  } catch (error) {
+    return fail('treasury gas funding', formatDiagnosticError(error))
+  }
 }
 
 async function loadMexasOrderbookContractIds(db: SupabaseClient) {
@@ -1563,6 +1656,7 @@ async function runChecks() {
   )
   checks.push(checkTreasuryWalletEnv(vercelEnvValues))
   checks.push(checkTreasurySignerEnv(vercelEnvNames, vercelEnvValues))
+  checks.push(await checkTreasuryGasFunding(vercelEnvValues))
 
   const supabaseUrlOrInstanceId = getSupabaseUrlOrInstanceId()
   const supabaseAdminKey = getSupabaseAdminKey()

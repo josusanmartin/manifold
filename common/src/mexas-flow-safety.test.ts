@@ -2395,6 +2395,17 @@ describe('MEXAS flow safety guardrails', () => {
       "pass(\n    'treasury signer env'",
       'checks.push(checkTreasurySignerEnv(vercelEnvNames, vercelEnvValues))',
     ])
+    expectMarkersInOrder(source, [
+      'DEFAULT_TREASURY_MIN_GAS_WEI',
+      'async function readArbitrumNativeBalanceWei',
+      "method: 'eth_getBalance'",
+      'function getTreasuryMinGasWei',
+      'MEXAS_TREASURY_MIN_GAS_WEI',
+      'async function checkTreasuryGasFunding',
+      "'treasury gas funding'",
+      'Fund the treasury with Arbitrum ETH',
+      'checks.push(await checkTreasuryGasFunding(vercelEnvValues))',
+    ])
   })
 
   test('launch readiness checks open MEXAS order backing against Privy wallet balances', () => {
