@@ -2851,6 +2851,12 @@ describe('MEXAS flow safety guardrails', () => {
       '2026060301_add_mexas_treasury_settlement_ledger.sql'
     )
     expect(source).toContain(
+      '20260604212354_enforce_mex_contract_token.sql'
+    )
+    expect(source).toContain('contracts.token default is not MEX')
+    expect(source).toContain('contracts_token_check is not MEX-only')
+    expect(source).toContain('pg_get_constraintdef(con.oid)')
+    expect(source).toContain(
       'public.mexas_treasury_settlement_ledger_ready() is distinct from true'
     )
     expect(source).toContain("'treasury settlement ledger table missing'")
@@ -2865,6 +2871,42 @@ describe('MEXAS flow safety guardrails', () => {
     )
     expect(source).toContain("'public clients can execute matching RPC'")
     expect(source).toContain("'public clients can execute matching health RPC'")
+  })
+
+  test('launch SQL enforces MEX-only contract tokens at the database boundary', () => {
+    const migration = readRepoFile(
+      'backend/supabase/migrations/20260604212354_enforce_mex_contract_token.sql'
+    )
+    const schemaSource = readRepoFile('backend/supabase/contracts.sql')
+    const applySource = readRepoFile(
+      'backend/scripts/apply-mexas-launch-sql.ts'
+    )
+    const sqlTestSource = readRepoFile(
+      'backend/scripts/test-mexas-orderbook-sql.ts'
+    )
+
+    expectMarkersInOrder(migration, [
+      "data ->> 'token' = 'MEX'",
+      "token is distinct from 'MEX'",
+      'Cannot enforce MEX-only contracts while non-MEX contract rows exist',
+      'alter column token',
+      "set default 'MEX'",
+      'drop constraint if exists contracts_token_check',
+      "add constraint contracts_token_check check (token = 'MEX')",
+    ])
+    expect(schemaSource).toContain("token text default 'MEX'")
+    expect(schemaSource).toContain("check (token = 'MEX'::text)")
+    expect(schemaSource).not.toContain("token text default 'MANA'")
+    expect(applySource).toContain(
+      '20260604212354_enforce_mex_contract_token.sql'
+    )
+    expect(applySource).toContain('contracts.token default is not MEX')
+    expect(applySource).toContain('contracts_token_check is not MEX-only')
+    expect(sqlTestSource).toContain(
+      '20260604212354_enforce_mex_contract_token.sql'
+    )
+    expect(sqlTestSource).toContain('contract_token_default')
+    expect(sqlTestSource).toContain('contracts_token_check')
   })
 
   test('fails closed before proxying unknown Manifold API endpoints', () => {

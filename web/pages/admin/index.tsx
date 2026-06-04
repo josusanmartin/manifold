@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Button } from 'web/components/buttons/button'
 import { ConfirmationButton } from 'web/components/buttons/confirmation-button'
 import { Page } from 'web/components/layout/page'
@@ -11,12 +12,10 @@ import { useRedirectIfSignedOut } from 'web/hooks/use-redirect-if-signed-out'
 import { handleCreateSportsMarkets } from 'web/lib/admin/create-sports-markets'
 import { api } from 'web/lib/api/api'
 import { db } from 'web/lib/supabase/db'
-import { LabCard } from '../lab'
 
 export default function AdminPage() {
   useRedirectIfSignedOut()
   const isAdmin = useAdmin()
-  const [manaStatus, setManaStatus] = useState(true)
   const [loanStatus, setLoanStatus] = useState(true)
   const [togglesEnabled, setTogglesEnabled] = useState(false)
 
@@ -28,19 +27,14 @@ export default function AdminPage() {
       .select('*')
       .then((result) => {
         const statuses = result.data ?? []
-        setManaStatus(statuses.find((s) => s.token === 'MANA')?.status ?? true)
         setLoanStatus(statuses.find((s) => s.token === 'LOAN')?.status ?? true)
       })
   }, [])
 
-  const toggleStatus = async (token: 'MANA' | 'LOAN') => {
+  const toggleStatus = async (token: 'LOAN') => {
     if (!togglesEnabled) return
     const result = await api('toggle-system-trading-status', { token })
-    if (token === 'MANA') {
-      setManaStatus(result.status)
-    } else {
-      setLoanStatus(result.status)
-    }
+    setLoanStatus(result.status)
   }
 
   if (!isAdmin) return <></>
@@ -57,12 +51,6 @@ export default function AdminPage() {
             setOn={setTogglesEnabled}
             disabled={false}
           />
-          <span>Mana trading: {manaStatus ? 'Enabled' : 'Disabled'}</span>
-          <ShortToggle
-            on={manaStatus}
-            setOn={() => toggleStatus('MANA')}
-            disabled={!togglesEnabled}
-          />
           <span>Loans: {loanStatus ? 'Enabled' : 'Disabled'}</span>
           <ShortToggle
             on={loanStatus}
@@ -71,32 +59,31 @@ export default function AdminPage() {
           />
         </Row>
 
-        <LabCard title="🧾 sales" href="/admin/sales" />
-        <LabCard title="🎟️ manifest tickets" href="/admin/tickets" />
-        <LabCard title="🆕 new users" href="/admin/new-users" />
-        <LabCard title="🎁 prize payouts" href="/admin/prize" />
-        <LabCard title="🐋 whales" href="/admin/whales" />
-        <LabCard title="💹 stats" href="/stats" />
-        <LabCard
-          title="🍚 umami"
+        <AdminCard title="Sales" href="/admin/sales" />
+        <AdminCard title="Manifest tickets" href="/admin/tickets" />
+        <AdminCard title="New users" href="/admin/new-users" />
+        <AdminCard title="Whales" href="/admin/whales" />
+        <AdminCard title="Stats" href="/stats" />
+        <AdminCard
+          title="Umami"
           href="https://analytics.eu.umami.is/websites/ee5d6afd-5009-405b-a69f-04e3e4e3a685"
         />
-        <LabCard
-          title="🍥 grafana"
+        <AdminCard
+          title="Grafana"
           description="db performance"
           href="https://manifoldmarkets.grafana.net/d/TFZtEJh4k/supabase"
         />
-        <LabCard
-          title="💤 postgres logs"
+        <AdminCard
+          title="Postgres logs"
           href="https://app.supabase.com/project/pxidrgkatumlvfqaxcll/logs/postgres-logs"
         />
-        <LabCard title="🤬 reports" href="/admin/reports" />
-        <LabCard title="👕 merch management" href="/admin/merch" />
-        <LabCard title="🎨 design system" href="/styles" />
-        <LabCard title="🌑 test new user" href="/admin/test-user" />
-        <LabCard title="👤 update user" href="/admin/update-user" />
-        <LabCard
-          title="👤 user info & account management"
+        <AdminCard title="Reports" href="/admin/reports" />
+        <AdminCard title="Merch management" href="/admin/merch" />
+        <AdminCard title="Design system" href="/styles" />
+        <AdminCard title="Test new user" href="/admin/test-user" />
+        <AdminCard title="Update user" href="/admin/update-user" />
+        <AdminCard
+          title="User info and account management"
           href="/admin/user-info"
         />
         <Row className="gap-2">
@@ -131,6 +118,24 @@ export default function AdminPage() {
         </Row>
       </div>
     </Page>
+  )
+}
+
+function AdminCard(props: {
+  title: string
+  description?: string
+  href: string
+}) {
+  const { title, description, href } = props
+
+  return (
+    <Link
+      href={href}
+      className="border-ink-300 hover:bg-primary-100 mb-4 block rounded-md border px-4 py-3"
+    >
+      <div className="text-lg font-semibold">{title}</div>
+      {description && <p className="text-ink-600">{description}</p>}
+    </Link>
   )
 }
 

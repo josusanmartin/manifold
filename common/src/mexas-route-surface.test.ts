@@ -1,4 +1,4 @@
-import { readdirSync } from 'fs'
+import { readdirSync, readFileSync } from 'fs'
 import { join, relative } from 'path'
 
 type Redirect = {
@@ -25,6 +25,10 @@ function listPageFiles(dir: string): string[] {
     if (entry.isDirectory()) return listPageFiles(path)
     return /\.(tsx|ts|jsx|js)$/.test(entry.name) ? [path] : []
   })
+}
+
+function readRepoFile(path: string) {
+  return readFileSync(join(__dirname, '..', '..', path), 'utf8')
 }
 
 function pageFileToRoute(file: string) {
@@ -178,6 +182,44 @@ describe('MEXAS route surface', () => {
         destination: '/checkout',
         permanent: false,
       })
+    }
+  })
+
+  test('removed legacy product pages are redirect-only stubs', () => {
+    const redirectOnlyPages = [
+      'web/pages/charity.tsx',
+      'web/pages/charity/[giveawayNum].tsx',
+      'web/pages/lab.tsx',
+      'web/pages/mana-auction.tsx',
+      'web/pages/predictle.tsx',
+      'web/pages/prize.tsx',
+      'web/pages/prize/[sweepstakesNum].tsx',
+      'web/pages/shop.tsx',
+    ]
+
+    for (const path of redirectOnlyPages) {
+      const source = readRepoFile(path)
+
+      expect(source).toContain("import { GetServerSideProps } from 'next'")
+      expect(source).toContain('return null')
+      expect(source).toContain('getServerSideProps: GetServerSideProps')
+      expect(source).toContain("destination: '/checkout'")
+      expect(source).toContain('permanent: false')
+      expect(source.split('\n').length).toBeLessThanOrEqual(14)
+
+      for (const legacyMarker of [
+        'useAPIGetter',
+        'Predictle',
+        'Prize Drawing',
+        'Manifold',
+        'Mana',
+        'Sweepstakes',
+        'CryptoProviders',
+        'SEO',
+        'track(',
+      ]) {
+        expect(source).not.toContain(legacyMarker)
+      }
     }
   })
 

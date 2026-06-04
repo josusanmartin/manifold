@@ -7,7 +7,6 @@ import {
   CurrencyDollarIcon,
   UserGroupIcon,
   StarIcon,
-  SparklesIcon,
   GiftIcon,
   DesktopComputerIcon,
   DocumentTextIcon,
@@ -113,12 +112,6 @@ export default function SitemapPage() {
               description="Compete in seasonal leagues"
               href="/leagues"
               icon={StarIcon}
-            />
-            <SitemapLink
-              title="Predictle"
-              description="Daily prediction game"
-              href="/predictle"
-              icon={SparklesIcon}
             />
             <SitemapLink
               title="Leaderboards"

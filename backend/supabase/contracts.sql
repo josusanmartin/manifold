@@ -38,17 +38,7 @@ create table if not exists
     resolution_probability numeric,
     resolution_time timestamp with time zone,
     slug text,
-    token text default 'MANA'::character varying not null constraint contracts_token_check check (
-      (
-        token = any (
-          array[
-            ('MANA'::character varying)::text,
-            ('MEX'::character varying)::text,
-            ('CASH'::character varying)::text
-          ]
-        )
-      )
-    ),
+    token text default 'MEX'::character varying not null constraint contracts_token_check check (token = 'MEX'::text),
     unique_bettor_count bigint default 0 not null,
     view_count bigint default 0 not null,
     visibility text,

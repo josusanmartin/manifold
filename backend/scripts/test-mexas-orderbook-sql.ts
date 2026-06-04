@@ -15,6 +15,8 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060303_add_mexas_treasury_processing_status.sql',
   'backend/supabase/migrations/2026060401_harden_mexas_treasury_ledger.sql',
   'backend/supabase/migrations/2026060402_lock_down_legacy_supabase_surface.sql',
+  'backend/supabase/migrations/20260604144518_lock_down_legacy_rpc_surface.sql',
+  'backend/supabase/migrations/20260604212354_enforce_mex_contract_token.sql',
 ]
 
 const ROOT = resolve(__dirname, '../..')
@@ -486,7 +488,16 @@ async function testReadinessAndPermissions(client: PgClient) {
         'authenticated',
         'public.mexas_match_orderbook_limit_order(text,bigint,integer)',
         'execute'
-      ) as authenticated_can_match
+      ) as authenticated_can_match,
+      pg_get_expr(d.adbin, d.adrelid) as contract_token_default,
+      pg_get_constraintdef(con.oid) as contract_token_check
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    join pg_attribute a on a.attrelid = c.oid and a.attname = 'token'
+    join pg_attrdef d on d.adrelid = c.oid and d.adnum = a.attnum
+    join pg_constraint con on con.conrelid = c.oid and con.conname = 'contracts_token_check'
+    where n.nspname = 'public'
+      and c.relname = 'contracts'
   `)
 
   const row = rows[0]
@@ -500,6 +511,17 @@ async function testReadinessAndPermissions(client: PgClient) {
     row.authenticated_can_match,
     false,
     'authenticated matching grant'
+  )
+  assert(
+    ["'MEX'::text", "'MEX'::character varying"].includes(
+      row.contract_token_default
+    ),
+    `Expected contracts.token default to be MEX, got ${row.contract_token_default}.`
+  )
+  assertEqual(
+    row.contract_token_check,
+    "CHECK ((token = 'MEX'::text))",
+    'contracts_token_check'
   )
 
   await client.query('begin')

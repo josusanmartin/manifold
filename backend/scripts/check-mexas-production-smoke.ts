@@ -210,6 +210,7 @@ const REDIRECTS = [
   { destination: '/checkout', path: '/manachan' },
   { destination: '/checkout', path: '/predictle' },
   { destination: '/checkout', path: '/prize' },
+  { destination: '/checkout', path: '/prize/2' },
   { destination: '/checkout', path: '/shop' },
   { destination: '/checkout', path: '/sitemap' },
   {
@@ -331,11 +332,15 @@ const JSON_PAYLOADS = [
 ]
 
 const NEXT_DATA_LEGACY_REDIRECT_PATHS = [
+  '/charity',
+  '/charity/1',
   '/comments',
+  '/lab',
   '/mana-auction',
   '/manachan',
   '/predictle',
   '/prize',
+  '/prize/2',
   '/shop',
 ]
 

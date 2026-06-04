@@ -14,6 +14,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060401_harden_mexas_treasury_ledger.sql',
   'backend/supabase/migrations/2026060402_lock_down_legacy_supabase_surface.sql',
   'backend/supabase/migrations/20260604144518_lock_down_legacy_rpc_surface.sql',
+  'backend/supabase/migrations/20260604212354_enforce_mex_contract_token.sql',
 ]
 
 const REQUIRED_CONTRACT_IDS = ['mexwcwin26a', 'ukrwarend26a']
@@ -110,6 +111,36 @@ begin
       );
     end if;
   end loop;
+
+  if not exists (
+    select 1
+    from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    join pg_attrdef d on d.adrelid = c.oid and d.adnum = a.attnum
+    where n.nspname = 'public'
+      and c.relname = 'contracts'
+      and a.attname = 'token'
+      and pg_get_expr(d.adbin, d.adrelid) in (
+        '''MEX''::text',
+        '''MEX''::character varying'
+      )
+  ) then
+    v_failures := array_append(v_failures, 'contracts.token default is not MEX');
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'contracts'
+      and con.conname = 'contracts_token_check'
+      and pg_get_constraintdef(con.oid) = 'CHECK ((token = ''MEX''::text))'
+  ) then
+    v_failures := array_append(v_failures, 'contracts_token_check is not MEX-only');
+  end if;
 
   if (
     select count(*)
@@ -402,6 +433,31 @@ async function verify(client: any) {
         }`
       )
     }
+  }
+
+  const tokenGuard = await client.query(
+    `
+      select
+        pg_get_expr(d.adbin, d.adrelid) as token_default,
+        pg_get_constraintdef(con.oid) as token_check
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+      join pg_attribute a on a.attrelid = c.oid and a.attname = 'token'
+      join pg_attrdef d on d.adrelid = c.oid and d.adnum = a.attnum
+      join pg_constraint con on con.conrelid = c.oid and con.conname = 'contracts_token_check'
+      where n.nspname = 'public'
+        and c.relname = 'contracts'
+    `
+  )
+  if (
+    !["'MEX'::text", "'MEX'::character varying"].includes(
+      tokenGuard.rows[0]?.token_default
+    )
+  ) {
+    failures.push('contracts.token default is not MEX')
+  }
+  if (tokenGuard.rows[0]?.token_check !== "CHECK ((token = 'MEX'::text))") {
+    failures.push('contracts_token_check is not MEX-only')
   }
 
   if (failures.length) {
