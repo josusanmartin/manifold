@@ -207,6 +207,51 @@ module.exports = {
         permanent: false,
       },
       {
+        source: '/docs',
+        destination: '/about',
+        permanent: false,
+      },
+      {
+        source: '/docs/:path*',
+        destination: '/about',
+        permanent: false,
+      },
+      {
+        source: '/faq',
+        destination: '/about',
+        permanent: false,
+      },
+      {
+        source: '/api-docs',
+        destination: '/about',
+        permanent: false,
+      },
+      {
+        source: '/data',
+        destination: '/about',
+        permanent: false,
+      },
+      {
+        source: '/data/:path*',
+        destination: '/about',
+        permanent: false,
+      },
+      {
+        source: '/privacy-policy',
+        destination: '/about',
+        permanent: false,
+      },
+      {
+        source: '/prize-faq',
+        destination: '/about',
+        permanent: false,
+      },
+      {
+        source: '/prize-rules',
+        destination: '/about',
+        permanent: false,
+      },
+      {
         source: '/analytics',
         destination: '/checkout',
         permanent: false,

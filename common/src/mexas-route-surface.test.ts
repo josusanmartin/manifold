@@ -129,8 +129,17 @@ describe('MEXAS route surface', () => {
     for (const source of [
       '/api',
       '/api/v0',
+      '/api-docs',
+      '/data',
+      '/data/:path*',
+      '/docs',
+      '/docs/:path*',
+      '/faq',
       '/mana-only-terms',
+      '/privacy-policy',
       '/privacy',
+      '/prize-faq',
+      '/prize-rules',
       '/sweepstakes-rules',
       '/terms',
     ]) {
