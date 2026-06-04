@@ -15,8 +15,8 @@ function WalletHeader() {
       </h1>
       <p className="text-ink-600 max-w-2xl text-sm">
         Deposita y retira {MEXAS_TOKEN.symbol} desde tu Wallet Privy. El saldo
-        disponible excluye MEX comprometido en órdenes abiertas o trades
-        ejecutados.
+        disponible excluye MEX comprometido en órdenes abiertas u operaciones
+        ejecutadas.
       </p>
     </Col>
   )

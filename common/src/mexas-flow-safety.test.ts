@@ -1263,14 +1263,22 @@ describe('MEXAS flow safety guardrails', () => {
       '.then(refreshWalletState)',
     ])
     expect(source).toContain('Disponible para retirar')
+    expect(source).toContain('MEX en cadena')
     expect(source).toContain('Reservado en órdenes abiertas')
     expect(source).toContain('setOpenReservedAmount')
     expect(source).toContain('órdenes abiertas descuentan MEX disponible')
-    expect(source).toContain('los trades ejecutados')
+    expect(source).toContain('las operaciones ejecutadas')
+    expectMarkersInOrder(walletPageSource, [
+      'u operaciones',
+      'ejecutadas.',
+    ])
     expect(source).toContain(
-      'Cancela órdenes abiertas o espera la resolución de trades'
+      'Cancela órdenes abiertas o espera la resolución de operaciones'
     )
     for (const pageSource of [source, walletPageSource, checkoutSource]) {
+      expect(pageSource).not.toContain('MEX on-chain')
+      expect(pageSource).not.toContain('trades ejecutados')
+      expect(pageSource).not.toContain('resolución de trades')
       expect(pageSource).not.toContain('permanecen en cadena y disponibles')
       expect(pageSource).not.toContain('permanece disponible')
     }

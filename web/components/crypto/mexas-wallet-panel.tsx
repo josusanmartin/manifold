@@ -363,7 +363,7 @@ function MexasWalletPanelInner() {
 
       if (parsedWithdrawAmount > latestWithdrawableUnits) {
         setWithdrawError(
-          'La cantidad supera tu MEX disponible. Cancela órdenes abiertas o espera la resolución de trades antes de retirar MEX comprometido.'
+          'La cantidad supera tu MEX disponible. Cancela órdenes abiertas o espera la resolución de operaciones antes de retirar MEX comprometido.'
         )
         return
       }
@@ -469,7 +469,7 @@ function MexasWalletPanelInner() {
       <Row className="flex-wrap items-start justify-between gap-4">
         <Col className="gap-1">
           <div className="text-ink-500 text-xs font-medium uppercase">
-            MEX on-chain
+            MEX en cadena
           </div>
           <Row className="items-baseline gap-2">
             <span className="text-ink-1000 text-4xl font-semibold tracking-normal">
@@ -626,7 +626,7 @@ function MexasWalletPanelInner() {
       <div className="text-ink-600 border-ink-200 rounded-md border bg-teal-50/70 p-3 text-sm dark:bg-teal-950/20">
         Deposita {MEXAS_TOKEN.symbol} directamente en esta Wallet en{' '}
         {MEXAS_TOKEN.chainName}. No hay compra de fondos ni conversión; las
-        órdenes abiertas descuentan MEX disponible y los trades ejecutados
+        órdenes abiertas descuentan MEX disponible y las operaciones ejecutadas
         comprometen MEX hasta que se cancela, expira o se resuelve el mercado.
       </div>
 
