@@ -402,6 +402,28 @@ async function fetchManual(path: string, init?: RequestInit) {
   return { response, text }
 }
 
+async function checkVercelChallengePreflight(
+  path: string,
+  method: 'GET' | 'HEAD'
+) {
+  const response = await smokeFetch(path, {
+    method,
+    redirect: 'manual',
+  })
+
+  if (isVercelChallenge(response)) {
+    return fail(
+      `Vercel challenge preflight ${method} ${path}`,
+      describeResponseStatus(response)
+    )
+  }
+
+  return pass(
+    `Vercel challenge preflight ${method} ${path}`,
+    `${response.status}`
+  )
+}
+
 async function checkRedirect(path: string, destination: string) {
   const response = await smokeFetch(path, { redirect: 'manual' })
   if (isVercelChallenge(response)) {
@@ -916,6 +938,15 @@ async function checkBlockedApi(path: string) {
 
 async function runSmoke() {
   const results: SmokeResult[] = []
+
+  const challengePreflight = await Promise.all([
+    checkVercelChallengePreflight('/checkout', 'GET'),
+    checkVercelChallengePreflight('/checkout', 'HEAD'),
+  ])
+  if (challengePreflight.some((result) => result.status === 'fail')) {
+    return challengePreflight
+  }
+  results.push(...challengePreflight)
 
   for (const page of PAGES) {
     results.push(...(await checkPage(page.path, page.required)))
