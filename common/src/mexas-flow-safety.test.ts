@@ -157,6 +157,39 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('Privy signup is idempotent across concurrent first-login requests', () => {
+    const source = readRepoFile('web/pages/api/privy-user.ts')
+
+    expectMarkersInOrder(source, [
+      'function isSupabaseUniqueViolation',
+      "code === '23505'",
+      'async function loadPrivyUserRows',
+      "db.from('users').select().eq('id', userId).maybeSingle()",
+      "db.from('private_users').select().eq('id', userId).maybeSingle()",
+    ])
+    expectMarkersInOrder(source, [
+      'async function createPrivyManifoldUser',
+      'const privateUserRow = await upsertPrivyPrivateUser',
+      'userId: id',
+    ])
+    expectMarkersInOrder(source, [
+      'async function createOrUpdatePrivyManifoldUser',
+      'for (let attempt = 0; attempt < USER_UPDATE_ATTEMPTS; attempt++)',
+      'const { userRow, privateUserRow } = await loadPrivyUserRows',
+      'if (userRow) {',
+      'return await updateExistingUser',
+      'return await createPrivyManifoldUser(params)',
+      'if (!isSupabaseUniqueViolation(error)) throw error',
+      'Could not create Privy user after retrying conflicts.',
+    ])
+    expectMarkersInOrder(source, [
+      'const result = await createOrUpdatePrivyManifoldUser',
+      'id: verified.user_id',
+      'walletAddress',
+    ])
+    expect(source).not.toContain(".from('private_users')\n    .insert")
+  })
+
   test('cancels MEXAS orders and refunds reserved funds under the user balance lock', () => {
     const source = readRepoFile('web/pages/api/v0/bet/cancel/[betId].ts')
     const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')

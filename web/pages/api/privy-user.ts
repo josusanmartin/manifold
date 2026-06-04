@@ -75,6 +75,15 @@ function getSupabaseAdminClient() {
   return createClient(urlOrInstanceId, key)
 }
 
+function isSupabaseUniqueViolation(error: unknown) {
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error as { code?: unknown }).code === '23505'
+  )
+}
+
 function getBearerToken(req: NextApiRequest) {
   const header = req.headers.authorization
   if (!header) return undefined
@@ -306,6 +315,24 @@ async function upsertPrivyPrivateUser(params: {
   return updatedPrivateUser as Row<'private_users'>
 }
 
+async function loadPrivyUserRows(db: SupabaseClient, userId: string) {
+  const [
+    { data: userRow, error: userError },
+    { data: privateUserRow, error: privateUserError },
+  ] = await Promise.all([
+    db.from('users').select().eq('id', userId).maybeSingle(),
+    db.from('private_users').select().eq('id', userId).maybeSingle(),
+  ])
+
+  if (userError) throw userError
+  if (privateUserError) throw privateUserError
+
+  return {
+    userRow: userRow as Row<'users'> | null,
+    privateUserRow: privateUserRow as Row<'private_users'> | null,
+  }
+}
+
 async function updateExistingUser(params: {
   db: SupabaseClient
   userRow: Row<'users'>
@@ -471,18 +498,51 @@ async function createPrivyManifoldUser(params: {
 
   if (userError) throw userError
 
-  const { data: privateUserRow, error: privateUserError } = await db
-    .from('private_users')
-    .insert({ id, data: privateUser })
-    .select()
-    .single()
-
-  if (privateUserError) throw privateUserError
+  const privateUserRow = await upsertPrivyPrivateUser({
+    db,
+    privateUser,
+    userId: id,
+  })
 
   return {
     user: convertUser(userRow),
     privateUser: convertPrivateUser(privateUserRow),
   }
+}
+
+async function createOrUpdatePrivyManifoldUser(params: {
+  db: SupabaseClient
+  id: string
+  email?: string
+  walletAddress?: string
+  ip?: string
+  deviceToken?: string
+}) {
+  for (let attempt = 0; attempt < USER_UPDATE_ATTEMPTS; attempt++) {
+    const { userRow, privateUserRow } = await loadPrivyUserRows(
+      params.db,
+      params.id
+    )
+    if (userRow) {
+      return await updateExistingUser({
+        db: params.db,
+        userRow,
+        privateUserRow,
+        email: params.email,
+        walletAddress: params.walletAddress,
+        ip: params.ip,
+        deviceToken: params.deviceToken,
+      })
+    }
+
+    try {
+      return await createPrivyManifoldUser(params)
+    } catch (error) {
+      if (!isSupabaseUniqueViolation(error)) throw error
+    }
+  }
+
+  throw new Error('Could not create Privy user after retrying conflicts.')
 }
 
 export default async function handler(
@@ -507,39 +567,14 @@ export default async function handler(
     const walletAddress = getLinkedWallet(privyUser, body.walletAddress)
     const ip = getIp(req)
 
-    const [
-      { data: userRow, error: userError },
-      { data: privateUserRow, error: privateUserError },
-    ] = await Promise.all([
-      db.from('users').select().eq('id', verified.user_id).maybeSingle(),
-      db
-        .from('private_users')
-        .select()
-        .eq('id', verified.user_id)
-        .maybeSingle(),
-    ])
-
-    if (userError) throw userError
-    if (privateUserError) throw privateUserError
-
-    const result = userRow
-      ? await updateExistingUser({
-          db,
-          userRow,
-          privateUserRow,
-          email,
-          walletAddress,
-          ip,
-          deviceToken: body.deviceToken,
-        })
-      : await createPrivyManifoldUser({
-          db,
-          id: verified.user_id,
-          email,
-          walletAddress,
-          ip,
-          deviceToken: body.deviceToken,
-        })
+    const result = await createOrUpdatePrivyManifoldUser({
+      db,
+      id: verified.user_id,
+      email,
+      walletAddress,
+      ip,
+      deviceToken: body.deviceToken,
+    })
 
     return res.status(200).json(result)
   } catch (e) {
