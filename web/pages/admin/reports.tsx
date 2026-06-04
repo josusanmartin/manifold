@@ -24,7 +24,15 @@ import { convertPost } from 'common/top-level-post'
 
 const PAGE_SIZE = 20
 
+function isMexasStaticBuild() {
+  return !!process.env.NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS
+}
+
 export async function getStaticProps() {
+  if (isMexasStaticBuild()) {
+    return { props: { reports: [] }, revalidate: 3600 }
+  }
+
   try {
     const reports = await getReports({ limit: PAGE_SIZE })
     return { props: { reports }, revalidate: 60 }

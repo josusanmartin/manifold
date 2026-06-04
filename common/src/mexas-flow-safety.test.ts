@@ -898,6 +898,19 @@ describe('MEXAS flow safety guardrails', () => {
     expect(settingsSource).not.toContain('cash prize raffles')
   })
 
+  test('does not query legacy admin reports during MEXAS static builds', () => {
+    const reportsSource = readRepoFile('web/pages/admin/reports.tsx')
+
+    expectMarkersInOrder(reportsSource, [
+      'function isMexasStaticBuild()',
+      'NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS',
+      'export async function getStaticProps()',
+      'if (isMexasStaticBuild())',
+      'return { props: { reports: [] }, revalidate: 3600 }',
+      'const reports = await getReports',
+    ])
+  })
+
   test('renders and validates MEX order amounts as MEX, not MANA or M$', () => {
     const amountSource = readRepoFile('web/components/widgets/amount-input.tsx')
     const sliderSource = readRepoFile('web/components/bet/bet-slider.tsx')
@@ -1327,12 +1340,12 @@ describe('MEXAS flow safety guardrails', () => {
       '!latestReadiness.escrowCaptureEnabled',
       '!latestReadiness.matchingEngineReady',
       'latestReadiness.message',
-      'NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS',
+      'mexasTreasuryAddress',
       'ensureEmbeddedWallet',
       'wallet.switchChain(MEXAS_TOKEN.chainId)',
       'eth_sendTransaction',
       "functionName: 'transfer'",
-      'args: [treasuryAddress, mexasAmountToUnits(amount)]',
+      'args: [mexasTreasuryAddress, mexasAmountToUnits(amount)]',
       'mexasEscrowTxHash = await captureMexasEscrowStake()',
       'mexasEscrowTxHash,',
     ])
@@ -1404,12 +1417,12 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expectMarkersInOrder(panelSource, [
       'const intent = getMexasEscrowPendingOrderIntent',
-      'const pendingTx = findStoredMexasPendingEscrowOrderTx(intent)',
-      'if (pendingTx) {',
-      'return pendingTx.txHash as Hex',
+      'const storedPendingTx = findStoredMexasPendingEscrowOrderTx(intent)',
+      'if (storedPendingTx) {',
+      'return storedPendingTx.txHash as Hex',
       'const txHash = (await provider.request',
-      'upsertStoredMexasPendingEscrowOrderTx',
       'makeMexasEscrowPendingOrderTx(intent',
+      'upsertStoredMexasPendingEscrowOrderTx',
       'return txHash',
     ])
     expectMarkersInOrder(panelSource, [
@@ -1417,6 +1430,13 @@ describe('MEXAS flow safety guardrails', () => {
       'mexasEscrowTxHash = await captureMexasEscrowStake()',
       'mexasEscrowTxHash,',
       'clearStoredMexasPendingEscrowOrderTx(mexasEscrowTxHash)',
+    ])
+    expectMarkersInOrder(panelSource, [
+      'pendingMexasEscrowTxForIntent',
+      'setPendingMexasEscrowTxForIntent(pendingTx)',
+      'Transferencia MEX pendiente',
+      'no se enviará otra',
+      'Registrar orden MEX pendiente',
     ])
     expect(panelSource).toContain(
       'Reintenta la misma orden para registrarla sin otra transferencia.'

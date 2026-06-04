@@ -38,7 +38,7 @@ import { removeUndefinedProps } from 'common/util/object'
 import { DAY_MS, HOUR_MS, MINUTE_MS, MONTH_MS, WEEK_MS } from 'common/util/time'
 import dayjs from 'dayjs'
 import { clamp } from 'lodash'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { encodeFunctionData, isAddress, parseUnits, type Hex } from 'viem'
 import { Input } from 'web/components/widgets/input'
@@ -239,6 +239,8 @@ export default function LimitOrderPanel(props: {
     usePersistentLocalState<number>(0, 'limit-order-expiration')
 
   const [lastBetDetails, setLastBetDetails] = useState<Bet | null>(null)
+  const [pendingMexasEscrowTxForIntent, setPendingMexasEscrowTxForIntent] =
+    useState<MexasEscrowPendingOrderTx | undefined>()
   const privy = usePrivyLogin()
   const { wallets } = useWallets()
   const mexasOrderReadiness = useMexasOrderReadiness(contract.id, orderBookOnly)
@@ -346,10 +348,38 @@ export default function LimitOrderPanel(props: {
       : getBinaryMCProb(preLimitProb, outcome as 'YES' | 'NO')
 
   const amount = betAmount ?? 0
+  const mexasTreasuryAddress =
+    process.env.NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS
   const mexasOrderExecutionMode: MexasOrderExecutionMode =
     mexasOrderReadiness?.escrowCaptureEnabled === true
       ? 'treasury-escrowed'
       : 'wallet-reserved'
+  const mexasPendingOrderIntent = useMemo(
+    () =>
+      orderBookOnly &&
+      mexasTreasuryAddress &&
+      isAddress(mexasTreasuryAddress) &&
+      privy.walletAddress &&
+      isAddress(privy.walletAddress)
+        ? getMexasEscrowPendingOrderIntent({
+            amount,
+            contractId: contract.id,
+            limitProb,
+            outcome,
+            treasuryAddress: mexasTreasuryAddress,
+            walletAddress: privy.walletAddress,
+          })
+        : undefined,
+    [
+      amount,
+      contract.id,
+      limitProb,
+      mexasTreasuryAddress,
+      orderBookOnly,
+      outcome,
+      privy.walletAddress,
+    ]
+  )
   const mexasCanCrossOrders =
     orderBookOnly && mexasOrderReadiness?.matchingEngineReady === true
   const mexasBlockedCrossingOrders =
@@ -389,6 +419,17 @@ export default function LimitOrderPanel(props: {
     mexasOrderReadinessLoading ||
     mexasOrderReadinessBlocked ||
     mexasCrossingOrderBlocked
+
+  useEffect(() => {
+    if (!orderBookOnly || !mexasPendingOrderIntent) {
+      setPendingMexasEscrowTxForIntent(undefined)
+      return
+    }
+
+    setPendingMexasEscrowTxForIntent(
+      findStoredMexasPendingEscrowOrderTx(mexasPendingOrderIntent)
+    )
+  }, [mexasPendingOrderIntent, orderBookOnly])
 
   function onBetChange(newAmount: number | undefined) {
     setBetAmount(newAmount)
@@ -459,9 +500,7 @@ export default function LimitOrderPanel(props: {
       )
     }
 
-    const treasuryAddress =
-      process.env.NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS
-    if (!treasuryAddress || !isAddress(treasuryAddress)) {
+    if (!mexasTreasuryAddress || !isAddress(mexasTreasuryAddress)) {
       throw new APIError(500, 'La tesorería MEXAS no está configurada.')
     }
 
@@ -476,7 +515,7 @@ export default function LimitOrderPanel(props: {
       contractId: contract.id,
       limitProb,
       outcome,
-      treasuryAddress,
+      treasuryAddress: mexasTreasuryAddress,
       walletAddress,
     })
     if (!intent) {
@@ -486,9 +525,10 @@ export default function LimitOrderPanel(props: {
       )
     }
 
-    const pendingTx = findStoredMexasPendingEscrowOrderTx(intent)
-    if (pendingTx) {
-      return pendingTx.txHash as Hex
+    const storedPendingTx = findStoredMexasPendingEscrowOrderTx(intent)
+    if (storedPendingTx) {
+      setPendingMexasEscrowTxForIntent(storedPendingTx)
+      return storedPendingTx.txHash as Hex
     }
 
     const wallet = wallets.find(
@@ -511,18 +551,18 @@ export default function LimitOrderPanel(props: {
           data: encodeFunctionData({
             abi: mexasErc20Abi,
             functionName: 'transfer',
-            args: [treasuryAddress, mexasAmountToUnits(amount)],
+            args: [mexasTreasuryAddress, mexasAmountToUnits(amount)],
           }),
           value: '0x0',
         },
       ],
     })) as Hex
-    upsertStoredMexasPendingEscrowOrderTx(
-      makeMexasEscrowPendingOrderTx(intent, {
-        createdTime: Date.now(),
-        txHash,
-      })
-    )
+    const pendingTx = makeMexasEscrowPendingOrderTx(intent, {
+      createdTime: Date.now(),
+      txHash,
+    })
+    upsertStoredMexasPendingEscrowOrderTx(pendingTx)
+    setPendingMexasEscrowTxForIntent(pendingTx)
     return txHash
   }
 
@@ -554,6 +594,7 @@ export default function LimitOrderPanel(props: {
       )
       if (mexasEscrowTxHash) {
         clearStoredMexasPendingEscrowOrderTx(mexasEscrowTxHash)
+        setPendingMexasEscrowTxForIntent(undefined)
       }
       console.log(`placed ${TRADE_TERM}. Result:`, bet)
       if (expiresMillisAfter === 1) {
@@ -589,6 +630,7 @@ export default function LimitOrderPanel(props: {
           message.includes('already attached to an order')
         ) {
           clearStoredMexasPendingEscrowOrderTx(mexasEscrowTxHash)
+          setPendingMexasEscrowTxForIntent(undefined)
           setError(
             'La transferencia MEX ya está asociada a una orden. Actualiza el mercado para verla.'
           )
@@ -885,6 +927,15 @@ export default function LimitOrderPanel(props: {
         )}
 
         <Col className="gap-2">
+          {user && orderBookOnly && pendingMexasEscrowTxForIntent && (
+            <div className="border-ink-200 bg-canvas-50 text-ink-700 rounded-md border px-3 py-2 text-sm">
+              Transferencia MEX pendiente{' '}
+              {shortenTxHash(pendingMexasEscrowTxForIntent.txHash)}. Vuelve a
+              enviar esta misma orden para registrarla; no se enviará otra
+              transferencia.
+            </div>
+          )}
+
           {user ? (
             <>
               <Row className="items-center justify-between gap-2">
@@ -916,6 +967,8 @@ export default function LimitOrderPanel(props: {
                     'Órdenes pausadas'
                   ) : mexasCrossingOrderBlocked ? (
                     'El precio cruza el libro'
+                  ) : pendingMexasEscrowTxForIntent ? (
+                    'Registrar orden MEX pendiente'
                   ) : (
                     <span>
                       Abrir orden por{' '}
