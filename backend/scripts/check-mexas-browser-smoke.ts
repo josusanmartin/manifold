@@ -3,6 +3,7 @@ import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 
 type BrowserContextOptions = any
+type Browser = any
 type ConsoleMessage = any
 type Page = any
 type Request = any
@@ -274,6 +275,68 @@ async function writeFailureScreenshot(
   return screenshotPath
 }
 
+async function checkVercelChallengePreflight(browser: Browser) {
+  const results: BrowserResult[] = []
+  if (IS_LOCAL_SITE) return results
+
+  const maybeFetch = (globalThis as any).fetch as
+    | ((url: string, init?: { redirect?: string }) => Promise<Response>)
+    | undefined
+  if (maybeFetch) {
+    try {
+      const response = await maybeFetch(getUrl('/checkout'), {
+        redirect: 'manual',
+      })
+      const status = response.status
+      const challenge = response.headers.get('x-vercel-mitigated') === 'challenge'
+
+      if (challenge) {
+        results.push(
+          fail(
+            'browser preflight Vercel Firewall',
+            `Vercel Firewall challenge active with status ${status}. Run "vercel firewall attack-mode disable" interactively or add a browser-smoke bypass before checking production.`
+          )
+        )
+        return results
+      }
+    } catch {
+      // Fall through to the browser probe below.
+    }
+  }
+
+  const context = await browser.newContext({
+    ...VIEWPORTS[0].context,
+    colorScheme: 'light',
+    locale: 'es-MX',
+  })
+  const page = await context.newPage()
+
+  try {
+    const response = await page.goto(getUrl('/checkout'), {
+      timeout: BROWSER_TIMEOUT_MS,
+      waitUntil: 'domcontentloaded',
+    })
+    const status = response?.status() ?? 0
+    const challenge = response?.headers()['x-vercel-mitigated'] === 'challenge'
+
+    if (challenge) {
+      results.push(
+        fail(
+          'browser preflight Vercel Firewall',
+          `Vercel Firewall challenge active with status ${status}. Run "vercel firewall attack-mode disable" interactively or add a browser-smoke bypass before checking production.`
+        )
+      )
+    }
+  } catch {
+    // Let the per-page checks report ordinary reachability/runtime failures.
+  } finally {
+    await page.close()
+    await context.close()
+  }
+
+  return results
+}
+
 async function checkRenderedPage(
   page: Page,
   check: PageCheck,
@@ -432,6 +495,12 @@ async function runBrowserSmoke() {
   const results: BrowserResult[] = []
 
   try {
+    const preflightResults = await checkVercelChallengePreflight(browser)
+    results.push(...preflightResults)
+    if (preflightResults.some((result) => result.status === 'fail')) {
+      return results
+    }
+
     for (const viewport of VIEWPORTS) {
       const context = await browser.newContext({
         ...viewport.context,
