@@ -278,6 +278,26 @@ const BLOCKED_STATIC_PATHS = [
 
 const JSON_PAYLOADS = [
   {
+    name: 'json MEXAS profile search',
+    path: '/api/search-markets-full?limit=5&sort=newest&filter=all&contractType=ALL',
+  },
+  {
+    name: 'json MEXAS profile metrics missing user',
+    path: '/api/v0/get-user-contract-metrics-with-contracts?userId=__missing_user__&limit=5&offset=0',
+  },
+  {
+    name: 'json MEXAS profile limit orders missing user',
+    path: '/api/get-user-limit-orders-with-contracts?userId=__missing_user__&count=5',
+  },
+  {
+    name: 'json MEXAS profile movements missing user',
+    path: '/api/get-balance-changes?userId=__missing_user__&after=0',
+  },
+  {
+    name: 'json MEXAS portfolio history missing user',
+    path: '/api/v0/get-user-portfolio-history?userId=__missing_user__&period=monthly',
+  },
+  {
     name: 'json orderbook mexwcwin26a',
     path: '/api/mexas-order-book?contractId=mexwcwin26a',
   },
@@ -943,6 +963,13 @@ async function runSmoke() {
   for (const payload of JSON_PAYLOADS) {
     results.push(await checkJsonPayloadCopy(payload.name, payload.path))
   }
+  results.push(
+    await checkExpectedStatus(
+      'local MEXAS portfolio missing user',
+      '/api/v0/get-user-portfolio?userId=__missing_user__',
+      404
+    )
+  )
   results.push(await checkBlockedOrderBook('not-a-mexas-market'))
   results.push(await checkBlockedBets('not-a-mexas-market'))
   results.push(

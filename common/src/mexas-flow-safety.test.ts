@@ -738,6 +738,8 @@ describe('MEXAS flow safety guardrails', () => {
     const portfolioValueSource = readRepoFile(
       'web/components/portfolio/portfolio-value-section.tsx'
     )
+    const mexasProfileApiSource = readRepoFile('web/lib/api/mexas-profile.ts')
+    const proxySource = readRepoFile('web/proxy.ts')
     const metricsApiSource = readRepoFile(
       'backend/api/src/get-user-contract-metrics-with-contracts.ts'
     )
@@ -808,9 +810,30 @@ describe('MEXAS flow safety guardrails', () => {
     )
     expect(balanceChangesSource).toContain('mexasOnly: true')
     expect(balanceChangesSource).toContain('filter(isMexasBalanceChange)')
+    expect(balanceChangesSource).not.toContain("useAPIGetter('get-cashouts'")
     expect(portfolioSummarySource).toContain('mexasOnly: true')
     expect(portfolioSummarySource).not.toContain('topicSlug="recent"')
     expect(portfolioValueSource).toContain('mexasOnly = false')
+    expect(mexasProfileApiSource).toContain(".eq('data->>token', 'MEX')")
+    expect(mexasProfileApiSource).toContain('return res.status(500).json({')
+    expect(mexasProfileApiSource).toContain(
+      'getMexasUserContractMetricsWithContracts'
+    )
+    expect(mexasProfileApiSource).toContain(
+      'getMexasUserLimitOrdersWithContracts'
+    )
+    expect(mexasProfileApiSource).toContain('getMexasBalanceChanges')
+    expect(mexasProfileApiSource).toContain('searchMexasContracts')
+    expectMarkersInOrder(proxySource, [
+      "'get-balance-changes'",
+      "'get-user-limit-orders-with-contracts'",
+      "'recent-markets'",
+      "'search-markets-full'",
+      "'mexas-order-book'",
+      "'v0/get-user-contract-metrics-with-contracts'",
+      "'v0/get-user-portfolio'",
+      "'v0/get-user-portfolio-history'",
+    ])
     expect(metricsApiSource).toContain(
       "coalesce(c.data->>'token', c.token) = 'MEX'"
     )
@@ -1660,6 +1683,17 @@ describe('MEXAS flow safety guardrails', () => {
     )
 
     expectMarkersInOrder(source, [
+      'const JSON_PAYLOADS = [',
+      '/api/search-markets-full?limit=5&sort=newest&filter=all&contractType=ALL',
+      'json MEXAS profile metrics missing user',
+      '/api/v0/get-user-contract-metrics-with-contracts?userId=__missing_user__&limit=5&offset=0',
+      'json MEXAS profile limit orders missing user',
+      '/api/get-user-limit-orders-with-contracts?userId=__missing_user__&count=5',
+      'json MEXAS profile movements missing user',
+      '/api/get-balance-changes?userId=__missing_user__&after=0',
+      'json orderbook mexwcwin26a',
+    ])
+    expectMarkersInOrder(source, [
       'async function checkBetsArray',
       '/api/v0/bets?contractId=mexwcwin26a&kinds=open-limit',
       'bets mexwcwin26a open-limit',
@@ -1673,6 +1707,11 @@ describe('MEXAS flow safety guardrails', () => {
       '/api/v0/bets?username=__mexas_missing_user__',
       'unknown api fail closed',
       '/api/v0/not-a-real-mexas-api',
+    ])
+    expectMarkersInOrder(source, [
+      'local MEXAS portfolio missing user',
+      '/api/v0/get-user-portfolio?userId=__missing_user__',
+      "checkBlockedOrderBook('not-a-mexas-market')",
     ])
     expectMarkersInOrder(source, [
       'const FORBIDDEN_JSON_COPY = [',

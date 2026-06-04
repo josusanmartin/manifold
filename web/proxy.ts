@@ -67,10 +67,17 @@ export const config = {
 }
 
 const pathsToSkip = [
+  'get-balance-changes',
+  'get-user-limit-orders-with-contracts',
+  'recent-markets',
+  'search-markets-full',
   'mexas-order-book',
   'privy-user',
   'v0/bet',
   'v0/bets',
+  'v0/get-user-contract-metrics-with-contracts',
+  'v0/get-user-portfolio',
+  'v0/get-user-portfolio-history',
   'v0/revalidate',
 ]
 

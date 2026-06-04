@@ -2,11 +2,9 @@ import dayjs from 'dayjs'
 import { Col } from 'web/components/layout/col'
 import {
   formatMoney,
-  formatMoneyUSD,
   formatSpice,
   formatSweepies,
   formatWithToken,
-  maybePluralize,
 } from 'common/util/format'
 import { Row } from 'web/components/layout/row'
 import clsx from 'clsx'
@@ -36,11 +34,9 @@ import { assertUnreachable } from 'common/util/types'
 import { AnyTxnCategory } from 'common/txn'
 import { useAPIGetter } from 'web/hooks/use-api-getter'
 import { Button } from 'web/components/buttons/button'
-import { Modal } from '../layout/modal'
 import { QuestType } from 'common/quest'
 import { PROFIT_FEE_FRACTION } from 'common/economy'
 import { CalendarIcon } from '@heroicons/react/solid'
-import DropdownMenu from '../widgets/dropdown-menu'
 import { ContractToken } from 'common/contract'
 
 export const BalanceChangeTable = (props: { user: User }) => {
@@ -59,10 +55,6 @@ export const BalanceChangeTable = (props: { user: User }) => {
   })
 
   const [query, setQuery] = useState('')
-  const { data: cashouts } = useAPIGetter('get-cashouts', {
-    userId: user.id,
-  })
-  const [showCashoutModal, setShowCashoutModal] = useState(false)
   const balanceChanges = (allBalanceChanges ?? [])
     .filter(isMexasBalanceChange)
     .filter((change) => {
@@ -89,11 +81,6 @@ export const BalanceChangeTable = (props: { user: User }) => {
         betText.toLowerCase().includes(query.toLowerCase())
       )
     })
-  const pendingCashouts =
-    cashouts?.filter((c) => c.txn.gidxStatus === 'Pending')?.length ?? 0
-
-  const hasCashouts = cashouts && cashouts.length > 0
-
   const relativeDateText = before
     ? `${formatJustDateShort(after)} - ${formatJustDateShort(before)}`
     : after === fourteenDaysAgo
@@ -159,20 +146,6 @@ export const BalanceChangeTable = (props: { user: User }) => {
             </Button>
           </Row>
         )}
-        {hasCashouts && (
-          <DropdownMenu
-            items={[
-              {
-                name: `Ver ${maybePluralize('retiro', cashouts.length)} ${
-                  pendingCashouts > 0 ? `(${pendingCashouts} pendientes)` : ''
-                }`,
-                onClick: () => setShowCashoutModal(true),
-              },
-            ]}
-            menuWidth="w-52"
-            buttonClass="px-2 py-1"
-          />
-        )}
       </Row>
       {!!before && before < Date.now() && (
         <Row className="text-ink-400 mt-4 items-center justify-center gap-6">
@@ -227,33 +200,6 @@ export const BalanceChangeTable = (props: { user: User }) => {
         </span>
         <div className="border-ink-400 grow border" />
       </Row>
-
-      <Modal open={showCashoutModal} setOpen={setShowCashoutModal}>
-        <Col className={'bg-canvas-0 gap-4 rounded-md p-4'}>
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="text-left">Cantidad</th>
-                <th className="text-left">Fecha</th>
-                <th className="text-left">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cashouts?.map((cashout) => (
-                <tr key={cashout.txn.id}>
-                  <td>{formatMoneyUSD(cashout.txn.payoutInDollars, true)}</td>
-                  <td className="whitespace-nowrap">
-                    {new Date(cashout.txn.createdTime).toLocaleString()}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    {cashout.txn.gidxStatus}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Col>
-      </Modal>
     </Col>
   )
 }
