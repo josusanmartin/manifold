@@ -14,7 +14,6 @@ import { BETTORS, User } from 'common/user'
 import { formatWithCommas } from 'common/util/format'
 import dayjs from 'dayjs'
 import { capitalize, sumBy } from 'lodash'
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { useAdmin, useDev, useTrusted } from 'web/hooks/use-admin'
@@ -26,11 +25,9 @@ import { ShareQRButton } from '../buttons/share-qr-button'
 import { Modal } from '../layout/modal'
 import { Row } from '../layout/row'
 import SuperBanControl from '../SuperBanControl'
-import { useSweepstakes } from '../sweepstakes-provider'
 import { InfoBox } from '../widgets/info-box'
 import { InfoTooltip } from '../widgets/info-tooltip'
 import ShortToggle from '../widgets/short-toggle'
-import { linkClass } from '../widgets/site-link'
 import { Table } from '../widgets/table'
 import { ContractHistoryButton } from './contract-edit-history-button'
 
@@ -115,15 +112,6 @@ export const Stats = (props: {
       contract.subsidyPool -
       ('answers' in contract ? sumBy(contract.answers, 'subsidyPool') : 0)
     : 0
-
-  const { prefersPlay, setPrefersPlay } = useSweepstakes()
-  const isPlay = contract.token == 'MANA'
-  const sweepsEnabled = !!contract.siblingContractId
-
-  const isNonBetPollOrBountiedQuestion =
-    contract.mechanism === 'none' &&
-    (contract.outcomeType === 'POLL' ||
-      contract.outcomeType === 'BOUNTIED_QUESTION')
 
   return (
     <Table className="table-fixed whitespace-normal sm:whitespace-nowrap">
@@ -340,26 +328,6 @@ export const Stats = (props: {
             </td>
           </tr>
         )}
-        {sweepsEnabled && !isNonBetPollOrBountiedQuestion && (
-          <tr>
-            <td>Sweepstakes</td>
-            <td className={linkClass}>
-              <Link
-                href={
-                  contract.token === 'CASH'
-                    ? `/${contract.creatorUsername}/${contract.slug.replace(
-                        '--cash',
-                        ''
-                      )}`
-                    : `/${contract.creatorUsername}/${contract.slug}--cash`
-                }
-              >
-                {contract.token === 'CASH' ? 'True' : 'False'}
-              </Link>
-            </td>
-          </tr>
-        )}
-
         {addAnswersPossible && (isCreator || isAdmin || isMod) && (
           <tr className={clsx(isMod && 'bg-purple-500/30')}>
             <td>

@@ -60,6 +60,7 @@ export function getApiUrl(path: string) {
 export function isMexasBrowserHostname(hostname: string) {
   const normalized = hostname.toLowerCase()
   return (
+    normalized === ENV_CONFIG.domain ||
     normalized === 'mexas-manifold.vercel.app' ||
     (normalized.startsWith('mexas-manifold-') &&
       normalized.endsWith('.vercel.app'))

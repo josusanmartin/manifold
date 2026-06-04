@@ -13,7 +13,6 @@ import { UserBan } from 'common/user'
 import { api } from 'web/lib/api/api'
 
 import { Footer } from '../footer'
-import { FirstStreakModalManager } from '../profile/first-streak-modal'
 export function Page(props: {
   trackPageView: string | false
   trackPageProps?: Record<string, any>
@@ -63,7 +62,6 @@ export function Page(props: {
   return (
     <>
       <ConfettiOnDemand />
-      <FirstStreakModalManager />
       <Col
         className={clsx(
           !hideBottomBar &&

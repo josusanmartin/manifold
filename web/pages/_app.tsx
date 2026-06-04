@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import { AuthProvider, AuthUser } from 'web/components/auth-context'
 import { PrivyWalletProviders } from 'web/components/crypto/privy-wallet-providers'
 import { NativeMessageProvider } from 'web/components/native-message-provider'
-import { Sweepstakes } from 'web/components/sweepstakes-provider'
 import { OptimisticEntitlementsProvider } from 'web/hooks/use-optimistic-entitlements'
 import { useHasLoaded } from 'web/hooks/use-has-loaded'
 import { useIOSBodyFix } from 'web/hooks/use-ios-body-fix'
@@ -194,11 +193,9 @@ function MyApp({ Component, pageProps }: AppProps<ManifoldPageProps>) {
           <PrivyWalletProviders>
             <AuthProvider serverUser={pageProps.auth}>
               <OptimisticEntitlementsProvider>
-                <Sweepstakes>
-                  <NativeMessageProvider>
-                    <Component {...pageProps} />
-                  </NativeMessageProvider>
-                </Sweepstakes>
+                <NativeMessageProvider>
+                  <Component {...pageProps} />
+                </NativeMessageProvider>
               </OptimisticEntitlementsProvider>
             </AuthProvider>
           </PrivyWalletProviders>

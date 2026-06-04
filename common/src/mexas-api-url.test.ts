@@ -1,4 +1,6 @@
 import { getApiUrl, getWebsocketUrl, isMexasBrowserHostname } from './api/utils'
+import { DEV_CONFIG } from './envs/dev'
+import { PROD_CONFIG } from './envs/prod'
 
 describe('MEXAS API URL routing', () => {
   const originalWindow = globalThis.window
@@ -26,6 +28,14 @@ describe('MEXAS API URL routing', () => {
     ).toBe(true)
     expect(isMexasBrowserHostname('manifold.markets')).toBe(false)
     expect(isMexasBrowserHostname('api.manifold.markets')).toBe(false)
+  })
+
+  test('does not ship upstream Manifold endpoints in env configs', () => {
+    for (const config of [PROD_CONFIG, DEV_CONFIG]) {
+      expect(JSON.stringify(config)).not.toContain('manifold.markets')
+      expect(config.moneyMoniker).toBe('MEX ')
+      expect(config.supabaseInstanceId).not.toBe('pxidrgkatumlvfqaxcll')
+    }
   })
 
   test('routes MEXAS browser API calls to the local Next API surface', () => {

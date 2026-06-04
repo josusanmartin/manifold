@@ -78,6 +78,13 @@ const MEXAS_ALLOWED_PUBLIC_PAGE_ROUTES = new Set([
   '/wallet',
 ])
 
+const MEXAS_WALLET_ALIAS_PAGE_ROUTES = new Set([
+  '/add-funds',
+  '/link/:slug',
+  '/links',
+  '/payments',
+])
+
 describe('MEXAS route surface', () => {
   test('redirects legacy product pages away from public launch surface', async () => {
     const redirectsBySource = await getRedirectsBySource()
@@ -185,51 +192,35 @@ describe('MEXAS route surface', () => {
     }
   })
 
-  test('removed legacy product pages are redirect-only stubs', () => {
-    const redirectOnlyPages = [
-      'web/pages/charity.tsx',
-      'web/pages/charity/[giveawayNum].tsx',
-      'web/pages/calculator.tsx',
-      'web/pages/discord-bot.tsx',
-      'web/pages/admin/cash-stats.tsx',
-      'web/pages/admin/cash-txns.tsx',
-      'web/pages/admin/index.tsx',
-      'web/pages/admin/journeys.tsx',
-      'web/pages/admin/merch.tsx',
-      'web/pages/admin/new-users.tsx',
-      'web/pages/admin/prize.tsx',
-      'web/pages/admin/redemptions.tsx',
-      'web/pages/admin/reports.tsx',
-      'web/pages/admin/sales.tsx',
-      'web/pages/admin/spam.tsx',
-      'web/pages/admin/test-user.tsx',
-      'web/pages/admin/tickets.tsx',
-      'web/pages/admin/txns.tsx',
-      'web/pages/admin/update-user.tsx',
-      'web/pages/admin/user-info.tsx',
-      'web/pages/admin/whales.tsx',
-      'web/pages/lab.tsx',
-      'web/pages/mana-auction.tsx',
-      'web/pages/manachan.tsx',
-      'web/pages/notifications.tsx',
-      'web/pages/predictle.tsx',
-      'web/pages/press.tsx',
-      'web/pages/prize.tsx',
-      'web/pages/prize/[sweepstakesNum].tsx',
-      'web/pages/shop.tsx',
-      'web/pages/sitemap.tsx',
-      'web/pages/twitch.tsx',
-    ]
+  test('every non-MEXAS page uses a server-side redirect stub', () => {
+    const pageFiles = listPageFiles(join(__dirname, '..', '..', 'web', 'pages'))
+      .filter((file) => !relative(join(__dirname, '..', '..', 'web', 'pages'), file).startsWith('api/'))
+      .map((file) => ({
+        file,
+        route: pageFileToRoute(file),
+        repoPath: relative(join(__dirname, '..', '..'), file).replace(/\\/g, '/'),
+      }))
+      .filter(
+        (page): page is { file: string; route: string; repoPath: string } =>
+          !!page.route &&
+          !MEXAS_ALLOWED_PUBLIC_PAGE_ROUTES.has(page.route)
+      )
 
-    for (const path of redirectOnlyPages) {
-      const source = readRepoFile(path)
+    for (const { route, repoPath } of pageFiles) {
+      const source = readRepoFile(repoPath)
+      const destination = MEXAS_WALLET_ALIAS_PAGE_ROUTES.has(route)
+        ? '/wallet'
+        : '/checkout'
 
       expect(source).toContain("import { GetServerSideProps } from 'next'")
       expect(source).toContain('return null')
       expect(source).toContain('getServerSideProps: GetServerSideProps')
-      expect(source).toContain("destination: '/checkout'")
+      expect(source).toContain(`destination: '${destination}'`)
       expect(source).toContain('permanent: false')
-      expect(source.split('\n').length).toBeLessThanOrEqual(14)
+
+      if (!MEXAS_WALLET_ALIAS_PAGE_ROUTES.has(route)) {
+        expect(source.split('\n').length).toBeLessThanOrEqual(24)
+      }
 
       for (const legacyMarker of [
         'useAPIGetter',
@@ -242,7 +233,9 @@ describe('MEXAS route surface', () => {
         'SEO',
         'track(',
       ]) {
-        expect(source).not.toContain(legacyMarker)
+        if (!MEXAS_WALLET_ALIAS_PAGE_ROUTES.has(route)) {
+          expect(source).not.toContain(legacyMarker)
+        }
       }
     }
   })

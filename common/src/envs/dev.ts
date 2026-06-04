@@ -2,7 +2,7 @@ import { EnvConfig, PROD_CONFIG } from './prod'
 
 export const DEV_CONFIG: EnvConfig = {
   ...PROD_CONFIG,
-  domain: 'dev.manifold.markets',
+  domain: 'localhost:3000',
   googleAnalyticsId: '',
   firebaseConfig: {
     apiKey: 'AIzaSyBoq3rzUa8Ekyo3ZaTnlycQYPRCA26VpOw',
@@ -20,8 +20,8 @@ export const DEV_CONFIG: EnvConfig = {
   supabaseInstanceId: 'mfodonznyfxllcezufgr',
   supabaseAnonKey:
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mb2RvbnpueWZ4bGxjZXp1ZmdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2Njc5ODgxNjcsImV4cCI6MTk4MzU2NDE2N30.RK8CA3G2_yccgiIFoxzweEuJ2XU5SoB7x7wBzMKitvo',
-  twitchBotEndpoint: 'https://dev-twitch-bot.manifold.markets',
-  apiEndpoint: 'api.dev.manifold.markets',
+  twitchBotEndpoint: 'http://localhost:3000',
+  apiEndpoint: 'localhost:3000/api',
   expoConfig: {
     iosClientId:
       '134303100058-lioqb7auc8minvqt9iamuit2pg10pubt.apps.googleusercontent.com',

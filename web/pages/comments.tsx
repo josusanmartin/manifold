@@ -1,12 +1,12 @@
+import { GetServerSideProps } from 'next'
+
 export default function CommentsPage() {
   return null
 }
 
-export const getServerSideProps = async () => {
-  return {
-    redirect: {
-      destination: '/checkout',
-      permanent: false,
-    },
-  }
-}
+export const getServerSideProps: GetServerSideProps = async () => ({
+  redirect: {
+    destination: '/checkout',
+    permanent: false,
+  },
+})

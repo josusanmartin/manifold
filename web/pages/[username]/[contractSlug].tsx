@@ -8,11 +8,9 @@ import { ContractPageContent } from 'web/components/contract/contract-page'
 import { ContractSEO } from 'web/components/contract/contract-seo'
 import { Page } from 'web/components/layout/page'
 import { Title } from 'web/components/widgets/title'
-import { useIsIframe } from 'web/hooks/use-is-iframe'
 import { toPublicMexasContractParams } from 'web/lib/mexas-public-contract'
 import { initSupabaseAdmin } from 'web/lib/supabase/admin-db'
 import Custom404 from '../404'
-import ContractEmbedPage from '../embed/[username]/[contractSlug]'
 
 export async function getStaticProps(ctx: {
   params: { username: string; contractSlug: string }
@@ -96,12 +94,8 @@ function NonPrivateContractPage(props: { contractParams: ContractParams }) {
 
   const points = pointsString ? base64toPoints(pointsString) : []
 
-  const inIframe = useIsIframe()
   if (!contract) {
     return <Custom404 customText="No se pudo cargar la pregunta" />
-  }
-  if (inIframe) {
-    return <ContractEmbedPage contract={contract} points={points} />
   }
 
   return (

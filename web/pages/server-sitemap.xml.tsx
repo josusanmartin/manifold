@@ -1,27 +1,12 @@
 import { GetServerSideProps } from 'next'
-import { getServerSideSitemap, ISitemapField } from 'next-sitemap'
-import { searchContracts } from 'web/lib/api/api'
-import { MEXAS_SITE_URL } from 'web/lib/mexas-brand'
 
-export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const contracts = await searchContracts({
-    term: '',
-    filter: 'all',
-    sort: 'score',
-    limit: 1000,
-  })
-
-  const score = (index: number) => (1 - index / 1000) * 0.3 + 0.4
-
-  const fields = contracts.map((market, i) => ({
-    loc: `${MEXAS_SITE_URL}/${market.creatorUsername}/${market.slug}`,
-    changefreq: market.volume24Hours > 10 ? 'hourly' : 'daily',
-    priority: score(i),
-    lastmod: new Date(market.lastUpdatedTime ?? 0).toISOString(),
-  })) as ISitemapField[]
-
-  return await getServerSideSitemap(ctx, fields)
+export default function LegacyRedirectPage() {
+  return null
 }
 
-// Default export to prevent next.js errors
-export default function Sitemap() {}
+export const getServerSideProps: GetServerSideProps = async () => ({
+  redirect: {
+    destination: '/checkout',
+    permanent: false,
+  },
+})

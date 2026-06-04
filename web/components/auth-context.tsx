@@ -127,8 +127,8 @@ export function AuthProvider(props: {
         authUser.user.userDeleted
       ) {
         const message = authUser.user.userDeleted
-          ? 'You have deleted the account associated with this email. To restore your account please email info@manifold.markets'
-          : 'You are banned from trading. To learn more please email info@manifold.markets'
+          ? 'Esta cuenta fue eliminada. Contacta a soporte de MEXAS para restaurarla.'
+          : 'Esta cuenta no puede operar en MEXAS. Contacta a soporte si necesitas revisar el caso.'
 
         const logout = isPrivyAuthEnabled ? privy.logout : firebaseLogout
         logout().then(() => {

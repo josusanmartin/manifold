@@ -46,11 +46,10 @@ type FirebaseConfig = {
 }
 
 export const PROD_CONFIG: EnvConfig = {
-  domain: 'manifold.markets',
-  supabaseInstanceId: 'pxidrgkatumlvfqaxcll',
-  supabaseAnonKey:
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4aWRyZ2thdHVtbHZmcWF4Y2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE2Njg5OTUzOTgsImV4cCI6MTk4NDU3MTM5OH0.d_yYtASLzAoIIGdXUBIgRAGLBnNow7JG2SoaNMQ8ySg',
-  googleAnalyticsId: 'GTM-MLMPXHJ6',
+  domain: 'mexas-manifold.vercel.app',
+  supabaseInstanceId: 'rdnkemofgumlvtpyajcm',
+  supabaseAnonKey: 'sb_publishable_dyMwdhvG1RgVLD35MpvFhg_ikvQSBAd',
+  googleAnalyticsId: '',
   firebaseConfig: {
     apiKey: 'AIzaSyDp3J57vLeAZCzxLD-vcPaGIkAmBoGOSYw',
     authDomain: 'mantic-markets.firebaseapp.com',
@@ -62,8 +61,8 @@ export const PROD_CONFIG: EnvConfig = {
     appId: '1:128925704902:web:f61f86944d8ffa2a642dc7',
     measurementId: 'G-SSFK1Q138D',
   },
-  twitchBotEndpoint: 'https://twitch-bot.manifold.markets',
-  apiEndpoint: 'api.manifold.markets',
+  twitchBotEndpoint: 'https://mexas-manifold.vercel.app',
+  apiEndpoint: 'mexas-manifold.vercel.app/api',
   cloudRunId: 'nggbo3neva',
   cloudRunRegion: 'uc',
 

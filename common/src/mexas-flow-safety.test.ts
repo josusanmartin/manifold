@@ -2162,8 +2162,8 @@ describe('MEXAS flow safety guardrails', () => {
     ]) {
       expect(existsSync(join(__dirname, '..', '..', path))).toBe(false)
     }
-    expect(serverSitemap).toContain('import { MEXAS_SITE_URL }')
-    expect(serverSitemap).toContain('loc: `${MEXAS_SITE_URL}/')
+    expect(serverSitemap).toContain("import { GetServerSideProps } from 'next'")
+    expect(serverSitemap).toContain("destination: '/checkout'")
     expect(serverSitemap).not.toContain('https://manifold.markets/')
     expect(mexasBrandSource).toContain(
       'Opera mercados de predicción con MEX en Arbitrum.'

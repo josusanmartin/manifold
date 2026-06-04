@@ -1,12 +1,12 @@
-import { redirectIfLoggedIn } from 'web/lib/firebase/server-auth'
-import BrowsePage from './browse'
+import { GetServerSideProps } from 'next'
 
-export const getServerSideProps = redirectIfLoggedIn('/home', async (_) => {
-  return {
-    props: {},
-  }
-})
-
-export default function Index() {
-  return <BrowsePage />
+export default function LegacyRedirectPage() {
+  return null
 }
+
+export const getServerSideProps: GetServerSideProps = async () => ({
+  redirect: {
+    destination: '/checkout',
+    permanent: false,
+  },
+})

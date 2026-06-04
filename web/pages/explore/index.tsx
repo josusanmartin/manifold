@@ -1,35 +1,12 @@
-import { Col } from 'web/components/layout/col'
-import { Page } from 'web/components/layout/page'
-import { SEO } from 'web/components/SEO'
-import { UnifiedFeed } from 'web/components/feed/unified-feed'
-import { LoadingIndicator } from 'web/components/widgets/loading-indicator'
-import { useSaveReferral } from 'web/hooks/use-save-referral'
-import { useSaveScroll } from 'web/hooks/use-save-scroll'
-import { useUser } from 'web/hooks/use-user'
+import { GetServerSideProps } from 'next'
 
-export function ExploreContent(props: { render: boolean }) {
-  const { render } = props
-  const user = useUser()
-  useSaveReferral(user)
-  useSaveScroll('explore', true)
-
-  if (!render) return null
-  if (user === undefined) {
-    return <LoadingIndicator />
-  }
-
-  return (
-    <Col className="mx-auto w-full max-w-2xl px-2 pt-4 sm:px-4">
-      <UnifiedFeed />
-    </Col>
-  )
+export default function LegacyRedirectPage() {
+  return null
 }
 
-export default function ExplorePage() {
-  return (
-    <Page trackPageView="/explore">
-      <SEO title="Explore" description="Explore" url="/explore" />
-      <ExploreContent render={true} />
-    </Page>
-  )
-}
+export const getServerSideProps: GetServerSideProps = async () => ({
+  redirect: {
+    destination: '/checkout',
+    permanent: false,
+  },
+})
