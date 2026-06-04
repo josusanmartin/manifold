@@ -1,6 +1,7 @@
 import { ContractParams, MaybeAuthedContractParams } from 'common/contract'
 import { getContractParams } from 'common/contract-params'
 import { base64toPoints } from 'common/edge/og'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { getContractFromSlug } from 'common/supabase/contracts'
 import { removeUndefinedProps } from 'common/util/object'
 import { ContractPageContent } from 'web/components/contract/contract-page'
@@ -16,7 +17,7 @@ import ContractEmbedPage from '../embed/[username]/[contractSlug]'
 export async function getStaticProps(ctx: {
   params: { username: string; contractSlug: string }
 }) {
-  const { contractSlug } = ctx.params
+  const { username, contractSlug } = ctx.params
   const adminDb = await initSupabaseAdmin()
 
   let contract
@@ -30,6 +31,19 @@ export async function getStaticProps(ctx: {
 
   if (!contract) {
     return { notFound: true }
+  }
+
+  if (!isMexasOrderBookOnlyContract(contract)) {
+    return { notFound: true }
+  }
+
+  if (contract.creatorUsername.toLowerCase() !== username.toLowerCase()) {
+    return {
+      redirect: {
+        destination: `/${contract.creatorUsername}/${contract.slug}`,
+        permanent: false,
+      },
+    }
   }
 
   if (contract.deleted) {

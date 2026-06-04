@@ -1559,6 +1559,7 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('MEXAS market static props bypass legacy comments and related-market prefetches', () => {
     const source = readRepoFile('common/src/contract-params.ts')
+    const pageSource = readRepoFile('web/pages/[username]/[contractSlug].tsx')
 
     expect(source).toContain('import { isMexasOrderBookOnlyContract }')
     expectMarkersInOrder(source, [
@@ -1573,6 +1574,16 @@ describe('MEXAS flow safety guardrails', () => {
       'return getMexasContractParams(contract)',
       'const contractSlug = contract.slug',
       'await Promise.all',
+    ])
+    expect(pageSource).toContain('import { isMexasOrderBookOnlyContract }')
+    expectMarkersInOrder(pageSource, [
+      'if (!contract) {',
+      'return { notFound: true }',
+      'if (!isMexasOrderBookOnlyContract(contract))',
+      'return { notFound: true }',
+      'if (contract.creatorUsername.toLowerCase() !== username.toLowerCase())',
+      'destination: `/${contract.creatorUsername}/${contract.slug}`',
+      'if (contract.deleted)',
     ])
   })
 

@@ -206,6 +206,10 @@ const REDIRECTS = [
       '/mexas-test/terminara-la-guerra-entre-rusia-y-ucrania-antes-del-31-de-diciembre-de-2026',
     path: '/mexas-test/will-the-russia-ukraine-war-end-by-december-31-2026',
   },
+  {
+    destination: '/mexas-test/ganara-mexico-la-copa-mundial-2026',
+    path: '/josusanmartin/ganara-mexico-la-copa-mundial-2026',
+  },
   { destination: '/about', path: '/api' },
   { destination: '/about', path: '/api/v0' },
   { destination: '/about', path: '/api-docs' },
