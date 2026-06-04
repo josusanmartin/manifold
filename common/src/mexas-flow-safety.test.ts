@@ -3965,10 +3965,17 @@ describe('MEXAS flow safety guardrails', () => {
     expect(readme).toContain('[ -f ../.env ] && . ../.env')
     expect(readme).toContain('`web/.vercel/.env.production.local`')
     expect(readme).toContain('nested copy can be stale')
+    expect(readme).toContain('MEXAS_BROWSER_REQUEST_DELAY_MS')
+    expect(readme).toContain('stops on the first detected')
     expect(readme).toContain('COREPACK_ENABLE_STRICT=0 yarn next start -p 3053')
     expect(readme).toContain('check:mexas-smoke')
     expect(source).toContain("const PLAYWRIGHT_VERSION = '1.60.0'")
     expect(source).toContain('MEXAS_PLAYWRIGHT_TMP_DIR')
+    expect(source).toContain('const BROWSER_REQUEST_DELAY_MS = Number')
+    expect(source).toContain('MEXAS_BROWSER_REQUEST_DELAY_MS')
+    expect(source).toContain('MEXAS_SMOKE_REQUEST_DELAY_MS')
+    expect(source).toContain('async function waitForBrowserRequestSlot')
+    expect(source).toContain('function isVercelChallengeFailure')
     expect(source).toContain("require('playwright')")
     expect(source).toContain("execFileSync('npm', ['install', `playwright@")
     expect(source).toContain("import { existsSync, mkdirSync } from 'fs'")
@@ -4014,6 +4021,21 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('Vercel Firewall challenge active')
     expect(source).toContain('vercel firewall attack-mode disable')
     expect(source).toContain('vercel firewall system-mitigations pause')
+    expectMarkersInOrder(source, [
+      'async function checkVercelChallengePreflight',
+      'await waitForBrowserRequestSlot()',
+      'const response = await maybeFetch',
+      'await waitForBrowserRequestSlot()',
+      'const response = await page.goto',
+    ])
+    expectMarkersInOrder(source, [
+      'for (const check of PAGES)',
+      'await waitForBrowserRequestSlot()',
+      'const pageResults = await checkRenderedPage(',
+      'results.push(...pageResults)',
+      'if (pageResults.some(isVercelChallengeFailure))',
+      'return results',
+    ])
   })
 
   test('launch docs include the interactive Vercel firewall recovery step', () => {
@@ -4023,6 +4045,7 @@ describe('MEXAS flow safety guardrails', () => {
       'Vercel Firewall challenge active',
       'Vercel WAF challenge rule',
       '$ vercel firewall attack-mode disable',
+      'MEXAS_BROWSER_REQUEST_DELAY_MS',
       '$ vercel firewall system-mitigations pause',
       'Privy allowed origin',
       'Vercel Security Checkpoint',

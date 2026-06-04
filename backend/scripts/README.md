@@ -96,6 +96,7 @@ If the readiness script fails, resolve blockers in this order:
 
    ```shell
    $ MEXAS_SMOKE_REQUEST_DELAY_MS=1000 yarn --cwd backend/scripts check:mexas-smoke
+   $ MEXAS_BROWSER_REQUEST_DELAY_MS=2000 yarn --cwd backend/scripts check:mexas-browser
    ```
 
    If a full production QA run still needs a temporary bypass, a human must run
@@ -185,7 +186,11 @@ $ yarn --cwd backend/scripts check:mexas-browser
 ```
 
 This checks hydrated Spanish copy, forbidden legacy copy, console errors,
-critical same-origin failed requests, and horizontal overflow. If production is
+critical same-origin failed requests, and horizontal overflow. Against non-local
+hosts it spaces browser navigations by default and stops on the first detected
+Vercel Firewall challenge instead of continuing to probe challenged pages.
+Override the browser pacing with `MEXAS_BROWSER_REQUEST_DELAY_MS`; if that is
+unset, the script falls back to `MEXAS_SMOKE_REQUEST_DELAY_MS`. If production is
 behind a Vercel Firewall challenge, run the command against a local production
 server with `MEXAS_SITE_URL=http://127.0.0.1:<port>` or disable the challenge
 interactively before using the production URL. If Vercel automatic system

@@ -44,6 +44,12 @@ const IS_LOCAL_SITE =
   SITE_HOSTNAME === '127.0.0.1' ||
   SITE_HOSTNAME === '[::1]'
 
+const BROWSER_REQUEST_DELAY_MS = Number(
+  process.env.MEXAS_BROWSER_REQUEST_DELAY_MS ??
+    process.env.MEXAS_SMOKE_REQUEST_DELAY_MS ??
+    (IS_LOCAL_SITE ? 0 : 1_000)
+)
+
 const PLAYWRIGHT_VERSION = '1.60.0'
 const PLAYWRIGHT_TMP_DIR =
   process.env.MEXAS_PLAYWRIGHT_TMP_DIR || '/tmp/mexas-browser-playwright'
@@ -217,7 +223,14 @@ function formatConsoleMessage(message: ConsoleMessage) {
 }
 
 function describeVercelChallenge(status: number) {
-  return `Vercel Firewall challenge active with status ${status}. Disable Attack Mode interactively with "vercel firewall attack-mode disable" or adjust the Vercel WAF challenge rule before launch. If Attack Mode is already disabled, this can be Vercel system mitigation against the probing IP; wait for cooldown or have a human temporarily run "vercel firewall system-mitigations pause" for QA and resume protection afterwards.`
+  return `Vercel Firewall challenge active with status ${status}. Disable Attack Mode interactively with "vercel firewall attack-mode disable" or adjust the Vercel WAF challenge rule before launch. If Attack Mode is already disabled, this can be Vercel system mitigation against the probing IP; wait for cooldown, reduce smoke request rate with MEXAS_BROWSER_REQUEST_DELAY_MS or MEXAS_SMOKE_REQUEST_DELAY_MS, or have a human temporarily run "vercel firewall system-mitigations pause" for QA and resume protection afterwards.`
+}
+
+function isVercelChallengeFailure(result: BrowserResult) {
+  return (
+    result.status === 'fail' &&
+    result.details.includes('Vercel Firewall challenge active')
+  )
 }
 
 function isIgnoredConsoleError(message: string) {
@@ -250,6 +263,14 @@ function isCriticalRequestFailure(request: Request) {
 
 function formatUnknownError(error: unknown) {
   return error instanceof Error ? error.message : String(error)
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms))
+}
+
+async function waitForBrowserRequestSlot() {
+  if (BROWSER_REQUEST_DELAY_MS > 0) await sleep(BROWSER_REQUEST_DELAY_MS)
 }
 
 async function waitForHydration(page: Page) {
@@ -295,6 +316,7 @@ async function checkVercelChallengePreflight(browser: Browser) {
     | undefined
   if (maybeFetch) {
     try {
+      await waitForBrowserRequestSlot()
       const response = await maybeFetch(getUrl('/checkout'), {
         redirect: 'manual',
       })
@@ -323,6 +345,7 @@ async function checkVercelChallengePreflight(browser: Browser) {
   const page = await context.newPage()
 
   try {
+    await waitForBrowserRequestSlot()
     const response = await page.goto(getUrl('/checkout'), {
       timeout: BROWSER_TIMEOUT_MS,
       waitUntil: 'domcontentloaded',
@@ -524,9 +547,16 @@ async function runBrowserSmoke() {
           const page = await context.newPage()
           try {
             try {
-              results.push(
-                ...(await checkRenderedPage(page, check, viewport.name))
+              await waitForBrowserRequestSlot()
+              const pageResults = await checkRenderedPage(
+                page,
+                check,
+                viewport.name
               )
+              results.push(...pageResults)
+              if (pageResults.some(isVercelChallengeFailure)) {
+                return results
+              }
             } catch (error) {
               results.push(
                 fail(
