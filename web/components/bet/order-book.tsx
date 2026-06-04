@@ -176,14 +176,18 @@ export function OrderTable(props: {
   const isPseudoNumeric = contract.outcomeType === 'PSEUDO_NUMERIC'
   const [isCancelling, setIsCancelling] = useState(false)
   const onCancel = async () => {
+    if (isCancelling) return
+
     setIsCancelling(true)
     try {
-      const cancelledBets = await Promise.all(
-        limitBets
-          .filter((b) => !b.isCancelled)
-          .map((bet) => api('bet/cancel/:betId', { betId: bet.id }))
+      const cancellableBets = limitBets.filter(
+        (b) => !b.isCancelled && getOpenAmount(b) > 0
       )
-      cancelledBets.forEach((bet) => onOrderCancelled?.(bet))
+
+      for (const bet of cancellableBets) {
+        const cancelledBet = await api('bet/cancel/:betId', { betId: bet.id })
+        onOrderCancelled?.(cancelledBet)
+      }
     } finally {
       setIsCancelling(false)
     }

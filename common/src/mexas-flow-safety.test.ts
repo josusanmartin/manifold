@@ -292,6 +292,21 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('serializes bulk order cancellation from the order table UI', () => {
+    const source = readRepoFile('web/components/bet/order-book.tsx')
+
+    expectMarkersInOrder(source, [
+      'const onCancel = async () => {',
+      'if (isCancelling) return',
+      'const cancellableBets = limitBets.filter',
+      'getOpenAmount(b) > 0',
+      'for (const bet of cancellableBets)',
+      "await api('bet/cancel/:betId'",
+      'onOrderCancelled?.(cancelledBet)',
+    ])
+    expect(source).not.toContain('const cancelledBets = await Promise.all')
+  })
+
   test('lists bets only after resolving MEXAS orderbook contract ids', () => {
     const source = readRepoFile('web/pages/api/v0/bets.ts')
 
