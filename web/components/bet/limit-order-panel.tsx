@@ -674,6 +674,7 @@ export default function LimitOrderPanel(props: {
           error={displayedError}
           setError={setError}
           disabled={isSubmitting}
+          disregardUserBalance={orderBookOnly}
           showSlider
           token={displayToken}
           sliderColor={pseudonymColor}

@@ -1286,6 +1286,23 @@ describe('MEXAS flow safety guardrails', () => {
     )
   })
 
+  test('does not block MEXAS limit orders on stale internal balance', () => {
+    const panelSource = readRepoFile('web/components/bet/limit-order-panel.tsx')
+    const amountSource = readRepoFile('web/components/widgets/amount-input.tsx')
+
+    expectMarkersInOrder(panelSource, [
+      'const orderBookOnly = isMexasOrderBookOnlyContract(contract)',
+      '<BuyAmountInput',
+      'disregardUserBalance={orderBookOnly}',
+      'token={displayToken}',
+    ])
+    expect(amountSource).toContain(
+      "token === 'MEX' && user.balance < (amount ?? 0)"
+    )
+    expect(amountSource).toContain('Abrir Wallet')
+    expect(amountSource).not.toContain('Open wallet')
+  })
+
   test('preflights MEXAS resolution exposure before the creator can resolve', () => {
     const apiSource = readRepoFile(
       'web/pages/api/v0/market/[contractId]/mexas-resolution-readiness.ts'
