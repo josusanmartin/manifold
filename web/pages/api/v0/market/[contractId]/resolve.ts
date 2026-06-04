@@ -521,7 +521,7 @@ async function resolveMexasMarket(
   const contractData = getRowData(closedContractRow)
   const resolutionProbability =
     outcome === 'YES' ? 1 : outcome === 'NO' ? 0 : undefined
-  const { data: resolvedContractRow, error: resolveError } = await db
+  let resolveQuery = db
     .from('contracts')
     .update({
       resolution: outcome,
@@ -542,6 +542,21 @@ async function resolveMexasMarket(
     })
     .eq('id', contractId)
     .is('resolution_time', null)
+    .eq('data->>mexasResolving', 'true')
+    .eq('data->>mexasResolvingOutcome', outcome)
+
+  const resolvingSince = contractData.mexasResolvingSince
+  if (typeof resolvingSince === 'number') {
+    resolveQuery = resolveQuery.eq(
+      'data->>mexasResolvingSince',
+      String(resolvingSince)
+    )
+  }
+  resolveQuery = closedContractRow.last_updated_time
+    ? resolveQuery.eq('last_updated_time', closedContractRow.last_updated_time)
+    : resolveQuery.is('last_updated_time', null)
+
+  const { data: resolvedContractRow, error: resolveError } = await resolveQuery
     .select()
     .maybeSingle()
 

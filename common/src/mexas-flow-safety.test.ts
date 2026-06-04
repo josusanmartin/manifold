@@ -569,6 +569,20 @@ describe('MEXAS flow safety guardrails', () => {
       'getMexasResolutionLockPredicates(contractData)',
       ".eq('last_updated_time', contractRow.last_updated_time)",
     ])
+    expectMarkersInOrder(source, [
+      'const contractData = getRowData(closedContractRow)',
+      'let resolveQuery = db',
+      ".is('resolution_time', null)",
+      ".eq('data->>mexasResolving', 'true')",
+      ".eq('data->>mexasResolvingOutcome', outcome)",
+      'const resolvingSince = contractData.mexasResolvingSince',
+      "resolveQuery = resolveQuery.eq(\n      'data->>mexasResolvingSince'",
+      'resolveQuery = closedContractRow.last_updated_time',
+      ".eq('last_updated_time', closedContractRow.last_updated_time)",
+      'await resolveQuery',
+      '.select()',
+      '.maybeSingle()',
+    ])
   })
 
   test('uses a consistent fresh order-lock timeout across order, cancel, and resolve flows', () => {
