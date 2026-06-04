@@ -1,7 +1,7 @@
 import { PrivyClient, type User as PrivyUser } from '@privy-io/node'
 import { APIError } from 'common/api/utils'
 import { RESERVED_PATHS } from 'common/envs/constants'
-import { getVerifiedPrivyEmbeddedEthereumWallet } from 'common/privy-wallet'
+import { getStablePrivyEmbeddedEthereumWallet } from 'common/privy-wallet'
 import { type UserAndPrivateUser, type PrivateUser } from 'common/user'
 import { getDefaultNotificationPreferences } from 'common/user-notification-preferences'
 import { cleanDisplayName, cleanUsername } from 'common/util/clean-username'
@@ -109,14 +109,19 @@ function getLinkedEmail(privyUser: PrivyUser) {
   return undefined
 }
 
-function getLinkedWallet(privyUser: PrivyUser, walletAddress?: string | null) {
+function getLinkedWallet(
+  privyUser: PrivyUser,
+  walletAddress?: string | null,
+  existingWalletAddress?: string | null
+) {
   if (walletAddress && !isAddress(walletAddress)) {
     throw new APIError(400, 'Invalid wallet address.')
   }
 
-  const linkedWallet = getVerifiedPrivyEmbeddedEthereumWallet(
+  const linkedWallet = getStablePrivyEmbeddedEthereumWallet(
     privyUser.linked_accounts,
-    walletAddress
+    walletAddress,
+    existingWalletAddress
   )
   if (walletAddress && !linkedWallet) {
     throw new APIError(
@@ -126,6 +131,26 @@ function getLinkedWallet(privyUser: PrivyUser, walletAddress?: string | null) {
   }
 
   return linkedWallet
+}
+
+function getStoredPrivyWalletAddress(
+  userRow: Row<'users'> | null,
+  privateUserRow: Row<'private_users'> | null
+) {
+  const userWalletAddress = getUserData(userRow).privyWalletAddress
+  if (typeof userWalletAddress === 'string') return userWalletAddress
+
+  const privateUserData = privateUserRow?.data
+  const privateWalletAddress =
+    privateUserData &&
+    typeof privateUserData === 'object' &&
+    !Array.isArray(privateUserData) &&
+    'privyWalletAddress' in privateUserData
+      ? privateUserData.privyWalletAddress
+      : undefined
+  return typeof privateWalletAddress === 'string'
+    ? privateWalletAddress
+    : undefined
 }
 
 function getFallbackName(
@@ -562,9 +587,21 @@ export default async function handler(
     const client = getPrivyClient()
     const verified = await client.utils().auth().verifyAccessToken(token)
     const privyUser = await client.users()._get(verified.user_id)
-    const db = getSupabaseAdminClient()
     const email = getLinkedEmail(privyUser)
-    const walletAddress = getLinkedWallet(privyUser, body.walletAddress)
+    const db = getSupabaseAdminClient()
+    const { userRow, privateUserRow } = await loadPrivyUserRows(
+      db,
+      verified.user_id
+    )
+    const existingWalletAddress = getStoredPrivyWalletAddress(
+      userRow,
+      privateUserRow
+    )
+    const walletAddress = getLinkedWallet(
+      privyUser,
+      body.walletAddress,
+      existingWalletAddress
+    )
     const ip = getIp(req)
 
     const result = await createOrUpdatePrivyManifoldUser({

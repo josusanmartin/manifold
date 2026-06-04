@@ -1,5 +1,6 @@
 import {
   getPrivyEmbeddedEthereumWalletAddresses,
+  getStablePrivyEmbeddedEthereumWallet,
   getVerifiedPrivyEmbeddedEthereumWallet,
   type PrivyLinkedAccountLike,
 } from './privy-wallet'
@@ -72,5 +73,41 @@ describe('Privy wallet selection', () => {
         '0x3333333333333333333333333333333333333333'
       )
     ).toBeUndefined()
+  })
+
+  test('preserves an existing embedded wallet when no wallet is requested', () => {
+    expect(
+      getStablePrivyEmbeddedEthereumWallet(
+        [
+          embeddedWallet('0x1111111111111111111111111111111111111111'),
+          embeddedWallet('0x2222222222222222222222222222222222222222'),
+        ],
+        undefined,
+        '0x2222222222222222222222222222222222222222'
+      )
+    ).toBe('0x2222222222222222222222222222222222222222')
+  })
+
+  test('lets an explicitly requested embedded wallet replace the existing wallet', () => {
+    expect(
+      getStablePrivyEmbeddedEthereumWallet(
+        [
+          embeddedWallet('0x1111111111111111111111111111111111111111'),
+          embeddedWallet('0x2222222222222222222222222222222222222222'),
+        ],
+        '0x1111111111111111111111111111111111111111',
+        '0x2222222222222222222222222222222222222222'
+      )
+    ).toBe('0x1111111111111111111111111111111111111111')
+  })
+
+  test('falls back to the first embedded wallet when the existing wallet is no longer linked', () => {
+    expect(
+      getStablePrivyEmbeddedEthereumWallet(
+        [embeddedWallet('0x1111111111111111111111111111111111111111')],
+        undefined,
+        '0x2222222222222222222222222222222222222222'
+      )
+    ).toBe('0x1111111111111111111111111111111111111111')
   })
 })

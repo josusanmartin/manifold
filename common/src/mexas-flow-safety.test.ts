@@ -190,6 +190,35 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).not.toContain(".from('private_users')\n    .insert")
   })
 
+  test('Privy wallet sync preserves an existing linked wallet unless the client requests a replacement', () => {
+    const source = readRepoFile('web/pages/api/privy-user.ts')
+    const walletSource = readRepoFile('common/src/privy-wallet.ts')
+    const walletTestSource = readRepoFile('common/src/privy-wallet.test.ts')
+
+    expectMarkersInOrder(walletSource, [
+      'export function getStablePrivyEmbeddedEthereumWallet',
+      'requestedWalletAddress?: string | null',
+      'existingWalletAddress?: string | null',
+      'if (normalizeAddress(requestedWalletAddress ?? undefined))',
+      'const existingWallet = getVerifiedPrivyEmbeddedEthereumWallet',
+      'return existingWallet ?? getVerifiedPrivyEmbeddedEthereumWallet(linkedAccounts)',
+    ])
+    expect(walletTestSource).toContain(
+      'preserves an existing embedded wallet when no wallet is requested'
+    )
+    expect(walletTestSource).toContain(
+      'lets an explicitly requested embedded wallet replace the existing wallet'
+    )
+    expectMarkersInOrder(source, [
+      'function getStoredPrivyWalletAddress',
+      'const { userRow, privateUserRow } = await loadPrivyUserRows',
+      'const existingWalletAddress = getStoredPrivyWalletAddress',
+      'const walletAddress = getLinkedWallet(',
+      'existingWalletAddress',
+      'const result = await createOrUpdatePrivyManifoldUser',
+    ])
+  })
+
   test('cancels MEXAS orders and refunds reserved funds under the user balance lock', () => {
     const source = readRepoFile('web/pages/api/v0/bet/cancel/[betId].ts')
     const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')

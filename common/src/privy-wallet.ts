@@ -38,3 +38,22 @@ export function getVerifiedPrivyEmbeddedEthereumWallet(
 
   return wallets[0]
 }
+
+export function getStablePrivyEmbeddedEthereumWallet(
+  linkedAccounts: PrivyLinkedAccountLike[],
+  requestedWalletAddress?: string | null,
+  existingWalletAddress?: string | null
+) {
+  if (normalizeAddress(requestedWalletAddress ?? undefined)) {
+    return getVerifiedPrivyEmbeddedEthereumWallet(
+      linkedAccounts,
+      requestedWalletAddress
+    )
+  }
+
+  const existingWallet = getVerifiedPrivyEmbeddedEthereumWallet(
+    linkedAccounts,
+    existingWalletAddress
+  )
+  return existingWallet ?? getVerifiedPrivyEmbeddedEthereumWallet(linkedAccounts)
+}
