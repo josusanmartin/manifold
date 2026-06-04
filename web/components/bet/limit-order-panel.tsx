@@ -43,7 +43,10 @@ import toast from 'react-hot-toast'
 import { encodeFunctionData, isAddress, parseUnits, type Hex } from 'viem'
 import { Input } from 'web/components/widgets/input'
 import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
-import { useMexasOrderReadiness } from 'web/hooks/use-mexas-order-readiness'
+import {
+  fetchMexasOrderReadiness,
+  useMexasOrderReadiness,
+} from 'web/hooks/use-mexas-order-readiness'
 import { usePersistentLocalState } from 'web/hooks/use-persistent-local-state'
 import { api } from 'web/lib/api/api'
 import { mexasErc20Abi } from 'web/lib/crypto/mexas'
@@ -441,6 +444,19 @@ export default function LimitOrderPanel(props: {
   async function captureMexasEscrowStake() {
     if (!orderBookOnly || !mexasOrderReadiness?.escrowCaptureEnabled) {
       return undefined
+    }
+
+    const latestReadiness = await fetchMexasOrderReadiness(contract.id)
+    if (
+      !latestReadiness.canPlaceOrders ||
+      !latestReadiness.escrowCaptureEnabled ||
+      !latestReadiness.matchingEngineReady
+    ) {
+      throw new APIError(
+        503,
+        latestReadiness.message ??
+          'Las nuevas órdenes MEXAS están pausadas hasta completar la liquidación on-chain.'
+      )
     }
 
     const treasuryAddress =

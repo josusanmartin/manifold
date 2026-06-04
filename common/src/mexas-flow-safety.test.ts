@@ -1111,6 +1111,11 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(panelSource, [
       'async function captureMexasEscrowStake',
       'mexasOrderReadiness?.escrowCaptureEnabled',
+      'const latestReadiness = await fetchMexasOrderReadiness(contract.id)',
+      '!latestReadiness.canPlaceOrders',
+      '!latestReadiness.escrowCaptureEnabled',
+      '!latestReadiness.matchingEngineReady',
+      'latestReadiness.message',
       'NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS',
       'ensureEmbeddedWallet',
       'wallet.switchChain(MEXAS_TOKEN.chainId)',
@@ -2151,7 +2156,10 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(hookSource, [
       'export type MexasOrderReadiness',
       'MEXAS_ORDER_READINESS_FALLBACK',
+      'export async function fetchMexasOrderReadiness',
       'mexas-order-readiness',
+      'throw new Error(data?.message ?? MEXAS_ORDER_READINESS_FALLBACK)',
+      'return data as MexasOrderReadiness',
       'canPlaceOrders: false',
       'escrowCaptureEnabled: false',
       'matchingEngineReady: false',
