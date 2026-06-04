@@ -642,6 +642,17 @@ async function getUserOnChainMexasAmount(
   }
 }
 
+async function loadMexasUserBackingRow(db: SupabaseClient, userId: string) {
+  const { data: userRow, error } = await db
+    .from('users')
+    .select('id,balance,data')
+    .eq('id', userId)
+    .single()
+
+  if (error) throw error
+  return userRow as Row<'users'> | undefined
+}
+
 export async function getOpenReservedMexasAmount(
   db: SupabaseClient,
   options: {
@@ -706,21 +717,11 @@ export async function releaseUnbackedMexasOrders(
     rowsByUserId.set(row.user_id, userRows)
   }
 
-  const userIds = [...rowsByUserId.keys()]
-  const { data: userRows, error: userError } = await db
-    .from('users')
-    .select('id,balance,data')
-    .in('id', userIds)
-
-  if (userError) throw userError
-
-  const userRowById = new Map(
-    ((userRows ?? []) as Row<'users'>[]).map((row) => [row.id, row])
-  )
   for (const [userId, userOrderRows] of rowsByUserId) {
     const releaseUserOrders = async () => {
+      const latestUserRow = await loadMexasUserBackingRow(db, userId)
       const onChainAmount = await getUserOnChainMexasAmount(
-        userRowById.get(userId),
+        latestUserRow,
         options.requireBalanceRead ?? false
       )
       if (onChainAmount === undefined) return

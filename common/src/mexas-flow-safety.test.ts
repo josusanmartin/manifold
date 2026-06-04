@@ -338,6 +338,19 @@ describe('MEXAS flow safety guardrails', () => {
       'const rows = await loadOpenReservedMexasOrderRows(db, options)',
     ])
     expectMarkersInOrder(source, [
+      'async function loadMexasUserBackingRow',
+      ".from('users')",
+      ".select('id,balance,data')",
+      ".eq('id', userId)",
+      '.single()',
+    ])
+    expectMarkersInOrder(source, [
+      'const releaseUserOrders = async () =>',
+      'const latestUserRow = await loadMexasUserBackingRow(db, userId)',
+      'const onChainAmount = await getUserOnChainMexasAmount(',
+      'latestUserRow',
+    ])
+    expectMarkersInOrder(source, [
       'async function loadOpenReservedMexasOrderRows',
       ".eq('data->>mexasFundsReserved', 'true')",
       ".eq('data->>mexasFundsReleased', 'false')",
