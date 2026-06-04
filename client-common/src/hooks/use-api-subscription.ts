@@ -1,10 +1,15 @@
 import { useEffect } from 'react'
-import { getWebsocketUrl } from 'common/api/utils'
+import { getWebsocketUrl, isMexasBrowserHostname } from 'common/api/utils'
 import { ServerMessage } from 'common/api/websockets'
 import { APIRealtimeClient } from 'common/api/websocket-client'
 
+const shouldDisableRealtimeClient =
+  typeof window !== 'undefined' &&
+  !process.env.NEXT_PUBLIC_API_URL &&
+  isMexasBrowserHostname(window.location.hostname)
+
 const client =
-  typeof window !== 'undefined'
+  typeof window !== 'undefined' && !shouldDisableRealtimeClient
     ? new APIRealtimeClient(getWebsocketUrl())
     : undefined
 

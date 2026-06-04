@@ -22,8 +22,6 @@ import { Row } from 'web/components/layout/row'
 import { Spacer } from 'web/components/layout/spacer'
 import { QueryUncontrolledTabs } from 'web/components/layout/tabs'
 import { BalanceChangeTable } from 'web/components/portfolio/balance-change-table'
-import { PortfolioSummary } from 'web/components/portfolio/portfolio-summary'
-import { PortfolioValueSection } from 'web/components/portfolio/portfolio-value-section'
 import { BlockedUser } from 'web/components/profile/blocked-user'
 import { UserContractsList } from 'web/components/profile/user-contracts-list'
 import { SEO } from 'web/components/SEO'
@@ -37,7 +35,7 @@ import { useAdminOrMod } from 'web/hooks/use-admin'
 import { useHeaderIsStuck } from 'web/hooks/use-header-is-stuck'
 import { useIsMobile } from 'web/hooks/use-is-mobile'
 import { useSaveReferral } from 'web/hooks/use-save-referral'
-import { usePrivateUser, useUser, useWebsocketUser } from 'web/hooks/use-user'
+import { usePrivateUser, useUser } from 'web/hooks/use-user'
 import { useUserBans } from 'web/hooks/use-user-bans'
 import { User } from 'web/lib/firebase/users'
 import { buildPersonProfile } from 'web/lib/json-ld'
@@ -119,6 +117,50 @@ export const DeletedUser = () => {
   )
 }
 
+function MexasPublicProfileSummary(props: {
+  user: User
+  hasCreatedQuestion: boolean
+  isCurrentUser: boolean
+}) {
+  const { user, hasCreatedQuestion, isCurrentUser } = props
+
+  return (
+    <Col className="border-ink-200 mt-4 gap-4 border-y py-4">
+      <Row className="flex-wrap gap-3">
+        <Col className="min-w-[180px] flex-1 gap-1">
+          <span className="text-ink-500 text-xs font-semibold uppercase">
+            Wallet
+          </span>
+          <span className="text-ink-1000 text-lg font-semibold">
+            @{user.username}
+          </span>
+        </Col>
+        <Col className="min-w-[180px] flex-1 gap-1">
+          <span className="text-ink-500 text-xs font-semibold uppercase">
+            Mercados MEX
+          </span>
+          <span className="text-ink-1000 text-lg font-semibold">
+            {hasCreatedQuestion ? 'Activos' : 'Sin mercados creados'}
+          </span>
+        </Col>
+        <Col className="min-w-[180px] flex-1 gap-1">
+          <span className="text-ink-500 text-xs font-semibold uppercase">
+            Acceso
+          </span>
+          <span className="text-ink-1000 text-lg font-semibold">
+            {isCurrentUser ? 'Tu perfil' : 'Perfil publico'}
+          </span>
+        </Col>
+      </Row>
+      <p className="text-ink-600 max-w-3xl text-sm">
+        Las operaciones visibles en esta fork se liquidan en MEX. Usa las
+        pestañas de operaciones, mercados y movimientos para revisar actividad
+        publica de MEXAS.
+      </p>
+    </Col>
+  )
+}
+
 function UserProfile(props: {
   user: User
   rating?: number
@@ -134,7 +176,7 @@ function UserProfile(props: {
     reviewCount,
     averageRating,
   } = props
-  const user = useWebsocketUser(props.user.id) ?? props.user
+  const user = props.user
   const isMobile = useIsMobile()
   const router = useRouter()
   const currentUser = useUser()
@@ -151,7 +193,7 @@ function UserProfile(props: {
     }
   }, [user.isBannedFromPosting, user.userDeleted, currentUser, user.id])
   const [showConfetti, setShowConfetti] = useState(false)
-  const { bans: userBans } = useUserBans(user.id)
+  const { bans: userBans } = useUserBans(currentUser ? user.id : undefined)
   const { ref: titleRef, headerStuck } = useHeaderIsStuck()
 
   useEffect(() => {
@@ -340,7 +382,13 @@ function UserProfile(props: {
                 queryString: 'summary',
                 prerender: true,
                 stackedTabIcon: <PresentationChartLineIcon className="h-5" />,
-                content: <PortfolioSummary className="mt-4" user={user} />,
+                content: (
+                  <MexasPublicProfileSummary
+                    user={user}
+                    hasCreatedQuestion={hasCreatedQuestion}
+                    isCurrentUser={isCurrentUser}
+                  />
+                ),
               },
               !!user.lastBetTime && {
                 title: 'Operaciones',
@@ -349,23 +397,10 @@ function UserProfile(props: {
                 content: (
                   <>
                     <Spacer h={2} />
-                    {!isCurrentUser && (
-                      <>
-                        <PortfolioValueSection
-                          user={user}
-                          defaultTimePeriod={
-                            currentUser?.id === user.id ? 'weekly' : 'monthly'
-                          }
-                          mexasOnly
-                        />
-
-                        <div className="text-ink-800 border-ink-300 mx-2 mt-6 gap-2 border-t pt-4 text-xl font-semibold lg:mx-0">
-                          Operaciones
-                        </div>
-
-                        <Spacer h={4} />
-                      </>
-                    )}
+                    <div className="text-ink-800 border-ink-300 mx-2 mt-2 gap-2 border-b pb-3 text-xl font-semibold lg:mx-0">
+                      Operaciones
+                    </div>
+                    <Spacer h={4} />
                     <UserBetsTable user={user} />
                   </>
                 ),

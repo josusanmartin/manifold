@@ -763,6 +763,7 @@ describe('MEXAS flow safety guardrails', () => {
       'web/components/widgets/checked-dropdown.tsx'
     )
     const settingsSource = readRepoFile('web/components/profile/settings.tsx')
+    const webApiSource = readRepoFile('web/lib/api/api.ts')
 
     expectMarkersInOrder(profileSource, [
       "title: 'Resumen'",
@@ -772,7 +773,14 @@ describe('MEXAS flow safety guardrails', () => {
       "title: 'Wallet'",
     ])
     expect(profileSource).toContain(".eq('data->>token', 'MEX')")
-    expect(profileSource).toContain('mexasOnly')
+    expect(profileSource).toContain('MexasPublicProfileSummary')
+    expect(profileSource).toContain('hasCreatedQuestion={hasCreatedQuestion}')
+    expect(profileSource).toContain(
+      'useUserBans(currentUser ? user.id : undefined)'
+    )
+    expect(profileSource).not.toContain('useWebsocketUser')
+    expect(profileSource).not.toContain('PortfolioSummary')
+    expect(profileSource).not.toContain('PortfolioValueSection')
     expect(profileSource).not.toContain('old_posts')
     expect(profileSource).not.toContain('ProfilePublicStats')
     expect(profileSource).not.toContain('RedeemSweepsButtons')
@@ -834,6 +842,16 @@ describe('MEXAS flow safety guardrails', () => {
       "'v0/get-user-portfolio'",
       "'v0/get-user-portfolio-history'",
     ])
+    expect(webApiSource).toContain('const LOCAL_MEXAS_API_PATHS')
+    expect(webApiSource).toContain("bet: '/api/v0/bet'")
+    expect(webApiSource).toContain("bets: '/api/v0/bets'")
+    expect(webApiSource).toContain(
+      "'get-user-contract-metrics-with-contracts':\n    '/api/v0/get-user-contract-metrics-with-contracts'"
+    )
+    expect(webApiSource).toContain(
+      "'search-markets-full': '/api/search-markets-full'"
+    )
+    expect(webApiSource).toContain('getLocalMexasApiUrl(path, params)')
     expect(metricsApiSource).toContain(
       "coalesce(c.data->>'token', c.token) = 'MEX'"
     )
@@ -3653,6 +3671,61 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('public display user loading does not require legacy entitlements', () => {
+    const source = readRepoFile('web/lib/supabase/users.ts')
+
+    expect(source).toContain('export async function getDisplayUsers')
+    expect(source).toContain(".from('users')")
+    expect(source).toContain('entitlements: []')
+    expect(source).not.toContain(".from('user_entitlements')")
+    expect(source).not.toContain('convertEntitlement')
+  })
+
+  test('browser smoke covers MEXAS production pages in desktop and mobile', () => {
+    const packageJson = readRepoFile('backend/scripts/package.json')
+    const readme = readRepoFile('backend/scripts/README.md')
+    const source = readRepoFile('backend/scripts/check-mexas-browser-smoke.ts')
+
+    expect(packageJson).toContain('"check:mexas-browser"')
+    expect(packageJson).not.toContain('"playwright"')
+    expect(readme).toContain('check:mexas-browser')
+    expect(readme).toContain('MEXAS_SITE_URL=http://127.0.0.1:<port>')
+    expect(source).toContain("const PLAYWRIGHT_VERSION = '1.60.0'")
+    expect(source).toContain('MEXAS_PLAYWRIGHT_TMP_DIR')
+    expect(source).toContain("require('playwright')")
+    expect(source).toContain("execFileSync('npm', ['install', `playwright@")
+    expect(source).toContain("import { existsSync, mkdirSync } from 'fs'")
+    expect(source).toContain('const PAGES: PageCheck[]')
+    expect(source).toContain('const VIEWPORTS: ViewportCheck[]')
+    expect(source).toContain("name: 'desktop'")
+    expect(source).toContain("name: 'mobile'")
+    expect(source).toContain("...devices['iPhone 14']")
+    expect(source).toContain("'/wallet'")
+    expect(source).toContain("'/checkout'")
+    expect(source).toContain(
+      "'/mexas-test/ganara-mexico-la-copa-mundial-2026'"
+    )
+    expect(source).toContain(
+      "'/mexas-test/terminara-la-guerra-entre-rusia-y-ucrania-antes-del-31-de-diciembre-de-2026'"
+    )
+    expect(source).toContain('FORBIDDEN_VISIBLE_COPY')
+    expect(source).toContain("'Receive Mana'")
+    expect(source).toContain("'Manifold'")
+    expect(source).toContain("'Cartera'")
+    expect(source).toContain("'Contexto del mercado'")
+    expect(source).toContain("page.on('console'")
+    expect(source).toContain("page.on('pageerror'")
+    expect(source).toContain("page.on('requestfailed'")
+    expect(source).toContain("request.failure()?.errorText === 'net::ERR_ABORTED'")
+    expect(source).toContain("page.on('response'")
+    expect(source).toContain('horizontalOverflow')
+    expect(source).toContain('function formatUnknownError')
+    expect(source).toContain("state: 'attached'")
+    expect(source).toContain("mkdirSync(ARTIFACT_DIR, { recursive: true })")
+    expect(source).toContain('Vercel Firewall challenge active')
+    expect(source).toContain('vercel firewall attack-mode disable')
+  })
+
   test('launch docs include the interactive Vercel firewall recovery step', () => {
     const source = readRepoFile('backend/scripts/README.md')
 
@@ -3681,5 +3754,16 @@ describe('MEXAS flow safety guardrails', () => {
     for (const marker of ['.env', '.env.*', '.git/', '.vercel/']) {
       expect(vercelignore).toContain(marker)
     }
+  })
+
+  test('MEXAS Vercel hosts do not open the inherited backend websocket', () => {
+    const source = readRepoFile('client-common/src/hooks/use-api-subscription.ts')
+
+    expect(source).toContain('shouldDisableRealtimeClient')
+    expect(source).toContain('isMexasBrowserHostname(window.location.hostname)')
+    expect(source).toContain('!process.env.NEXT_PUBLIC_API_URL')
+    expect(source).toContain(
+      "typeof window !== 'undefined' && !shouldDisableRealtimeClient"
+    )
   })
 })

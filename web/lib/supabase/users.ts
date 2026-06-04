@@ -4,7 +4,6 @@ import { APIError, api } from '../api/api'
 import { DAY_MS, WEEK_MS } from 'common/util/time'
 import { HIDE_FROM_LEADERBOARD_USER_IDS } from 'common/envs/constants'
 import type { DisplayUser } from 'common/api/user-types'
-import { convertEntitlement } from 'common/shop/types'
 import { db } from './db'
 export type { DisplayUser }
 
@@ -50,46 +49,20 @@ export async function searchUsers(prompt: string, limit: number) {
 export async function getDisplayUsers(userIds: string[]) {
   if (userIds.length === 0) return []
 
-  // Fetch users and entitlements in parallel
-  const [usersResult, entitlementsResult] = await Promise.all([
-    run(
-      (
-        db
-          .from('users')
-          .select(
-            `id, name, username, is_bot, data->avatarUrl, data->isBannedFromPosting`
-          ) as any
-      ).in('id', userIds)
-    ),
-    run(
+  const { data: users } = await run(
+    (
       db
-        .from('user_entitlements')
-        .select('*')
-        .in('user_id', userIds)
-        .or('expires_time.is.null,expires_time.gt.now()')
-    ),
-  ])
+        .from('users')
+        .select(
+          `id, name, username, is_bot, data->avatarUrl, data->isBannedFromPosting`
+        ) as any
+    ).in('id', userIds)
+  )
 
-  const { data: users } = usersResult
-  const { data: entitlements } = entitlementsResult
-
-  // Group entitlements by user_id
-  const entitlementsByUser = new Map<string, typeof entitlements>()
-  for (const e of entitlements ?? []) {
-    const userId = e.user_id
-    if (!entitlementsByUser.has(userId)) {
-      entitlementsByUser.set(userId, [])
-    }
-    entitlementsByUser.get(userId)!.push(e)
-  }
-
-  // Merge entitlements into users
   return (users ?? []).map((user: any) => ({
     ...user,
     isBot: user.is_bot ?? undefined,
-    entitlements: (entitlementsByUser.get(user.id) ?? []).map(
-      convertEntitlement
-    ),
+    entitlements: [],
   })) as DisplayUser[]
 }
 

@@ -106,8 +106,15 @@ La verificacion SQL devolvio:
 - `mexas_orderbook_matching_engine_ready = true`;
 - `mexas_treasury_settlement_ledger_ready = true`;
 - `mexas_escrow_capture_ready = true`;
-- `mexwcwin26a`, `ukrwarend26a` y `wcupwin26a` con `token=MEX` y
-  `data_token=MEX`.
+- `mexwcwin26a` y `ukrwarend26a` con `token=MEX` y `data_token=MEX`.
+
+El mercado multi-opcion viejo `wcupwin26a` fue retirado de Supabase produccion
+mediante MCP. No tenia apuestas ni liquidez; se borraron el contrato y sus 25
+respuestas asociadas.
+
+Tambien se aplico mediante Supabase MCP la columna heredada faltante
+`public.users.is_bot boolean not null default false`, necesaria para las cargas
+publicas de usuarios que aun comparten helpers con Manifold.
 
 Despues de aplicar SQL, pasaron:
 

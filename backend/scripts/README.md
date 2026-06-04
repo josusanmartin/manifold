@@ -137,6 +137,22 @@ This checks public page status codes, required Spanish MEXAS copy, absence of
 visible legacy Manifold/Mana/comment/verification UI strings, and the public
 MEXAS orderbook endpoint.
 
+For a browser-level smoke test that renders the allowed MEXAS pages in desktop
+and mobile Chromium, run:
+
+```shell
+$ yarn --cwd backend/scripts check:mexas-browser
+```
+
+This checks hydrated Spanish copy, forbidden legacy copy, console errors,
+critical same-origin failed requests, and horizontal overflow. If production is
+behind a Vercel Firewall challenge, run the command against a local production
+server with `MEXAS_SITE_URL=http://127.0.0.1:<port>` or disable the challenge
+interactively before using the production URL. The script installs
+`playwright@1.60.0` into `/tmp/mexas-browser-playwright` on demand if it is not
+already available in local `node_modules`, so it does not add browser binaries
+to Vercel production installs.
+
 For an isolated SQL integration audit of the MEXAS orderbook matcher, run:
 
 ```shell

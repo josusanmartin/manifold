@@ -1,6 +1,6 @@
 import { JSONContent } from '@tiptap/core'
 import { apiWithAuth, callWithAuth } from 'client-common/lib/api'
-import { APIParams, APIPath } from 'common/api/schema'
+import { API, APIParams, APIPath, APIResponse } from 'common/api/schema'
 import { getApiUrl } from 'common/api/utils'
 import { Bet } from 'common/bet'
 import { ContractComment } from 'common/comment'
@@ -22,7 +22,52 @@ export async function api<P extends APIPath>(
   path: P,
   params: APIParams<P> = {}
 ) {
+  const localUrl = getLocalMexasApiUrl(path, params)
+  if (localUrl) {
+    return (await callWithAuth(
+      localUrl.url,
+      API[path].method,
+      auth,
+      localUrl.params
+    )) as APIResponse<P>
+  }
+
   return apiWithAuth(path, auth, params)
+}
+
+const LOCAL_MEXAS_API_PATHS: Partial<Record<APIPath, string>> = {
+  bet: '/api/v0/bet',
+  bets: '/api/v0/bets',
+  'bet/cancel/:betId': '/api/v0/bet/cancel/:betId',
+  'get-balance-changes': '/api/get-balance-changes',
+  'get-user-contract-metrics-with-contracts':
+    '/api/v0/get-user-contract-metrics-with-contracts',
+  'get-user-limit-orders-with-contracts':
+    '/api/get-user-limit-orders-with-contracts',
+  'get-user-portfolio': '/api/v0/get-user-portfolio',
+  'get-user-portfolio-history': '/api/v0/get-user-portfolio-history',
+  'market/:contractId/resolve': '/api/v0/market/:contractId/resolve',
+  'recent-markets': '/api/recent-markets',
+  'search-markets-full': '/api/search-markets-full',
+}
+
+function getLocalMexasApiUrl<P extends APIPath>(
+  path: P,
+  params: APIParams<P>
+) {
+  const localPath = LOCAL_MEXAS_API_PATHS[path]
+  if (!localPath) return
+
+  const apiParams = { ...(params as Record<string, unknown>) }
+  let url = localPath
+  for (const [key, value] of Object.entries(apiParams)) {
+    const marker = `:${key}`
+    if (!url.includes(marker)) continue
+    url = url.replace(marker, encodeURIComponent(String(value)))
+    delete apiParams[key]
+  }
+
+  return { params: apiParams, url }
 }
 
 // helper function for the old apis so we don't have to migrate them
