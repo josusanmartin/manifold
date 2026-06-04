@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { execFileSync } from 'child_process'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
@@ -58,6 +58,37 @@ function assertDeepEqual<T>(actual: T, expected: T, message: string) {
 }
 
 let savepointCounter = 0
+
+function getEscrowTxHash(seed: string) {
+  return `0x${createHash('sha256').update(seed).digest('hex')}`
+}
+
+async function expectAsyncError(
+  client: PgClient,
+  callback: () => Promise<void>,
+  pattern: RegExp,
+  message: string
+) {
+  const savepoint = `expect_async_error_${++savepointCounter}`
+  await client.query(`savepoint ${savepoint}`)
+
+  try {
+    await callback()
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    await client.query(`rollback to savepoint ${savepoint}`)
+    await client.query(`release savepoint ${savepoint}`)
+    assert(
+      pattern.test(errorMessage),
+      `${message}: unexpected error ${errorMessage}`
+    )
+    return
+  }
+
+  await client.query(`rollback to savepoint ${savepoint}`)
+  await client.query(`release savepoint ${savepoint}`)
+  throw new Error(`${message}: expected query to fail.`)
+}
 
 async function expectSqlError(
   client: PgClient,
@@ -328,6 +359,7 @@ async function seedOrder(
     dataIsCancelled?: boolean
     dataIsFilled?: boolean
     dataIsRedemption?: boolean
+    escrowTxHash?: string
     isCancelled?: boolean
     isFilled?: boolean
     limitProb: number
@@ -356,7 +388,7 @@ async function seedOrder(
     mexasReservedAmount: params.orderAmount,
     mexasStakeEscrowed: params.escrowed ? true : undefined,
     mexasEscrowTxHash: params.escrowed
-      ? `0x${params.id.padEnd(64, '0').slice(0, 64)}`
+      ? params.escrowTxHash ?? getEscrowTxHash(params.id)
       : undefined,
     mexasEscrowPayerAddress: params.escrowed
       ? '0x1111111111111111111111111111111111111111'
@@ -963,6 +995,110 @@ async function testPriceTimePriority(client: PgClient) {
   assertEqual(Number(releasedAsk.amount), 0, 'released ask stays untouched')
 }
 
+async function testEscrowedNoSidePriceTimePriority(client: PgClient) {
+  const contractId = 'no-side-price-time'
+  await seedUsers(client, [
+    'no-maker-below',
+    'no-maker-high',
+    'no-maker-new',
+    'no-maker-old',
+    'no-taker',
+  ])
+  await seedContract(client, contractId)
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:00Z'),
+    escrowed: true,
+    id: 'no-side-same-user-bid',
+    limitProb: 0.9,
+    orderAmount: 9,
+    outcome: 'YES',
+    userId: 'no-taker',
+  })
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:01Z'),
+    escrowed: true,
+    id: 'no-side-below-cross-bid',
+    limitProb: 0.45,
+    orderAmount: 4.5,
+    outcome: 'YES',
+    userId: 'no-maker-below',
+  })
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:02Z'),
+    escrowed: true,
+    id: 'no-side-high-bid',
+    limitProb: 0.8,
+    orderAmount: 4,
+    outcome: 'YES',
+    userId: 'no-maker-high',
+  })
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:03Z'),
+    escrowed: true,
+    id: 'no-side-old-bid',
+    limitProb: 0.6,
+    orderAmount: 6,
+    outcome: 'YES',
+    userId: 'no-maker-old',
+  })
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:04Z'),
+    escrowed: true,
+    id: 'no-side-new-bid',
+    limitProb: 0.6,
+    orderAmount: 6,
+    outcome: 'YES',
+    userId: 'no-maker-new',
+  })
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:05Z'),
+    escrowed: true,
+    id: 'no-side-taker',
+    limitProb: 0.5,
+    orderAmount: 9,
+    outcome: 'NO',
+    userId: 'no-taker',
+  })
+
+  const result = await matchOrder(client, 'no-side-taker')
+
+  assertDeepEqual(
+    result.matches.map((match) => match.makerBetId),
+    ['no-side-high-bid', 'no-side-old-bid', 'no-side-new-bid'],
+    'NO-side price-time maker order'
+  )
+  assertDeepEqual(
+    result.matches.map((match) => match.takerAmount),
+    [1, 4, 4],
+    'NO-side taker fill amounts'
+  )
+  assertDeepEqual(
+    result.matches.map((match) => match.price),
+    [0.8, 0.6, 0.6],
+    'NO-side maker prices'
+  )
+
+  const taker = await loadOrder(client, 'no-side-taker')
+  assertEqual(Number(taker.amount), 9, 'NO-side taker filled amount')
+  assertEqual(Number(taker.shares), 25, 'NO-side taker shares')
+  assertEqual(taker.is_filled, true, 'NO-side taker filled flag')
+
+  const sameUserBid = await loadOrder(client, 'no-side-same-user-bid')
+  assertEqual(Number(sameUserBid.amount), 0, 'NO-side same-user bid untouched')
+  const belowCrossBid = await loadOrder(client, 'no-side-below-cross-bid')
+  assertEqual(
+    Number(belowCrossBid.amount),
+    0,
+    'NO-side non-crossing bid untouched'
+  )
+}
+
 async function testConcurrentTakers(
   client: PgClient,
   connectionString: string
@@ -1148,6 +1284,49 @@ async function testEscrowAndMarketGuards(client: PgClient) {
   await expectMatchError(client, 'expired-taker', /Taker order is expired/)
 }
 
+async function testEscrowCaptureHashUniqueness(client: PgClient) {
+  const contractId = 'escrow-capture-unique'
+  const duplicateHash = getEscrowTxHash('duplicate-capture')
+  await seedUsers(client, ['capture-a', 'capture-b'])
+  await seedContract(client, contractId)
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:06:00Z'),
+    escrowTxHash: duplicateHash,
+    escrowed: true,
+    id: 'capture-a-order',
+    limitProb: 0.4,
+    orderAmount: 1,
+    outcome: 'YES',
+    userId: 'capture-a',
+  })
+
+  await client.query('begin')
+  try {
+    await expectAsyncError(
+      client,
+      () =>
+        seedOrder(client, {
+          contractId,
+          createdTime: new Date('2026-06-03T00:06:01Z'),
+          escrowTxHash: duplicateHash,
+          escrowed: true,
+          id: 'capture-b-order',
+          limitProb: 0.5,
+          orderAmount: 1,
+          outcome: 'NO',
+          userId: 'capture-b',
+        }),
+      /duplicate key|unique/i,
+      'duplicate escrow capture tx hash'
+    )
+    await client.query('commit')
+  } catch (error) {
+    await client.query('rollback').catch(() => undefined)
+    throw error
+  }
+}
+
 async function expectMatchError(
   client: PgClient,
   betId: string,
@@ -1191,8 +1370,14 @@ async function main() {
     await runStep('verify SQL price-time priority', () =>
       testPriceTimePriority(client)
     )
+    await runStep('verify escrowed NO-side SQL price-time priority', () =>
+      testEscrowedNoSidePriceTimePriority(client)
+    )
     await runStep('verify concurrent takers serialize on one maker', () =>
       testConcurrentTakers(client, postgres.connectionString)
+    )
+    await runStep('verify escrow capture tx hash uniqueness', () =>
+      testEscrowCaptureHashUniqueness(client)
     )
     await runStep(
       'verify escrow separation, closed markets, resolved markets, and expired takers',

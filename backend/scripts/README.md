@@ -160,6 +160,7 @@ $ yarn --cwd backend/scripts test:mexas-orderbook-sql
 ```
 
 This starts a temporary Docker Postgres, applies the MEXAS launch migrations,
-and verifies backend-only RPC grants, treasury ledger idempotency/RLS, price-time
-priority, two concurrent takers racing for the same maker, wallet-vs-escrow
-separation, closed/resolved market rejection, and expired taker rejection.
+and verifies backend-only RPC grants, treasury ledger idempotency/RLS,
+YES-side and escrowed NO-side price-time priority, two concurrent takers racing
+for the same maker, escrow capture hash uniqueness, wallet-vs-escrow separation,
+closed/resolved market rejection, and expired taker rejection.

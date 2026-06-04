@@ -2332,6 +2332,9 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile(
       'backend/supabase/migrations/2026060202_add_mexas_rpc_matching.sql'
     )
+    const integrationSource = readRepoFile(
+      'backend/scripts/test-mexas-orderbook-sql.ts'
+    )
 
     expectMarkersInOrder(source, [
       'from public.contract_bets',
@@ -2366,6 +2369,18 @@ describe('MEXAS flow safety guardrails', () => {
       'where bet_id = v_taker.bet_id',
     ])
     expect(source).not.toContain('skip locked')
+    expectMarkersInOrder(integrationSource, [
+      'async function testPriceTimePriority',
+      'price-time maker order',
+      'async function testEscrowedNoSidePriceTimePriority',
+      'NO-side price-time maker order',
+      'async function testConcurrentTakers',
+    ])
+    expectMarkersInOrder(integrationSource, [
+      "'verify SQL price-time priority'",
+      "'verify escrowed NO-side SQL price-time priority'",
+      "'verify concurrent takers serialize on one maker'",
+    ])
   })
 
   test('persists SQL matcher fills in canonical columns and JSON data', () => {
@@ -3008,6 +3023,9 @@ describe('MEXAS flow safety guardrails', () => {
       'backend/scripts/check-mexas-launch-readiness.ts'
     )
     const schemaSource = readRepoFile('common/src/supabase/schema.ts')
+    const sqlTestSource = readRepoFile(
+      'backend/scripts/test-mexas-orderbook-sql.ts'
+    )
 
     expectMarkersInOrder(helperSource, [
       'MEXAS_ESCROW_TX_HASH_PATTERN',
@@ -3056,6 +3074,12 @@ describe('MEXAS flow safety guardrails', () => {
       'must be true before launch so crossing orders can capture stake on-chain',
     ])
     expect(schemaSource).toContain('mexas_escrow_capture_ready')
+    expectMarkersInOrder(sqlTestSource, [
+      'function getEscrowTxHash',
+      'async function testEscrowCaptureHashUniqueness',
+      'duplicate escrow capture tx hash',
+      "'verify escrow capture tx hash uniqueness'",
+    ])
   })
 
   test('treasury transfer helper signs outgoing MEXAS payments behind an idempotent processing claim', () => {
