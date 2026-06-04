@@ -98,7 +98,7 @@ function NonPrivateContractPage(props: { contractParams: ContractParams }) {
 
   const inIframe = useIsIframe()
   if (!contract) {
-    return <Custom404 customText="Unable to fetch question" />
+    return <Custom404 customText="No se pudo cargar la pregunta" />
   }
   if (inIframe) {
     return <ContractEmbedPage contract={contract} points={points} />

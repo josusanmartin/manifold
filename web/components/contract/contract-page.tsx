@@ -152,7 +152,8 @@ export function ContractPageContent(props: ContractParams) {
   const { ref: titleRef, headerStuck } = useHeaderIsStuck()
 
   const showExplainerPanel =
-    user === null || (user && user.createdTime > Date.now() - 3 * DAY_MS)
+    !isMexasOrderBookOnly &&
+    (user === null || (user && user.createdTime > Date.now() - 3 * DAY_MS))
 
   const [justNowReview, setJustNowReview] = useState<null | Rating>(null)
   const userReview = useReview(props.contract.id, user?.id)

@@ -778,6 +778,12 @@ describe('MEXAS flow safety guardrails', () => {
     expect(profileSource).toContain(".eq('data->>token', 'MEX')")
     expect(profileSource).toContain('MexasPublicProfileSummary')
     expect(profileSource).toContain('hasCreatedQuestion={hasCreatedQuestion}')
+    expect(profileSource).toContain('<Title>Cuenta eliminada</Title>')
+    expect(profileSource).toContain('Esta cuenta fue eliminada.')
+    expect(profileSource).toContain('Perfil público')
+    expect(profileSource).toContain('pública de MEXAS')
+    expect(profileSource).not.toContain('Deleted account')
+    expect(profileSource).not.toContain("This user's account has been deleted.")
     expect(profileSource).toContain(
       'useUserBans(currentUser ? user.id : undefined)'
     )
@@ -1789,6 +1795,9 @@ describe('MEXAS flow safety guardrails', () => {
   test('MEXAS market static props bypass legacy comments and related-market prefetches', () => {
     const source = readRepoFile('common/src/contract-params.ts')
     const pageSource = readRepoFile('web/pages/[username]/[contractSlug].tsx')
+    const contractPageSource = readRepoFile(
+      'web/components/contract/contract-page.tsx'
+    )
 
     expect(source).toContain('import { isMexasOrderBookOnlyContract }')
     expectMarkersInOrder(source, [
@@ -1805,6 +1814,8 @@ describe('MEXAS flow safety guardrails', () => {
       'await Promise.all',
     ])
     expect(pageSource).toContain('import { isMexasOrderBookOnlyContract }')
+    expect(pageSource).toContain('No se pudo cargar la pregunta')
+    expect(pageSource).not.toContain('Unable to fetch question')
     expectMarkersInOrder(pageSource, [
       'if (!contract) {',
       'return { notFound: true }',
@@ -1813,6 +1824,11 @@ describe('MEXAS flow safety guardrails', () => {
       'if (contract.creatorUsername.toLowerCase() !== username.toLowerCase())',
       'destination: `/${contract.creatorUsername}/${contract.slug}`',
       'if (contract.deleted)',
+    ])
+    expectMarkersInOrder(contractPageSource, [
+      'const showExplainerPanel =',
+      '!isMexasOrderBookOnly',
+      'user === null',
     ])
   })
 
@@ -1967,6 +1983,7 @@ describe('MEXAS flow safety guardrails', () => {
     const publicSurfaceSource = readRepoFile(
       'common/src/mexas-public-surface.ts'
     )
+    const mexasBrandSource = readRepoFile('web/lib/mexas-brand.ts')
 
     expectMarkersInOrder(source, [
       'const STATIC_FILES = [',
@@ -2048,6 +2065,12 @@ describe('MEXAS flow safety guardrails', () => {
     expect(serverSitemap).toContain('import { MEXAS_SITE_URL }')
     expect(serverSitemap).toContain('loc: `${MEXAS_SITE_URL}/')
     expect(serverSitemap).not.toContain('https://manifold.markets/')
+    expect(mexasBrandSource).toContain(
+      'Opera mercados de predicción con MEX en Arbitrum.'
+    )
+    expect(mexasBrandSource).not.toContain(
+      'Trade prediction markets with MEX on Arbitrum.'
+    )
   })
 
   test('production smoke covers broad legacy API blockers', () => {

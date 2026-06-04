@@ -110,8 +110,8 @@ export const DeletedUser = () => {
         <meta name="robots" content="noindex, nofollow" />
       </Head>
       <div className="flex h-full flex-col items-center justify-center">
-        <Title>Deleted account</Title>
-        <p>This user's account has been deleted.</p>
+        <Title>Cuenta eliminada</Title>
+        <p>Esta cuenta fue eliminada.</p>
       </div>
     </Page>
   )
@@ -148,14 +148,14 @@ function MexasPublicProfileSummary(props: {
             Acceso
           </span>
           <span className="text-ink-1000 text-lg font-semibold">
-            {isCurrentUser ? 'Tu perfil' : 'Perfil publico'}
+            {isCurrentUser ? 'Tu perfil' : 'Perfil público'}
           </span>
         </Col>
       </Row>
       <p className="text-ink-600 max-w-3xl text-sm">
         Las operaciones visibles en esta fork se liquidan en MEX. Usa las
         pestañas de operaciones, mercados y movimientos para revisar actividad
-        publica de MEXAS.
+        pública de MEXAS.
       </p>
     </Col>
   )
