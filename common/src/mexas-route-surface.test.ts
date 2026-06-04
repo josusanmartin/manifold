@@ -189,12 +189,19 @@ describe('MEXAS route surface', () => {
     const redirectOnlyPages = [
       'web/pages/charity.tsx',
       'web/pages/charity/[giveawayNum].tsx',
+      'web/pages/calculator.tsx',
+      'web/pages/discord-bot.tsx',
       'web/pages/lab.tsx',
       'web/pages/mana-auction.tsx',
+      'web/pages/manachan.tsx',
+      'web/pages/notifications.tsx',
       'web/pages/predictle.tsx',
+      'web/pages/press.tsx',
       'web/pages/prize.tsx',
       'web/pages/prize/[sweepstakesNum].tsx',
       'web/pages/shop.tsx',
+      'web/pages/sitemap.tsx',
+      'web/pages/twitch.tsx',
     ]
 
     for (const path of redirectOnlyPages) {

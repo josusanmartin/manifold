@@ -3,10 +3,8 @@ import clsx from 'clsx'
 
 import { IconButton } from '../buttons/button'
 import { Row } from '../layout/row'
-import { LogoIcon } from '../icons/logo-icon'
 import { usePersistentLocalState } from 'web/hooks/use-persistent-local-state'
 import Link from 'next/link'
-import { ArrowRightIcon } from '@heroicons/react/solid'
 
 export function Banner(props: {
   setShowBanner?: (show: boolean) => void
@@ -52,171 +50,36 @@ export function Banner(props: {
   )
 }
 
-export function PivotBanner(props: { hideBanner: () => void }) {
-  const { hideBanner } = props
-  return (
-    <Banner
-      className="border-primary-300 from-primary-100 to-primary-200 border bg-gradient-to-b"
-      link="https://news.manifold.markets/p/exploring-cash-prizes-for-good-predictions"
-      setShowBanner={hideBanner}
-    >
-      <Row className="gap-2">
-        <LogoIcon
-          className="h-6 w-6 flex-shrink-0 text-black dark:text-white"
-          height={24}
-          width={24}
-          aria-hidden
-          strokeWidth={1}
-        />
-        <div>
-          <span className="font-semibold">Coming soon!</span> Cash prizes and
-          other changes. Read more
-        </div>
-      </Row>
-    </Banner>
-  )
+export function PivotBanner(_props: { hideBanner: () => void }) {
+  return null
 }
 
-export function ManifestBanner(props: { hideBanner: () => void }) {
-  const { hideBanner } = props
-  return (
-    <Banner
-      className="border-primary-300 from-primary-100 to-primary-200 border bg-gradient-to-b"
-      link="https://manifest.is"
-      setShowBanner={hideBanner}
-    >
-      <Row className="gap-2">
-        <LogoIcon
-          className="h-6 w-6 flex-shrink-0 text-black dark:text-white"
-          height={24}
-          width={24}
-          aria-hidden
-          strokeWidth={1}
-        />
-        <div>
-          <span className="font-semibold">Get tickets to Manifest 2024 🥳</span>{' '}
-          — our second forecasting festival, June 7-9 in Berkeley, CA
-        </div>
-      </Row>
-    </Banner>
-  )
+export function ManifestBanner(_props: { hideBanner: () => void }) {
+  return null
 }
 
 export function Manifest2026Banner() {
-  const [showBanner, hideBanner] = useBanner('manifest-2026')
-  if (!showBanner) return null
-  return (
-    <Banner
-      className="border-primary-300 from-primary-100 to-primary-200 my-2 border bg-gradient-to-b py-2"
-      link="https://manifest.is"
-      setShowBanner={hideBanner}
-    >
-      <Row className="items-center gap-2 py-1">
-        <LogoIcon
-          className="h-6 w-6 flex-shrink-0 text-black dark:text-white"
-          height={24}
-          width={24}
-          aria-hidden
-          strokeWidth={1}
-        />
-        <div>
-          <span className="font-semibold">Manifest 2026</span> is June 12-14th
-          in Berkeley! Get tickets now!
-        </div>
-        <ArrowRightIcon className="ml-1 h-4 w-4" />
-      </Row>
-    </Banner>
-  )
+  return null
 }
 
-export function Manifest2025Banner(props: { hideBanner: () => void }) {
-  const { hideBanner } = props
-  return (
-    <Banner
-      className="border-primary-300 from-primary-100 to-primary-200 border bg-gradient-to-b"
-      link="https://www.manifest.is/"
-      setShowBanner={hideBanner}
-    >
-      <Row className="gap-2 py-1">
-        <LogoIcon
-          className="h-6 w-6 flex-shrink-0 text-black dark:text-white"
-          height={24}
-          width={24}
-          aria-hidden
-          strokeWidth={1}
-        />
-        <div>
-          <span className="font-semibold">
-            Manifest 2025 tickets available! 🎉
-          </span>
-        </div>
-      </Row>
-    </Banner>
-  )
+export function Manifest2025Banner(_props: { hideBanner: () => void }) {
+  return null
 }
 
 export function DowntimeBanner() {
-  const maintainanceBannerEnabled = false
-  if (!maintainanceBannerEnabled) return null
-  return (
-    <Banner className=" bg-primary-100 hover:bg-primary-200 dark:text-primary-800 text-primary-700  hover:text-primary-900 items-center py-2  transition-colors">
-      ⚠️ Manifold will be down at 9PM PT for about 2 hours, as we upgrade our
-      financial infrastructure.
-    </Banner>
-  )
+  return null
 }
 
 export function WatchPartyBanner() {
-  return (
-    <Banner
-      className="border-primary-300 from-primary-100 to-primary-200 my-2 border bg-gradient-to-b py-2"
-      link="/tv"
-    >
-      🇺🇸 Join the presidential debate watch party on Manifold TV! 🇺🇸
-    </Banner>
-  )
+  return null
 }
 
 export function StateOfTheUnionBanner() {
-  return (
-    <Banner
-      className="border-primary-300 from-primary-100 to-primary-200 my-2 border bg-gradient-to-b py-2"
-      link="https://manifold.markets/tv/86"
-      target="_self"
-    >
-      🇺🇸 Join our State of the Union watch party{' '}
-      {new Date('2024-03-05T21:00:00-05:00').toLocaleString(undefined, {
-        weekday: 'long',
-        hour: 'numeric',
-      })}
-      ! 🇺🇸
-    </Banner>
-  )
+  return null
 }
 
 export function StateOfTheUnion2026Banner() {
-  const [showBanner, hideBanner] = useBanner('sotu-2026')
-  if (!showBanner) return null
-  return (
-    <Banner
-      className="my-2 items-center border border-blue-300 bg-gradient-to-r from-red-50 via-white to-blue-50 py-3 transition-colors hover:from-red-100 hover:via-white hover:to-blue-100 dark:from-red-950/30 dark:via-slate-900/30 dark:to-blue-950/30"
-      link="https://manifold.markets/tv/109"
-      target="_self"
-      setShowBanner={hideBanner}
-    >
-      <Row className="items-center gap-2">
-        <span className="text-lg">🇺🇸</span>
-        <div>
-          <span className="font-semibold">State of the Union watch party</span>{' '}
-          on Manifold TV tonight at{' '}
-          {new Date('2026-02-24T21:00:00-05:00').toLocaleString(undefined, {
-            hour: 'numeric',
-          })}
-        </div>
-        <ArrowRightIcon className="ml-1 h-4 w-4" />
-      </Row>
-    </Banner>
-  )
+  return null
 }
 
 export const useBanner = (name: string) => {
@@ -229,69 +92,13 @@ export const useBanner = (name: string) => {
 }
 
 export const FeeBanner = () => {
-  const [showBanner, hideBanner] = useBanner('fee-change')
-  if (!showBanner) return null
-  return (
-    <Banner
-      className="bg-primary-100 hover:bg-primary-200 dark:text-primary-800 text-primary-700 hover:text-primary-900 items-center py-2 transition-colors"
-      link="https://manifoldmarkets.notion.site/Fee-change-18b54492ea7a80a6b069d488fc3613ee"
-      setShowBanner={hideBanner}
-    >
-      <Row className="items-center gap-2">
-        <LogoIcon
-          className="h-6 w-6 flex-shrink-0 text-black dark:text-white"
-          height={24}
-          width={24}
-          aria-hidden
-          strokeWidth={1}
-        />
-        <div>Sweepstakes fees changing on Feb 3rd. Read more</div>
-      </Row>
-    </Banner>
-  )
+  return null
 }
 
 export const TwombaBanner = () => {
-  const [showBanner, hideBanner] = useBanner('twomba')
-  if (!showBanner) return null
-  return (
-    <Banner
-      className="bg-primary-100 hover:bg-primary-200  dark:text-primary-800 text-primary-700 hover:text-primary-900 items-center py-2 transition-colors"
-      link="https://news.manifold.markets/p/cash-prizes-are-here"
-      setShowBanner={hideBanner}
-    >
-      <Row className=" items-center gap-2">
-        <LogoIcon
-          className="h-6 w-6 flex-shrink-0 text-black dark:text-white"
-          height={24}
-          width={24}
-          aria-hidden
-          strokeWidth={1}
-        />
-        <div>Sweepstakes cash prizes are here! Read more</div>
-      </Row>
-    </Banner>
-  )
+  return null
 }
 
 export const CharityGiveawayBanner = () => {
-  const [showBanner, hideBanner] = useBanner('charity-giveaway-2026')
-  if (!showBanner) return null
-  return (
-    <Banner
-      className="bg-primary-100 hover:bg-primary-200 text-ink-700 hover:text-ink-900 items-center py-2 transition-colors"
-      link="/charity"
-      target="_self"
-      setShowBanner={hideBanner}
-    >
-      <Row className="items-center gap-2">
-        <span>🎟️</span>
-        <div>
-          <span className="font-semibold">Charity is back!</span> Help your
-          favorite charity win $1,000
-        </div>
-        <ArrowRightIcon className="ml-1 h-4 w-4" />
-      </Row>
-    </Banner>
-  )
+  return null
 }

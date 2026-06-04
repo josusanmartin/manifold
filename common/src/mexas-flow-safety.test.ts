@@ -2162,6 +2162,47 @@ describe('MEXAS flow safety guardrails', () => {
     )
   })
 
+  test('legacy promotional nav banners are inert for MEXAS launch', () => {
+    const source = readRepoFile('web/components/nav/banner.tsx')
+
+    for (const exportName of [
+      'PivotBanner',
+      'ManifestBanner',
+      'Manifest2026Banner',
+      'Manifest2025Banner',
+      'DowntimeBanner',
+      'WatchPartyBanner',
+      'StateOfTheUnionBanner',
+      'StateOfTheUnion2026Banner',
+    ]) {
+      expect(source).toContain(`export function ${exportName}`)
+    }
+
+    for (const exportName of [
+      'FeeBanner',
+      'TwombaBanner',
+      'CharityGiveawayBanner',
+    ]) {
+      expect(source).toContain(`export const ${exportName}`)
+    }
+
+    for (const legacyMarker of [
+      'manifold.markets',
+      'manifoldmarkets',
+      'news.manifold',
+      'Manifold TV',
+      'Sweepstakes',
+      'Manifest 202',
+      'cash prizes',
+      '/charity',
+      '/tv',
+      'favorite charity',
+      'financial infrastructure',
+    ]) {
+      expect(source).not.toContain(legacyMarker)
+    }
+  })
+
   test('production smoke covers broad legacy API blockers', () => {
     const source = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'
