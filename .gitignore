@@ -1,6 +1,8 @@
 .DS_Store
 .idea/
 .vercel
+.agents/
+.codex/
 node_modules
 yarn-error.log
 dev
@@ -11,3 +13,4 @@ mantic-markets-firebase-adminsdk*.json
 .env
 .env.local
 mexas-launch.sql
+skills-lock.json

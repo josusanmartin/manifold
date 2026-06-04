@@ -1,0 +1,9 @@
+.agents/
+.codex/
+.env
+.env.*
+.git/
+.vercel/
+node_modules/
+skills-lock.json
+mexas-launch.sql

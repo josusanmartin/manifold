@@ -3217,4 +3217,23 @@ describe('MEXAS flow safety guardrails', () => {
       'Re-run `check:mexas-launch`',
     ])
   })
+
+  test('production deploy packaging excludes local agent and secret artifacts', () => {
+    const gitignore = readRepoFile('.gitignore')
+    const vercelignore = readRepoFile('.vercelignore')
+
+    for (const marker of [
+      '.agents/',
+      '.codex/',
+      'skills-lock.json',
+      'mexas-launch.sql',
+    ]) {
+      expect(gitignore).toContain(marker)
+      expect(vercelignore).toContain(marker)
+    }
+
+    for (const marker of ['.env', '.env.*', '.git/', '.vercel/']) {
+      expect(vercelignore).toContain(marker)
+    }
+  })
 })
