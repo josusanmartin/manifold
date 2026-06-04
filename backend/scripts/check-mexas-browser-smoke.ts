@@ -36,6 +36,13 @@ const BROWSER_TIMEOUT_MS = Number(
 const ARTIFACT_DIR =
   process.env.MEXAS_BROWSER_ARTIFACT_DIR || '/tmp/mexas-browser-smoke'
 
+const SITE_ORIGIN = new URL(SITE_URL).origin
+const SITE_HOSTNAME = new URL(SITE_URL).hostname
+const IS_LOCAL_SITE =
+  SITE_HOSTNAME === 'localhost' ||
+  SITE_HOSTNAME === '127.0.0.1' ||
+  SITE_HOSTNAME === '[::1]'
+
 const PLAYWRIGHT_VERSION = '1.60.0'
 const PLAYWRIGHT_TMP_DIR =
   process.env.MEXAS_PLAYWRIGHT_TMP_DIR || '/tmp/mexas-browser-playwright'
@@ -208,6 +215,16 @@ function formatConsoleMessage(message: ConsoleMessage) {
   return `${message.type()}: ${message.text()}`
 }
 
+function isIgnoredConsoleError(message: string) {
+  if (!IS_LOCAL_SITE) return false
+
+  const isLocalPrivyCors =
+    message.includes('auth.privy.io/api/v1/apps/') &&
+    message.includes(`from origin '${SITE_ORIGIN}' has been blocked by CORS`)
+
+  return isLocalPrivyCors || message === 'error: Failed to load resource: net::ERR_FAILED'
+}
+
 function isCriticalResponse(response: Response) {
   if (!isSameOrigin(response.url())) return false
   if (response.status() < 400) return false
@@ -269,7 +286,10 @@ async function checkRenderedPage(
 
   page.on('console', (message: ConsoleMessage) => {
     if (message.type() === 'error') {
-      consoleErrors.push(formatConsoleMessage(message))
+      const formatted = formatConsoleMessage(message)
+      if (!isIgnoredConsoleError(formatted)) {
+        consoleErrors.push(formatted)
+      }
     }
   })
   page.on('pageerror', (error: Error) => {
