@@ -14,6 +14,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060302_add_mexas_escrow_capture_guard.sql',
   'backend/supabase/migrations/2026060303_add_mexas_treasury_processing_status.sql',
   'backend/supabase/migrations/2026060401_harden_mexas_treasury_ledger.sql',
+  'backend/supabase/migrations/2026060402_lock_down_legacy_supabase_surface.sql',
 ]
 
 const ROOT = resolve(__dirname, '../..')
@@ -438,6 +439,7 @@ async function testReadinessAndPermissions(client: PgClient) {
       public.mexas_orderbook_matching_engine_ready() as matching_ready,
       public.mexas_treasury_settlement_ledger_ready() as ledger_ready,
       public.mexas_escrow_capture_ready() as capture_ready,
+      public.mexas_legacy_surface_locked_down() as legacy_surface_ready,
       has_function_privilege(
         'service_role',
         'public.mexas_match_orderbook_limit_order(text,bigint,integer)',
@@ -459,6 +461,7 @@ async function testReadinessAndPermissions(client: PgClient) {
   assertEqual(row.matching_ready, true, 'matching health RPC')
   assertEqual(row.ledger_ready, true, 'treasury ledger health RPC')
   assertEqual(row.capture_ready, true, 'escrow capture health RPC')
+  assertEqual(row.legacy_surface_ready, true, 'legacy surface health RPC')
   assertEqual(row.service_can_match, true, 'service role matching grant')
   assertEqual(row.anon_can_match, false, 'anon matching grant')
   assertEqual(

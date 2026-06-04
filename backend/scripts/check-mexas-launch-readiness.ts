@@ -2106,6 +2106,30 @@ async function runChecks() {
           )
     )
 
+    const { data: legacySurfaceReady, error: legacySurfaceReadyError } =
+      await db.rpc('mexas_legacy_surface_locked_down')
+    if (legacySurfaceReadyError || legacySurfaceReady !== true) {
+      needsLaunchSql = true
+    }
+    checks.push(
+      legacySurfaceReadyError
+        ? fail(
+            'legacy Supabase surface',
+            `Health RPC is not callable: ${formatDiagnosticError(
+              legacySurfaceReadyError
+            )}`
+          )
+        : legacySurfaceReady === true
+        ? pass(
+            'legacy Supabase surface',
+            'Legacy Manifold tables, materialized views, and unsafe functions are locked down for anon/authenticated Supabase clients.'
+          )
+        : fail(
+            'legacy Supabase surface',
+            'Legacy Supabase surface lockdown returned false.'
+          )
+    )
+
     const tokenAlignment = await checkMexasContractTokenAlignment(db)
     if (tokenAlignment.needsLaunchSql) needsLaunchSql = true
     checks.push(tokenAlignment.result)

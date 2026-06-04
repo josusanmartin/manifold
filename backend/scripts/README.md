@@ -95,8 +95,9 @@ If the readiness script fails, resolve blockers in this order:
 As of the 2026-06-04 production readiness pass, the treasury has Arbitrum gas,
 the launch SQL is applied in Supabase, the RPC matching engine reports ready,
 the treasury ledger reports ready, the escrow capture guard reports ready, the
-treasury ledger has the explicit service-role RLS policy plus bet-id FK index
-from the Supabase advisor follow-up, and the production smoke checks pass.
+treasury ledger has the explicit service-role RLS policy plus bet-id FK index,
+legacy Manifold Supabase tables/views/functions flagged by advisors are locked
+down for anon/authenticated clients, and the production smoke checks pass.
 
 `MEXAS_TREASURY_SIGNER_SECRET` is already expected in Vercel production and must
 derive exactly to `MEXAS_TREASURY_WALLET_ADDRESS`. If either treasury env fails

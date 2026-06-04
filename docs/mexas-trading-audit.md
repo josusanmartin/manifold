@@ -89,6 +89,7 @@ La auditoria automatica actual pasa estos checks de seguridad:
 - RPC de matching listo;
 - ledger de tesoreria listo;
 - guard de captura escrow listo;
+- superficie legacy de Supabase cerrada para clientes anon/authenticated;
 - reservas abiertas activas;
 - ausencia de locks persistentes en mercados MEXAS;
 - respaldo on-chain de ordenes abiertas;
@@ -131,6 +132,16 @@ legacy de Manifold, pero la tabla de tesoreria MEXAS ya no aparece como RLS sin
 policy ni como FK sin indice. Los indices MEXAS nuevos aparecen como `unused`
 porque el libro live aun tiene poco uso; no se deben eliminar antes de trafico
 real.
+
+Se encontro ademas que varias tablas legacy (`ach_trades`, `mod_reports`,
+`predictle_*`, `reports`, `shop_orders`, `user_bans`, `user_entitlements`),
+materialized views ACH y funciones legacy (`get_donations_by_charity`,
+`get_user_manalink_claims`) seguian expuestas al rol anon/authenticated a nivel
+Supabase. Se aplico `2026060402_lock_down_legacy_supabase_surface.sql` mediante
+MCP `execute_sql`: la verificacion live devolvio
+`legacy_surface_ready=true`, `exposed_legacy_tables=0`,
+`exposed_legacy_mviews=0` y `exposed_security_definer_functions=0`. El checker
+`check:mexas-launch` ahora falla si esta superficie vuelve a abrirse.
 
 ## Auditoria 2026-06-03
 

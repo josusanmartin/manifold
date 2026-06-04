@@ -2784,6 +2784,47 @@ describe('MEXAS flow safety guardrails', () => {
     expect(sqlTestSource).toContain('treasury service-role policy exists')
   })
 
+  test('launch SQL locks down legacy Supabase surfaces outside MEXAS', () => {
+    const migration = readRepoFile(
+      'backend/supabase/migrations/2026060402_lock_down_legacy_supabase_surface.sql'
+    )
+    const applySource = readRepoFile(
+      'backend/scripts/apply-mexas-launch-sql.ts'
+    )
+    const readinessSource = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expectMarkersInOrder(migration, [
+      'predictle_daily',
+      'predictle_results',
+      'alter table public.%I enable row level security',
+      'revoke all on table public.%I from public, anon, authenticated',
+      'mv_ach_volume',
+      'get_donations_by_charity',
+      'get_user_manalink_claims',
+      'public.mexas_legacy_surface_locked_down',
+      "has_table_privilege('anon', oid, 'SELECT')",
+      "has_function_privilege('anon', f.signature, 'EXECUTE')",
+      "search_path=public",
+      'grant',
+      'service_role',
+    ])
+    expect(applySource).toContain(
+      '2026060402_lock_down_legacy_supabase_surface.sql'
+    )
+    expect(applySource).toContain('legacy Supabase surface health RPC missing')
+    expect(applySource).toContain(
+      'legacy Supabase surface lockdown returned false'
+    )
+    expect(readinessSource).toContain(
+      "await db.rpc('mexas_legacy_surface_locked_down')"
+    )
+    expect(readinessSource).toContain(
+      'Legacy Manifold tables, materialized views, and unsafe functions are locked down'
+    )
+  })
+
   test('escrow capture verification is idempotent and stays behind launch readiness', () => {
     const helperSource = readRepoFile('web/lib/api/mexas-escrow-capture.ts')
     const migrationSource = readRepoFile(

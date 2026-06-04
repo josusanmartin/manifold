@@ -12,6 +12,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060302_add_mexas_escrow_capture_guard.sql',
   'backend/supabase/migrations/2026060303_add_mexas_treasury_processing_status.sql',
   'backend/supabase/migrations/2026060401_harden_mexas_treasury_ledger.sql',
+  'backend/supabase/migrations/2026060402_lock_down_legacy_supabase_surface.sql',
 ]
 
 const REQUIRED_CONTRACT_IDS = ['mexwcwin26a', 'ukrwarend26a']
@@ -206,6 +207,12 @@ begin
     v_failures := array_append(v_failures, 'treasury settlement ledger bet_id FK index missing');
   end if;
 
+  if to_regprocedure('public.mexas_legacy_surface_locked_down()') is null then
+    v_failures := array_append(v_failures, 'legacy Supabase surface health RPC missing');
+  elsif public.mexas_legacy_surface_locked_down() is distinct from true then
+    v_failures := array_append(v_failures, 'legacy Supabase surface lockdown returned false');
+  end if;
+
   if not has_function_privilege(
     'service_role',
     'public.mexas_match_orderbook_limit_order(text,bigint,integer)',
@@ -236,6 +243,14 @@ begin
     'execute'
   ) then
     v_failures := array_append(v_failures, 'service_role cannot execute escrow capture health RPC');
+  end if;
+
+  if not has_function_privilege(
+    'service_role',
+    'public.mexas_legacy_surface_locked_down()',
+    'execute'
+  ) then
+    v_failures := array_append(v_failures, 'service_role cannot execute legacy surface health RPC');
   end if;
 
   if has_function_privilege(
