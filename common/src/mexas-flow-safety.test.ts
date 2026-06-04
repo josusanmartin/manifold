@@ -1017,6 +1017,57 @@ describe('MEXAS flow safety guardrails', () => {
     )
   })
 
+  test('routes local MEXAS API calls through the global Privy bearer token provider', () => {
+    const authSource = readRepoFile('web/components/auth-context.tsx')
+    const commonApiSource = readRepoFile('common/src/util/api.ts')
+    const webApiSource = readRepoFile('web/lib/api/api.ts')
+    const resolutionPanelSource = readRepoFile(
+      'web/components/resolution-panel.tsx'
+    )
+    const resolveApiSource = readRepoFile(
+      'web/pages/api/v0/market/[contractId]/resolve.ts'
+    )
+
+    expectMarkersInOrder(authSource, [
+      'setPrivyAccessTokenProvider',
+      'const privy = usePrivyLogin()',
+      'setPrivyAccessTokenProvider(() => privy.getAccessToken())',
+      'return () => setPrivyAccessTokenProvider(null)',
+    ])
+    expectMarkersInOrder(commonApiSource, [
+      'let privyAccessTokenProvider',
+      'export function setPrivyAccessTokenProvider',
+      'export function hasPrivyAccessTokenProvider',
+      'else if (privyAccessTokenProvider)',
+      'headers.Authorization = `Bearer ${token}`',
+      "headers['X-Auth-Provider'] = 'privy'",
+      'else if (user)',
+    ])
+    expect(webApiSource).toContain('const LOCAL_MEXAS_API_PATHS')
+    expect(webApiSource).toContain(
+      "'market/:contractId/resolve': '/api/v0/market/:contractId/resolve'"
+    )
+    expectMarkersInOrder(webApiSource, [
+      'const localUrl = getLocalMexasApiUrl(path, params)',
+      'return (await callWithAuth(',
+      'localUrl.url',
+    ])
+    expectMarkersInOrder(resolutionPanelSource, [
+      'const { getAccessToken } = usePrivyLogin()',
+      '/mexas-resolution-readiness',
+      'Authorization: `Bearer ${token}`',
+      "await api('market/:contractId/resolve'",
+    ])
+    expectMarkersInOrder(resolveApiSource, [
+      'function getBearerToken',
+      'const header = req.headers.authorization',
+      'async function getPrivyUserId',
+      'const token = getBearerToken(req)',
+      'verifyAccessToken(token)',
+      'const userId = await getPrivyUserId(req)',
+    ])
+  })
+
   test('does not offer immediate expiration for MEXAS orderbook markets', () => {
     const source = readRepoFile('web/components/bet/limit-order-panel.tsx')
 
@@ -1510,6 +1561,9 @@ describe('MEXAS flow safety guardrails', () => {
     const confirmSource = readRepoFile(
       'web/components/buttons/confirmation-button.tsx'
     )
+    const tableActionSource = readRepoFile(
+      'web/components/contract/contract-table-action.tsx'
+    )
 
     expectMarkersInOrder(apiSource, [
       'async function loadContractRow',
@@ -1558,6 +1612,8 @@ describe('MEXAS flow safety guardrails', () => {
     )
     expect(dangerSource).toContain('Resolver')
     expect(confirmSource).toContain('Resolver a ${label}')
+    expect(tableActionSource).toContain('Resolver')
+    expect(tableActionSource).not.toContain('>Resolve<')
     expect(panelSource).not.toContain('comments section')
   })
 

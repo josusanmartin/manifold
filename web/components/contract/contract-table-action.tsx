@@ -163,7 +163,7 @@ export function ResolveButton(props: { contract: Contract }) {
             setOpen(true)
           }}
         >
-          Resolve
+          Resolver
         </Button>
         {open && (
           <Modal
