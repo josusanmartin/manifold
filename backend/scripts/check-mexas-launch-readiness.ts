@@ -57,6 +57,11 @@ const LAUNCH_SQL_APPLY_ENVS = [
   'SUPABASE_DB_PASSWORD',
 ]
 
+const MANUAL_LAUNCH_SQL_PATHS = [
+  '/tmp/mexas-launch.sql',
+  resolve(__dirname, '../..', 'mexas-launch.sql'),
+]
+
 const REQUIRED_MEXAS_CONTRACTS = [
   {
     id: 'mexwcwin26a',
@@ -230,6 +235,19 @@ function formatDiagnosticError(error: unknown) {
 
 function hasEnv(name: string) {
   return !!process.env[name]?.trim()
+}
+
+function getManualLaunchSqlDetails() {
+  const existingPaths = MANUAL_LAUNCH_SQL_PATHS.filter((path) =>
+    existsSync(path)
+  )
+  if (existingPaths.length) {
+    return `Generated launch SQL exists at ${existingPaths.join(
+      ', '
+    )}; apply it in Supabase SQL Editor or set a Postgres connection env so apply:mexas-launch-sql can run it.`
+  }
+
+  return 'Generated launch SQL is not present locally yet.'
 }
 
 function getRequiredProductionEnvPresenceFailures(
@@ -2104,7 +2122,7 @@ async function runChecks() {
           )
         : fail(
             'launch SQL apply access',
-            `Launch SQL is missing and no local Postgres connection env is set. Set one of ${LAUNCH_SQL_APPLY_ENVS.join(
+            `Launch SQL is not applied and no local Postgres connection env is set. ${getManualLaunchSqlDetails()} Set one of ${LAUNCH_SQL_APPLY_ENVS.join(
               ', '
             )}, or run "COREPACK_ENABLE_STRICT=0 corepack yarn --silent --cwd backend/scripts print:mexas-launch-sql > /tmp/mexas-launch.sql" and paste /tmp/mexas-launch.sql into Supabase SQL Editor. Service-role REST cannot apply this because contracts_token_check and RPC/index DDL require Postgres SQL access.`
           )
