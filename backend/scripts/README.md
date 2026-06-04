@@ -89,6 +89,26 @@ If the readiness script fails, resolve blockers in this order:
    $ vercel firewall attack-mode disable
    ```
 
+   If Attack Mode is already disabled, no custom rules are configured, and only
+   the smoke runner's IP is still challenged, Vercel automatic system
+   mitigations may have flagged the QA probe burst. First retry with a lower
+   request rate, for example:
+
+   ```shell
+   $ MEXAS_SMOKE_REQUEST_DELAY_MS=1000 yarn --cwd backend/scripts check:mexas-smoke
+   ```
+
+   If a full production QA run still needs a temporary bypass, a human must run
+   the mitigation pause interactively, then resume protection immediately after
+   QA:
+
+   ```shell
+   $ vercel firewall system-mitigations pause
+   $ yarn --cwd backend/scripts check:mexas-smoke
+   $ yarn --cwd backend/scripts check:mexas-browser
+   $ vercel firewall system-mitigations resume
+   ```
+
 5. If `Privy allowed origin` fails with `Vercel Security Checkpoint`, the
    Privy app config endpoint could not be verified from this server. That is
    not evidence that the domain is missing from Privy. Re-run after the
@@ -152,7 +172,10 @@ $ yarn --cwd backend/scripts check:mexas-smoke
 
 This checks public page status codes, required Spanish MEXAS copy, absence of
 visible legacy Manifold/Mana/comment/verification UI strings, and the public
-MEXAS orderbook endpoint.
+MEXAS orderbook endpoint. Against non-local hosts it spaces requests by default
+to avoid turning the audit itself into a Vercel mitigation trigger. Override
+with `MEXAS_SMOKE_REQUEST_DELAY_MS` if production is especially sensitive or if
+you are running against a local server.
 
 For a browser-level smoke test that renders the allowed MEXAS pages in desktop
 and mobile Chromium, run:
@@ -165,7 +188,10 @@ This checks hydrated Spanish copy, forbidden legacy copy, console errors,
 critical same-origin failed requests, and horizontal overflow. If production is
 behind a Vercel Firewall challenge, run the command against a local production
 server with `MEXAS_SITE_URL=http://127.0.0.1:<port>` or disable the challenge
-interactively before using the production URL. The script installs
+interactively before using the production URL. If Vercel automatic system
+mitigations are challenging only the QA runner, use
+`vercel firewall system-mitigations pause` interactively for the QA window and
+resume it afterwards. The script installs
 `playwright@1.60.0` into `/tmp/mexas-browser-playwright` on demand if it is not
 already available in local `node_modules`, so it does not add browser binaries
 to Vercel production installs.

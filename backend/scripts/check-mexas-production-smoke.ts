@@ -11,10 +11,21 @@ const SITE_URL =
   process.env.MEXAS_SITE_URL ||
   process.env.NEXT_PUBLIC_SITE_URL ||
   'https://mexas-manifold.vercel.app'
+const SITE_HOSTNAME = new URL(SITE_URL).hostname
+const IS_LOCAL_SITE =
+  SITE_HOSTNAME === 'localhost' ||
+  SITE_HOSTNAME === '127.0.0.1' ||
+  SITE_HOSTNAME === '[::1]'
 
 const SMOKE_FETCH_TIMEOUT_MS = Number(
   process.env.MEXAS_SMOKE_FETCH_TIMEOUT_MS ?? 15_000
 )
+const SMOKE_REQUEST_DELAY_MS = Number(
+  process.env.MEXAS_SMOKE_REQUEST_DELAY_MS ?? (IS_LOCAL_SITE ? 0 : 250)
+)
+
+let smokeFetchQueue: Promise<void> = Promise.resolve()
+let nextSmokeFetchReadyAt = 0
 
 const FORBIDDEN_VISIBLE_COPY = [
   'Receive Mana',
@@ -369,11 +380,29 @@ function isVercelChallenge(response: Response) {
 function describeResponseStatus(response: Response) {
   if (!isVercelChallenge(response)) return `${response.status}`
 
-  return `${response.status} Vercel Firewall challenge active. Disable Attack Challenge Mode interactively with "vercel firewall attack-mode disable" or adjust the Vercel WAF challenge rule before launch.`
+  return `${response.status} Vercel Firewall challenge active. Disable Attack Challenge Mode interactively with "vercel firewall attack-mode disable" or adjust the Vercel WAF challenge rule before launch. If Attack Mode is already disabled, this can be Vercel system mitigation against the probing IP; wait for cooldown, reduce smoke request rate with MEXAS_SMOKE_REQUEST_DELAY_MS, or have a human temporarily run "vercel firewall system-mitigations pause" for QA and resume protection afterwards.`
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms))
+}
+
+async function waitForSmokeFetchSlot() {
+  const delayMs = Math.max(0, SMOKE_REQUEST_DELAY_MS)
+  if (delayMs === 0) return
+
+  const queued = smokeFetchQueue.then(async () => {
+    const waitMs = Math.max(0, nextSmokeFetchReadyAt - Date.now())
+    if (waitMs > 0) await sleep(waitMs)
+    nextSmokeFetchReadyAt = Date.now() + delayMs
+  })
+  smokeFetchQueue = queued.catch(() => {})
+  await queued
 }
 
 async function smokeFetch(path: string, init?: RequestInit) {
   try {
+    await waitForSmokeFetchSlot()
     return await fetch(`${SITE_URL}${path}`, {
       signal: AbortSignal.timeout(SMOKE_FETCH_TIMEOUT_MS),
       ...init,
@@ -939,10 +968,10 @@ async function checkBlockedApi(path: string) {
 async function runSmoke() {
   const results: SmokeResult[] = []
 
-  const challengePreflight = await Promise.all([
-    checkVercelChallengePreflight('/checkout', 'GET'),
-    checkVercelChallengePreflight('/checkout', 'HEAD'),
-  ])
+  const challengePreflight = [
+    await checkVercelChallengePreflight('/checkout', 'GET'),
+    await checkVercelChallengePreflight('/checkout', 'HEAD'),
+  ]
   if (challengePreflight.some((result) => result.status === 'fail')) {
     return challengePreflight
   }
@@ -968,7 +997,9 @@ async function runSmoke() {
     results.push(await checkRedirect(redirect.path, redirect.destination))
   }
 
-  results.push(...(await Promise.all(BLOCKED_API_PATHS.map(checkBlockedApi))))
+  for (const path of BLOCKED_API_PATHS) {
+    results.push(await checkBlockedApi(path))
+  }
 
   results.push(await checkOrderBook('mexwcwin26a'))
   results.push(await checkOrderBook('ukrwarend26a'))

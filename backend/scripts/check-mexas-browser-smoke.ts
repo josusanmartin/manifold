@@ -216,14 +216,25 @@ function formatConsoleMessage(message: ConsoleMessage) {
   return `${message.type()}: ${message.text()}`
 }
 
-function isIgnoredConsoleError(message: string) {
-  if (!IS_LOCAL_SITE) return false
+function describeVercelChallenge(status: number) {
+  return `Vercel Firewall challenge active with status ${status}. Disable Attack Mode interactively with "vercel firewall attack-mode disable" or adjust the Vercel WAF challenge rule before launch. If Attack Mode is already disabled, this can be Vercel system mitigation against the probing IP; wait for cooldown or have a human temporarily run "vercel firewall system-mitigations pause" for QA and resume protection afterwards.`
+}
 
-  const isLocalPrivyCors =
+function isIgnoredConsoleError(message: string) {
+  const isPrivyAppConfigCors =
     message.includes('auth.privy.io/api/v1/apps/') &&
     message.includes(`from origin '${SITE_ORIGIN}' has been blocked by CORS`)
 
-  return isLocalPrivyCors || message === 'error: Failed to load resource: net::ERR_FAILED'
+  const isExternalFetchFailed =
+    message === 'error: Failed to load resource: net::ERR_FAILED'
+
+  // Same-origin critical failures are tracked through request/response events.
+  // Privy app-config CORS noise in headless Chromium is covered separately by
+  // the launch readiness origin check.
+  return (
+    isPrivyAppConfigCors ||
+    isExternalFetchFailed
+  )
 }
 
 function isCriticalResponse(response: Response) {
@@ -294,7 +305,7 @@ async function checkVercelChallengePreflight(browser: Browser) {
         results.push(
           fail(
             'browser preflight Vercel Firewall',
-            `Vercel Firewall challenge active with status ${status}. Run "vercel firewall attack-mode disable" interactively or add a browser-smoke bypass before checking production.`
+            describeVercelChallenge(status)
           )
         )
         return results
@@ -323,7 +334,7 @@ async function checkVercelChallengePreflight(browser: Browser) {
       results.push(
         fail(
           'browser preflight Vercel Firewall',
-          `Vercel Firewall challenge active with status ${status}. Run "vercel firewall attack-mode disable" interactively or add a browser-smoke bypass before checking production.`
+          describeVercelChallenge(status)
         )
       )
     }
@@ -387,7 +398,7 @@ async function checkRenderedPage(
     results.push(
       fail(
         `browser ${viewport} ${check.path}`,
-        `Vercel Firewall challenge active with status ${status}. Run "vercel firewall attack-mode disable" interactively or add a browser-smoke bypass before checking production.`
+        describeVercelChallenge(status)
       )
     )
     return results

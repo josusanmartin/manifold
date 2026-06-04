@@ -1906,7 +1906,7 @@ function isVercelChallengeResponse(response: Response) {
 function describeSiteResponse(response: Awaited<ReturnType<typeof checkUrl>>) {
   if (response.mitigated !== 'challenge') return `${response.status}`
 
-  return `${response.status} Vercel Firewall challenge active. Disable Attack Challenge Mode interactively with "vercel firewall attack-mode disable" or adjust the Vercel WAF challenge rule before launch.`
+  return `${response.status} Vercel Firewall challenge active. Disable Attack Challenge Mode interactively with "vercel firewall attack-mode disable" or adjust the Vercel WAF challenge rule before launch. If Attack Mode is already disabled, this can be Vercel system mitigation against the probing IP; wait for cooldown, reduce smoke request rate with MEXAS_SMOKE_REQUEST_DELAY_MS, or have a human temporarily run "vercel firewall system-mitigations pause" for QA and resume protection afterwards.`
 }
 
 async function checkPrivyAllowedOrigin(

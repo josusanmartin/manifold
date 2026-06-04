@@ -1692,7 +1692,14 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'const SMOKE_FETCH_TIMEOUT_MS = Number(',
       'process.env.MEXAS_SMOKE_FETCH_TIMEOUT_MS ?? 15_000',
+      'const SMOKE_REQUEST_DELAY_MS = Number(',
+      'process.env.MEXAS_SMOKE_REQUEST_DELAY_MS',
+      'let smokeFetchQueue: Promise<void> = Promise.resolve()',
+      'let nextSmokeFetchReadyAt = 0',
+      'function sleep(ms: number)',
+      'async function waitForSmokeFetchSlot',
       'async function smokeFetch',
+      'await waitForSmokeFetchSlot()',
       'signal: AbortSignal.timeout(SMOKE_FETCH_TIMEOUT_MS)',
       'Fetch ${path} failed after ${SMOKE_FETCH_TIMEOUT_MS}ms',
       'async function fetchText',
@@ -1705,6 +1712,7 @@ describe('MEXAS flow safety guardrails', () => {
       "const response = await smokeFetch(path, { redirect: 'manual' })",
     ])
     expect(countOccurrences(source, 'fetch(`${SITE_URL}${path}`')).toBe(1)
+    expect(source).not.toContain('Promise.all(BLOCKED_API_PATHS.map')
   })
 
   test('launch checks diagnose Vercel Firewall challenges explicitly', () => {
@@ -1720,6 +1728,7 @@ describe('MEXAS flow safety guardrails', () => {
       expect(source).toContain('Vercel Firewall challenge active')
       expect(source).toContain('vercel firewall attack-mode disable')
       expect(source).toContain('adjust the Vercel WAF challenge rule')
+      expect(source).toContain('vercel firewall system-mitigations pause')
     }
     expectMarkersInOrder(smokeSource, [
       'function isVercelChallenge',
@@ -1883,7 +1892,7 @@ describe('MEXAS flow safety guardrails', () => {
       'async function checkBetsArray',
     ])
     expectMarkersInOrder(source, [
-      'const challengePreflight = await Promise.all',
+      'const challengePreflight = [',
       "checkVercelChallengePreflight('/checkout', 'GET')",
       "checkVercelChallengePreflight('/checkout', 'HEAD')",
       "if (challengePreflight.some((result) => result.status === 'fail'))",
@@ -1899,6 +1908,10 @@ describe('MEXAS flow safety guardrails', () => {
       '/api/v0/bets?username=__mexas_missing_user__',
       'unknown api fail closed',
       '/api/v0/not-a-real-mexas-api',
+    ])
+    expectMarkersInOrder(source, [
+      'for (const path of BLOCKED_API_PATHS)',
+      'results.push(await checkBlockedApi(path))',
     ])
     expectMarkersInOrder(source, [
       'local MEXAS portfolio missing user',
@@ -2166,9 +2179,10 @@ describe('MEXAS flow safety guardrails', () => {
     ]) {
       expect(apiSurfaceSource).toContain(`'${path}'`)
     }
-    expect(source).toContain(
-      'Promise.all(BLOCKED_API_PATHS.map(checkBlockedApi))'
-    )
+    expectMarkersInOrder(source, [
+      'for (const path of BLOCKED_API_PATHS)',
+      'results.push(await checkBlockedApi(path))',
+    ])
   })
 
   test('renders order book remaining sizes from canonical filled amount', () => {
@@ -3972,6 +3986,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain("message.includes('auth.privy.io/api/v1/apps/')")
     expect(source).toContain("message.includes(`from origin '${SITE_ORIGIN}'")
     expect(source).toContain("message === 'error: Failed to load resource: net::ERR_FAILED'")
+    expect(source).toContain('launch readiness origin check')
     expect(source).toContain("state: 'attached'")
     expect(source).toContain("mkdirSync(ARTIFACT_DIR, { recursive: true })")
     expect(source).toContain('async function checkVercelChallengePreflight')
@@ -3983,6 +3998,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('preflightResults.some')
     expect(source).toContain('Vercel Firewall challenge active')
     expect(source).toContain('vercel firewall attack-mode disable')
+    expect(source).toContain('vercel firewall system-mitigations pause')
   })
 
   test('launch docs include the interactive Vercel firewall recovery step', () => {
@@ -3992,6 +4008,7 @@ describe('MEXAS flow safety guardrails', () => {
       'Vercel Firewall challenge active',
       'Vercel WAF challenge rule',
       '$ vercel firewall attack-mode disable',
+      '$ vercel firewall system-mitigations pause',
       'Privy allowed origin',
       'Vercel Security Checkpoint',
       'not evidence that the domain is missing',
