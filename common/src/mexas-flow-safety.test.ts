@@ -1804,6 +1804,10 @@ describe('MEXAS flow safety guardrails', () => {
     expect(smokeSource).toContain('function decodeURIComponentSafe')
     for (const path of [
       "path: '/admin/cash-stats'",
+      "path: '/admin/prize'",
+      "path: '/admin/sales'",
+      "path: '/admin/txns'",
+      "path: '/admin/whales'",
       "path: '/ai/test'",
       "path: '/analytics'",
       "path: '/browse/for-you'",
