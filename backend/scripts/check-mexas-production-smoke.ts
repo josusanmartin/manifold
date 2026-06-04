@@ -219,6 +219,7 @@ const BLOCKED_API_PATHS = [
   '/api/og/market',
   '/api/og/topic',
   '/api/og/update',
+  '/api/og/fonts.json',
   '/api/v0/deployment-id',
   '/api/v0/search-markets-full',
   '/api/v0/user/by-id/balance',
@@ -992,6 +993,13 @@ async function runSmoke() {
   )
   results.push(await checkExpectedStatus('method bet GET', '/api/v0/bet', 405))
   results.push(
+    await checkExpectedStatus(
+      'method revalidate GET',
+      '/api/v0/revalidate',
+      405
+    )
+  )
+  results.push(
     await checkExpectedStatus('method privy-user GET', '/api/privy-user', 405)
   )
   results.push(
@@ -1003,6 +1011,23 @@ async function runSmoke() {
     await checkExpectedStatus('auth bet POST', '/api/v0/bet', 401, {
       method: 'POST',
     })
+  )
+  results.push(
+    await checkExpectedStatus(
+      'auth revalidate POST',
+      '/api/v0/revalidate',
+      401,
+      {
+        body: JSON.stringify({
+          apiSecret: '__wrong_secret__',
+          pathToRevalidate: '/checkout',
+        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        method: 'POST',
+      }
+    )
   )
   results.push(
     await checkExpectedStatus(

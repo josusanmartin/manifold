@@ -107,10 +107,13 @@ export const revalidateStaticProps = async (
     if (!apiSecret)
       throw new Error('Revalidation failed because of missing API_SECRET.')
 
-    const queryStr = `?pathToRevalidate=${pathToRevalidate}&apiSecret=${apiSecret}`
-    const resp = await fetch(
-      `https://${ENV_CONFIG.domain}/api/v0/revalidate` + queryStr
-    )
+    const resp = await fetch(`https://${ENV_CONFIG.domain}/api/v0/revalidate`, {
+      body: JSON.stringify({ apiSecret, pathToRevalidate }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+    })
 
     if (resp.ok) {
       // metrics.inc('vercel/revalidations_succeeded', { path: pathToRevalidate })

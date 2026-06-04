@@ -3,7 +3,7 @@ import { validate } from 'web/lib/api/validator'
 import { ValidationError } from 'web/lib/api/validator-types'
 import { z } from 'zod'
 
-const queryParams = z
+const bodyParams = z
   .object({
     // This secret is stored in both Firebase and Vercel's environment variables, as API_SECRET.
     apiSecret: z.string(),
@@ -16,9 +16,14 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  let params: z.infer<typeof queryParams>
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST')
+    return res.status(405).json({ message: 'Method not allowed.' })
+  }
+
+  let params: z.infer<typeof bodyParams>
   try {
-    params = validate(queryParams, req.query)
+    params = validate(bodyParams, req.body)
   } catch (e) {
     if (e instanceof ValidationError) {
       return res.status(400).json(e)

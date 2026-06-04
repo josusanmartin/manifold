@@ -1498,17 +1498,42 @@ describe('MEXAS flow safety guardrails', () => {
       '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
       'method bet GET',
       '/api/v0/bet',
+      'method revalidate GET',
+      '/api/v0/revalidate',
       'method privy-user GET',
       '/api/privy-user',
       'auth privy-user POST',
       '/api/privy-user',
       'auth bet POST',
+      'auth revalidate POST',
+      '__wrong_secret__',
       'auth cancel POST',
       '/api/v0/bet/cancel/__missing_bet__',
       'auth resolve POST',
       '/api/v0/market/mexwcwin26a/resolve',
     ])
     expect(source).toContain("'Open options'")
+  })
+
+  test('revalidation endpoint uses POST body so API secrets are not passed in URLs', () => {
+    const endpointSource = readRepoFile('web/pages/api/v0/revalidate.ts')
+    const backendSource = readRepoFile('backend/shared/src/utils.ts')
+
+    expectMarkersInOrder(endpointSource, [
+      "if (req.method !== 'POST')",
+      "res.setHeader('Allow', 'POST')",
+      'return res.status(405)',
+      'params = validate(bodyParams, req.body)',
+      'if (apiSecret !== process.env.API_SECRET)',
+    ])
+    expect(endpointSource).not.toContain('req.query')
+    expectMarkersInOrder(backendSource, [
+      'fetch(`https://${ENV_CONFIG.domain}/api/v0/revalidate`, {',
+      'body: JSON.stringify({ apiSecret, pathToRevalidate })',
+      "'Content-Type': 'application/json'",
+      "method: 'POST'",
+    ])
+    expect(backendSource).not.toContain('apiSecret=${apiSecret}')
   })
 
   test('MEXAS market UI does not call the broad bets history endpoint', () => {
@@ -1648,6 +1673,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain(
       '...MEXAS_BLOCKED_API_SMOKE_PATHS.map((path) => `/api/${path}`)'
     )
+    expect(source).toContain("'/api/og/fonts.json'")
     for (const path of [
       'v0/comment',
       'v0/comments',
