@@ -151,6 +151,97 @@ function isFreshProcessing(row: Row<'mexas_treasury_transfers'>) {
   )
 }
 
+function assertEqualTreasuryTransferField(
+  mismatches: string[],
+  field: string,
+  actual: unknown,
+  expected: unknown
+) {
+  if (actual !== expected) mismatches.push(field)
+}
+
+function assertTreasuryTransferMatchesParams(
+  params: MexasTreasuryTransferParams,
+  row: Row<'mexas_treasury_transfers'>,
+  treasuryAddress: Address,
+  recipientAddress: Address
+) {
+  const mismatches: string[] = []
+  assertEqualTreasuryTransferField(
+    mismatches,
+    'idempotency_key',
+    row.idempotency_key,
+    params.idempotencyKey
+  )
+  assertEqualTreasuryTransferField(
+    mismatches,
+    'transfer_type',
+    row.transfer_type,
+    params.transferType
+  )
+  assertEqualTreasuryTransferField(
+    mismatches,
+    'user_id',
+    row.user_id,
+    params.userId
+  )
+  assertEqualTreasuryTransferField(
+    mismatches,
+    'contract_id',
+    row.contract_id,
+    params.contractId ?? null
+  )
+  assertEqualTreasuryTransferField(
+    mismatches,
+    'bet_id',
+    row.bet_id,
+    params.betId ?? null
+  )
+  assertEqualTreasuryTransferField(
+    mismatches,
+    'outcome',
+    row.outcome,
+    params.outcome ?? null
+  )
+  assertEqualTreasuryTransferField(
+    mismatches,
+    'amount',
+    mexasAmountToUnits(row.amount).toString(),
+    mexasAmountToUnits(params.amount).toString()
+  )
+  assertEqualTreasuryTransferField(
+    mismatches,
+    'token_address',
+    normalizeEvmAddress(row.token_address),
+    normalizeEvmAddress(MEXAS_TOKEN.address)
+  )
+  assertEqualTreasuryTransferField(
+    mismatches,
+    'chain_id',
+    row.chain_id,
+    MEXAS_TOKEN.chainId
+  )
+  assertEqualTreasuryTransferField(
+    mismatches,
+    'treasury_address',
+    normalizeEvmAddress(row.treasury_address),
+    treasuryAddress
+  )
+  assertEqualTreasuryTransferField(
+    mismatches,
+    'recipient_address',
+    normalizeEvmAddress(row.recipient_address),
+    recipientAddress
+  )
+
+  if (mismatches.length) {
+    throw new APIError(
+      503,
+      `MEXAS treasury transfer idempotency conflict: ${mismatches.join(', ')}.`
+    )
+  }
+}
+
 async function loadTransferByIdempotencyKey(
   db: SupabaseClient,
   idempotencyKey: string
@@ -270,6 +361,12 @@ async function claimTreasuryTransfer(
   if (!existing) {
     throw new APIError(503, 'MEXAS treasury transfer changed. Please retry.')
   }
+  assertTreasuryTransferMatchesParams(
+    params,
+    existing,
+    treasuryAddress,
+    recipientAddress
+  )
   if (existing.status === 'confirmed') return { inserted: false, row: existing }
   if (existing.status === 'submitted' && existing.tx_hash) {
     return { inserted: false, row: existing }

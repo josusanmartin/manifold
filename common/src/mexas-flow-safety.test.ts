@@ -2635,6 +2635,31 @@ describe('MEXAS flow safety guardrails', () => {
       "status: 'confirmed'",
     ])
     expectMarkersInOrder(helperSource, [
+      'function assertTreasuryTransferMatchesParams',
+      'idempotency_key',
+      'transfer_type',
+      'user_id',
+      'contract_id',
+      'bet_id',
+      'outcome',
+      'amount',
+      'token_address',
+      'chain_id',
+      'treasury_address',
+      'recipient_address',
+      'MEXAS treasury transfer idempotency conflict',
+    ])
+    expectMarkersInOrder(helperSource, [
+      'const existing = await loadTransferByIdempotencyKey',
+      'assertTreasuryTransferMatchesParams(',
+      'params,',
+      'existing,',
+      'treasuryAddress,',
+      'recipientAddress',
+      "if (existing.status === 'confirmed')",
+      "if (existing.status === 'submitted' && existing.tx_hash)",
+    ])
+    expectMarkersInOrder(helperSource, [
       'export async function submitMexasTreasuryTransfer',
       'getMexasEscrowTreasuryAddress()',
       'claimTreasuryTransfer',
