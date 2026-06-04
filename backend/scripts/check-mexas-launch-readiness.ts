@@ -1390,7 +1390,9 @@ async function checkNoWalletReservedOrdersBeforeEscrowLaunch(
           walletReservedOrders.length > 5
             ? `; ${walletReservedOrders.length - 5} more`
             : ''
-        }. Cancel or expire wallet-reserved orders before enabling treasury escrow orders.`
+        }. Cancel or expire wallet-reserved orders before enabling treasury escrow orders.`.concat(
+          ' First run "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-wallet-orders", then apply with "COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts apply:mexas-wallet-orders" after reviewing the dry-run output.'
+        )
       )
     }
 

@@ -67,7 +67,21 @@ Current launch blockers should be resolved in this order:
    `MEX`, the matching RPC is installed, escrow capture is guarded, and the
    backend-only treasury ledger exists.
 
-3. If site checks report `Vercel Firewall challenge active`, disable Attack
+3. Cancel or expire active wallet-reserved test orders before treating treasury
+   escrow mode as live. These orders were backed by users' Privy wallets before
+   on-chain escrow capture was available, and must not be silently hidden when
+   the public book switches to treasury escrow mode.
+
+   ```shell
+   $ yarn --cwd backend/scripts audit:mexas-wallet-orders
+   $ yarn --cwd backend/scripts apply:mexas-wallet-orders
+   ```
+
+   The audit command is read-only. The apply command requires
+   `--confirm-wallet-reserved-cancel` through the package script and uses the
+   same MEXAS cancellation/release helper as the API.
+
+4. If site checks report `Vercel Firewall challenge active`, disable Attack
    Challenge Mode or adjust the Vercel WAF challenge rule before launch. Vercel
    requires this to be done interactively; run:
 
@@ -75,7 +89,7 @@ Current launch blockers should be resolved in this order:
    $ vercel firewall attack-mode disable
    ```
 
-4. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
+5. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
    markets until every launch-readiness line is `PASS`.
 
 `MEXAS_TREASURY_SIGNER_SECRET` is already expected in Vercel production and must

@@ -23,11 +23,17 @@ export type MexasReservedOrderData = {
   mexasReservedAmount?: number
   mexasFundsReserved?: boolean
   mexasFundsReleased?: boolean
+  mexasReleaseCreditAmount?: number
+  mexasReleaseCreditKey?: string
+  mexasReleaseReason?: string
+  mexasReleasedAt?: number
   mexasStakeEscrowed?: boolean
   mexasEscrowTxHash?: string
   mexasEscrowPayerAddress?: string
   mexasEscrowTreasuryAddress?: string
   mexasEscrowAmount?: number
+  mexasTreasuryReleaseTransferId?: string
+  mexasTreasuryReleaseTxHash?: string
   mexasTestUnwound?: boolean
 }
 

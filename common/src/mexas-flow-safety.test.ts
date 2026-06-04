@@ -3099,11 +3099,53 @@ describe('MEXAS flow safety guardrails', () => {
       "escrowCaptureOrders !== 'true'",
       "fail(\n        'wallet-reserved order migration'",
       'Cancel or expire wallet-reserved orders before enabling treasury escrow orders.',
+      'audit:mexas-wallet-orders',
+      'apply:mexas-wallet-orders',
       'checks.push(\n      await checkNoWalletReservedOrdersBeforeEscrowLaunch',
     ])
     expect(source).toContain(
       'No active wallet-reserved MEXAS orders would be hidden by treasury escrow mode.'
     )
+  })
+
+  test('provides read-only and confirmed wallet-reserved order cancellation script', () => {
+    const packageJson = readRepoFile('backend/scripts/package.json')
+    const source = readRepoFile(
+      'backend/scripts/cancel-mexas-wallet-reserved-orders.ts'
+    )
+    const docs = readRepoFile('backend/scripts/README.md')
+
+    expect(packageJson).toContain('"audit:mexas-wallet-orders"')
+    expect(packageJson).toContain('"apply:mexas-wallet-orders"')
+    expect(docs).toContain('audit:mexas-wallet-orders')
+    expect(docs).toContain('apply:mexas-wallet-orders')
+    expect(docs).toContain('--confirm-wallet-reserved-cancel')
+    expectMarkersInOrder(source, [
+      'async function loadMexasOrderbookContractRows',
+      ".contains('data', { token: 'MEX' } as any)",
+      ".is('resolution_time', null)",
+      'async function loadActiveWalletReservedOrders',
+      ".eq('is_filled', false)",
+      ".eq('is_cancelled', false)",
+      ".eq('data->>mexasFundsReserved', 'true')",
+      ".eq('data->>mexasFundsReleased', 'false')",
+      'hasActiveMexasWalletReservation(bet)',
+      'function printPlan',
+      'async function applyCancellation',
+      'releaseCancelledMexasOrder(db, order.row)',
+    ])
+    expectMarkersInOrder(source, [
+      "const apply = process.argv.includes('--apply')",
+      "const confirmed = process.argv.includes('--confirm-wallet-reserved-cancel')",
+      'printPlan(orders)',
+      'if (!apply)',
+      'Dry run only. Pass --apply --confirm-wallet-reserved-cancel',
+      'if (!confirmed)',
+      "throw new Error(\n      'Refusing to apply without --confirm-wallet-reserved-cancel.'",
+    ])
+    expect(source).not.toContain('.delete(')
+    expect(source).not.toContain('.rpc(')
+    expect(source).not.toContain('from public.')
   })
 
   test('launch readiness checks treasury MEX backing for active escrow liabilities', () => {
