@@ -1,3 +1,6 @@
+import { readdirSync } from 'fs'
+import { join, relative } from 'path'
+
 type Redirect = {
   source: string
   destination: string
@@ -15,6 +18,61 @@ async function getRedirectsBySource() {
   const redirects = await nextConfig.redirects()
   return new Map(redirects.map((redirect) => [redirect.source, redirect]))
 }
+
+function listPageFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) return listPageFiles(path)
+    return /\.(tsx|ts|jsx|js)$/.test(entry.name) ? [path] : []
+  })
+}
+
+function pageFileToRoute(file: string) {
+  let route = relative(join(__dirname, '..', '..', 'web', 'pages'), file)
+    .replace(/\.(tsx|ts|jsx|js)$/, '')
+    .replace(/\\/g, '/')
+
+  if (route === '_app' || route === '_document') return undefined
+  if (route === 'index') return '/'
+  if (route.endsWith('/index')) route = route.slice(0, -'/index'.length)
+
+  return (
+    '/' +
+    route
+      .replace(/\[\[\.\.\.(.+?)\]\]/g, ':$1*')
+      .replace(/\[\.\.\.(.+?)\]/g, ':$1*')
+      .replace(/\[(.+?)\]/g, ':$1')
+  )
+}
+
+function redirectSourceToRouteRegex(source: string) {
+  const escaped = source
+    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\/:([A-Za-z0-9_]+)\*/g, '(?:/.*)?')
+    .replace(/\/:([A-Za-z0-9_]+)\+/g, '/.+')
+    .replace(/\/:([A-Za-z0-9_]+)/g, '/[^/]+')
+
+  return new RegExp(`^${escaped}$`)
+}
+
+async function getRedirectMatchers() {
+  const redirects = await nextConfig.redirects()
+  return redirects.map((redirect) => ({
+    ...redirect,
+    regex: redirectSourceToRouteRegex(redirect.source),
+  }))
+}
+
+const MEXAS_ALLOWED_PUBLIC_PAGE_ROUTES = new Set([
+  '/404',
+  '/:username',
+  '/:username/:contractSlug',
+  '/about',
+  '/checkout',
+  '/login',
+  '/me',
+  '/wallet',
+])
 
 describe('MEXAS route surface', () => {
   test('redirects legacy product pages away from public launch surface', async () => {
@@ -189,5 +247,24 @@ describe('MEXAS route surface', () => {
         },
       ],
     })
+  })
+
+  test('every non-API Next page is either a MEXAS page or redirected away', async () => {
+    const pageRoutes = listPageFiles(join(__dirname, '..', '..', 'web', 'pages'))
+      .map(pageFileToRoute)
+      .filter(
+        (route): route is string =>
+          !!route && route !== '/api' && !route.startsWith('/api/')
+      )
+    const redirectMatchers = await getRedirectMatchers()
+
+    const unhandledRoutes = pageRoutes
+      .filter((route) => !MEXAS_ALLOWED_PUBLIC_PAGE_ROUTES.has(route))
+      .filter(
+        (route) => !redirectMatchers.some((matcher) => matcher.regex.test(route))
+      )
+      .sort()
+
+    expect(unhandledRoutes).toEqual([])
   })
 })
