@@ -2072,14 +2072,26 @@ describe('MEXAS flow safety guardrails', () => {
       ".eq('id', contractId)",
       'if (!contractRow)',
       'return res.status(404)',
-      'if (!isMexasOrderBookOnlyContract(convertContract(contractRow)))',
+      'const contract = convertContract(contractRow)',
+      'if (!isMexasOrderBookOnlyContract(contract))',
       'return res.status(404)',
-      'await runOrderBookMaintenance(db, contractId)',
+      'contract.isResolved',
+      '(contract.closeTime && Date.now() >= contract.closeTime)',
+      'return res.status(200).json([])',
+      'const executionMode = await getMexasOrderExecutionMode(db)',
+      'await runOrderBookMaintenance(db, contractId, executionMode)',
       ".from('contract_bets')",
       ".eq('data->>mexasFundsReserved', 'true')",
       ".eq('data->>mexasFundsReleased', 'false')",
     ])
     expect(source).toContain('const ORDER_BOOK_MAINTENANCE_TIMEOUT_MS = 750')
+    expect(source).toContain(
+      'const ORDER_BOOK_MAINTENANCE_MIN_INTERVAL_MS = 30_000'
+    )
+    expect(source).toContain('orderBookMaintenanceByContract')
+    expect(source).toContain('activeMaintenance')
+    expect(source).toContain("if (executionMode === 'wallet-reserved')")
+    expect(source).toContain("if (executionMode !== 'wallet-reserved') return")
     expect(source).toContain('Promise.race')
     expect(source).toContain(
       'releaseClosedMexasMarketOrders(db, { contractId })'

@@ -23,6 +23,11 @@ type ErrorResponse = { message: string }
 const ORDER_BOOK_PAGE_SIZE = 1000
 const MAX_ORDER_BOOK_ROWS = 5000
 const ORDER_BOOK_MAINTENANCE_TIMEOUT_MS = 750
+const ORDER_BOOK_MAINTENANCE_MIN_INTERVAL_MS = 30_000
+const orderBookMaintenanceByContract = new Map<
+  string,
+  { promise: Promise<void>; startedAt: number }
+>()
 
 function getSupabaseAdminClient() {
   const key =
@@ -105,15 +110,43 @@ function getBestOpenMexasOrders(orders: LimitBet[], sideLimit: number) {
 
 async function runOrderBookMaintenance(
   db: ReturnType<typeof getSupabaseAdminClient>,
-  contractId: string
+  contractId: string,
+  executionMode: MexasOrderExecutionMode
 ) {
+  const now = Date.now()
+  const activeMaintenance = orderBookMaintenanceByContract.get(contractId)
+  if (
+    activeMaintenance &&
+    now - activeMaintenance.startedAt < ORDER_BOOK_MAINTENANCE_MIN_INTERVAL_MS
+  ) {
+    return
+  }
+
   const maintenancePromise = (async () => {
     await releaseClosedMexasMarketOrders(db, { contractId })
     await releaseExpiredMexasOrders(db, { contractId })
-    await releaseUnbackedMexasOrders(db, { contractId })
+    if (executionMode === 'wallet-reserved') {
+      await releaseUnbackedMexasOrders(db, { contractId })
+    }
   })().catch((error) => {
     console.warn('Failed to maintain Mexas order book:', error)
   })
+  orderBookMaintenanceByContract.set(contractId, {
+    promise: maintenancePromise,
+    startedAt: now,
+  })
+
+  maintenancePromise.finally(() => {
+    const active = orderBookMaintenanceByContract.get(contractId)
+    if (active?.promise === maintenancePromise) {
+      orderBookMaintenanceByContract.set(contractId, {
+        promise: maintenancePromise,
+        startedAt: now,
+      })
+    }
+  })
+
+  if (executionMode !== 'wallet-reserved') return
 
   const timedOut = await Promise.race([
     maintenancePromise.then(() => false),
@@ -161,12 +194,20 @@ export default async function handler(
     if (!contractRow) {
       return res.status(404).json({ message: 'Contract not found.' })
     }
-    if (!isMexasOrderBookOnlyContract(convertContract(contractRow))) {
+    const contract = convertContract(contractRow)
+    if (!isMexasOrderBookOnlyContract(contract)) {
       return res.status(404).json({ message: 'Order book not found.' })
     }
+    if (
+      contract.isResolved ||
+      (contract.closeTime && Date.now() >= contract.closeTime)
+    ) {
+      res.setHeader('Cache-Control', 's-maxage=5, stale-while-revalidate=30')
+      return res.status(200).json([])
+    }
 
-    await runOrderBookMaintenance(db, contractId)
     const executionMode = await getMexasOrderExecutionMode(db)
+    await runOrderBookMaintenance(db, contractId, executionMode)
 
     const rows: Row<'contract_bets'>[] = []
     for (
