@@ -1,12 +1,18 @@
 import { APIError } from 'common/api/utils'
-import type { AnyBalanceChangeType } from 'common/balance-change'
+import type {
+  AnyBalanceChangeType,
+  BetBalanceChange,
+  MexasTreasuryBalanceChange,
+} from 'common/balance-change'
 import type { LimitBet } from 'common/bet'
 import { calculateUpdatedMetricsForContracts } from 'common/calculate-metrics'
 import type { MarketContract } from 'common/contract'
 import type { ContractMetric } from 'common/contract-metric'
 import {
   hasInactiveMexasOrderDataFlags,
+  isMexasTestUnwound,
   isMexasOrderBookOnlyContract,
+  type MexasReservedOrderData,
 } from 'common/mexas-market'
 import type { LivePortfolioMetrics } from 'common/portfolio-metrics'
 import { convertBet } from 'common/supabase/bets'
@@ -15,6 +21,7 @@ import { convertContractMetricRows } from 'common/supabase/contract-metrics'
 import {
   createClient,
   millisToTs,
+  tsToMillis,
   type Row,
   type SupabaseClient,
 } from 'common/supabase/utils'
@@ -390,6 +397,27 @@ function isVisibleMexasBetRow(row: Row<'contract_bets'>) {
   return !hasInactiveMexasOrderDataFlags(getData(row))
 }
 
+function isInBalanceChangeWindow(
+  time: number | undefined,
+  props: { before?: number; after: number }
+) {
+  return (
+    time !== undefined &&
+    time >= props.after &&
+    (props.before === undefined || time < props.before)
+  )
+}
+
+function getProfileContractForBalanceChange(contract: MarketContract) {
+  return {
+    question: contract.question,
+    slug: contract.slug,
+    visibility: contract.visibility,
+    creatorUsername: contract.creatorUsername,
+    token: 'MEX' as const,
+  }
+}
+
 export async function getMexasUserLimitOrdersWithContracts(
   db: SupabaseClient,
   props: {
@@ -445,66 +473,125 @@ export async function getMexasBalanceChanges(
     after: number
   }
 ) {
-  let query = db
+  const afterTs = millisToTs(props.after)
+  let betQuery = db
     .from('contract_bets')
     .select('*')
     .eq('user_id', props.userId)
-    .gte('updated_time', millisToTs(props.after))
+    .or(`created_time.gte.${afterTs},updated_time.gte.${afterTs}`)
     .order('updated_time', { ascending: false })
     .limit(500)
 
-  if (props.before) query = query.lt('updated_time', millisToTs(props.before))
+  if (props.before) {
+    const beforeTs = millisToTs(props.before)
+    betQuery = betQuery.lt('created_time', beforeTs)
+  }
 
-  const { data, error } = await query
-  if (error) throw error
+  let transferQuery = db
+    .from('mexas_treasury_transfers')
+    .select('*')
+    .eq('user_id', props.userId)
+    .in('status', ['submitted', 'confirmed'])
+    .gte('updated_time', afterTs)
+    .order('updated_time', { ascending: false })
+    .limit(500)
 
-  const rows = ((data ?? []) as Row<'contract_bets'>[]).filter(
-    isVisibleMexasBetRow
-  )
+  if (props.before) {
+    transferQuery = transferQuery.lt('updated_time', millisToTs(props.before))
+  }
+
+  const [
+    { data: betRowsData, error: betRowsError },
+    { data: transferRowsData, error: transferRowsError },
+  ] = await Promise.all([betQuery, transferQuery])
+  if (betRowsError) throw betRowsError
+  if (transferRowsError) throw transferRowsError
+
+  const rows = (betRowsData ?? []) as Row<'contract_bets'>[]
+  const transferRows = (transferRowsData ?? []) as Row<
+    'mexas_treasury_transfers'
+  >[]
   const contracts = await loadMexasContractsByIds(
     db,
-    rows.map((row) => row.contract_id)
+    [
+      ...rows.map((row) => row.contract_id),
+      ...transferRows
+        .map((row) => row.contract_id)
+        .filter((id): id is string => typeof id === 'string'),
+    ]
   )
   const contractsById = Object.fromEntries(
     contracts.map((contract) => [contract.id, contract])
   )
 
-  return rows
-    .map((row) => {
-      const contract = contractsById[row.contract_id]
-      if (!contract) return undefined
+  const betChanges = rows.flatMap((row) => {
+    const contract = contractsById[row.contract_id]
+    if (!contract) return []
 
-      const bet = convertBet(row)
-      const amount =
-        Math.abs(bet.amount ?? 0) > 0
-          ? Math.abs(bet.amount)
-          : Math.abs((bet as LimitBet).orderAmount ?? 0)
-      if (amount <= 0) return undefined
+    const bet = convertBet(row) as LimitBet & MexasReservedOrderData
+    if (isMexasTestUnwound(bet)) return []
+    if (bet.limitProb === undefined || bet.orderAmount === undefined) return []
+    if (!isInBalanceChangeWindow(bet.createdTime, props)) return []
 
-      return {
-        key: bet.id,
-        type: bet.isRedemption
-          ? 'redeem_shares'
-          : bet.amount < 0
-          ? 'sell_shares'
-          : bet.isFilled
-          ? 'fill_bet'
-          : 'create_bet',
-        amount,
-        createdTime: bet.updatedTime ?? bet.createdTime,
+    const amount = Math.abs(bet.orderAmount)
+    if (amount <= 0) return []
+
+    return [
+      {
+        key: `${bet.id}-open`,
+        type: 'create_bet',
+        amount: -amount,
+        createdTime: bet.createdTime,
         bet: {
           outcome: bet.outcome,
           shares: bet.shares,
         },
         answer: undefined,
-        contract: {
-          question: contract.question,
-          slug: contract.slug,
-          visibility: contract.visibility,
-          creatorUsername: contract.creatorUsername,
+        contract: getProfileContractForBalanceChange(contract),
+      } satisfies BetBalanceChange,
+    ]
+  })
+
+  const treasuryChanges = transferRows
+    .flatMap((row): MexasTreasuryBalanceChange[] => {
+      const amount = Number(row.amount)
+      if (!Number.isFinite(amount) || amount <= 0) return []
+
+      const contract =
+        typeof row.contract_id === 'string'
+          ? contractsById[row.contract_id]
+          : undefined
+      const createdTime = tsToMillis(
+        row.confirmed_time ?? row.submitted_time ?? row.updated_time
+      )
+      if (!isInBalanceChangeWindow(createdTime, props)) return []
+
+      const transferType = row.transfer_type as
+        | 'order-release'
+        | 'resolution-payout'
+        | 'resolution-cancel'
+        | 'withdrawal'
+
+      return [
+        {
+          key: `mexas-treasury-${row.id}`,
+          type: 'mexas_treasury_transfer',
+          amount: transferType === 'withdrawal' ? -amount : amount,
+          createdTime,
           token: 'MEX',
-        },
-      } as AnyBalanceChangeType
+          transferType,
+          status: row.status as MexasTreasuryBalanceChange['status'],
+          ...(row.tx_hash ? { txHash: row.tx_hash } : {}),
+          ...(contract
+            ? { contract: getProfileContractForBalanceChange(contract) }
+            : {}),
+        } satisfies MexasTreasuryBalanceChange,
+      ]
     })
-    .filter((change): change is AnyBalanceChangeType => change !== undefined)
+
+  return orderBy(
+    [...betChanges, ...treasuryChanges] satisfies AnyBalanceChangeType[],
+    (change) => change.createdTime,
+    'desc'
+  )
 }

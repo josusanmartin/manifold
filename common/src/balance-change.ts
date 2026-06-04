@@ -5,7 +5,10 @@ import { QuestType } from 'common/quest'
 import { Answer } from 'common/answer'
 import { AnyTxnCategory, Txn } from './txn'
 
-export type AnyBalanceChangeType = BetBalanceChange | TxnBalanceChange
+export type AnyBalanceChangeType =
+  | BetBalanceChange
+  | TxnBalanceChange
+  | MexasTreasuryBalanceChange
 
 export type BalanceChange = {
   type: string
@@ -48,11 +51,30 @@ export type TxnBalanceChange = BalanceChange & {
   answerText?: string
 }
 
+export type MexasTreasuryBalanceChange = BalanceChange & {
+  type: 'mexas_treasury_transfer'
+  token: 'MEX'
+  transferType:
+    | 'order-release'
+    | 'resolution-payout'
+    | 'resolution-cancel'
+    | 'withdrawal'
+  status: 'pending' | 'processing' | 'submitted' | 'confirmed'
+  txHash?: string
+  contract?: MinimalContract
+}
+
 export const isBetChange = (
   change: AnyBalanceChangeType
 ): change is BetBalanceChange =>
   BET_BALANCE_CHANGE_TYPES.includes(change.type as any)
 
+export const isMexasTreasuryChange = (
+  change: AnyBalanceChangeType
+): change is MexasTreasuryBalanceChange =>
+  change.type === 'mexas_treasury_transfer'
+
 export const isTxnChange = (
   change: AnyBalanceChangeType
-): change is TxnBalanceChange => !('bet' in change)
+): change is TxnBalanceChange =>
+  !('bet' in change) && !isMexasTreasuryChange(change)

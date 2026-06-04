@@ -15,7 +15,9 @@ import {
   AnyBalanceChangeType,
   BetBalanceChange,
   isBetChange,
+  isMexasTreasuryChange,
   isTxnChange,
+  MexasTreasuryBalanceChange,
   TxnBalanceChange,
 } from 'common/balance-change'
 import Link from 'next/link'
@@ -66,6 +68,11 @@ export const BalanceChangeTable = (props: { user: User }) => {
       const userUsername = 'user' in change ? change.user?.username ?? '' : ''
       const answerText = 'answer' in change ? change.answer?.text ?? '' : ''
       const betText = 'bet' in change ? betChangeToText(change) : ''
+      const treasuryText = isMexasTreasuryChange(change)
+        ? `${mexasTreasuryTransferTitle(change)} ${mexasTreasuryTransferDescription(
+            change
+          )}`
+        : ''
       return (
         contractQuestion.toLowerCase().includes(query.toLowerCase()) ||
         changeType.toLowerCase().includes(query.toLowerCase()) ||
@@ -78,7 +85,8 @@ export const BalanceChangeTable = (props: { user: User }) => {
           .includes(query.toLowerCase()) ||
         userName.toLowerCase().includes(query.toLowerCase()) ||
         userUsername.toLowerCase().includes(query.toLowerCase()) ||
-        betText.toLowerCase().includes(query.toLowerCase())
+        betText.toLowerCase().includes(query.toLowerCase()) ||
+        treasuryText.toLowerCase().includes(query.toLowerCase())
       )
     })
   const relativeDateText = before
@@ -206,6 +214,7 @@ export const BalanceChangeTable = (props: { user: User }) => {
 
 function isMexasBalanceChange(change: AnyBalanceChangeType) {
   if (isBetChange(change)) return change.contract.token === 'MEX'
+  if (isMexasTreasuryChange(change)) return true
   if (isTxnChange(change)) return change.contract?.token === 'MEX'
   return false
 }
@@ -223,7 +232,9 @@ function RenderBalanceChanges(props: {
   const balanceRunningTotals = [
     { mana: currManaBalance, cash: currCashBalance, spice: currSpiceBalance },
     ...balanceChanges.map((change) => {
-      if (isTxnChange(change) && change.token === 'SPICE') {
+      if (isMexasTreasuryChange(change)) {
+        currManaBalance -= change.amount
+      } else if (isTxnChange(change) && change.token === 'SPICE') {
         currSpiceBalance -= change.amount
       } else if (
         isTxnChange(change)
@@ -254,6 +265,16 @@ function RenderBalanceChanges(props: {
               avatarSize={avatarSize}
               hideBalance={hideBalance}
               token={change.contract.token}
+            />
+          )
+        } else if (isMexasTreasuryChange(change)) {
+          return (
+            <MexasTreasuryBalanceChangeRow
+              key={change.key}
+              change={change}
+              balance={balanceRunningTotals[i]}
+              avatarSize={avatarSize}
+              hideBalance={hideBalance}
             />
           )
         } else if (isTxnChange(change)) {
@@ -412,6 +433,84 @@ const BetBalanceChangeRow = (props: {
               {'·'}
             </>
           )}{' '}
+          {customFormatTime(change.createdTime)}
+        </Row>
+      </Col>
+    </Row>
+  )
+}
+
+const MexasTreasuryBalanceChangeRow = (props: {
+  change: MexasTreasuryBalanceChange
+  balance: { mana: number }
+  avatarSize: 'sm' | 'md'
+  hideBalance?: boolean
+}) => {
+  const { change, balance, avatarSize, hideBalance } = props
+  const { amount, contract, txHash } = change
+  const title = mexasTreasuryTransferTitle(change)
+  const details = mexasTreasuryTransferDescription(change)
+  const amountText = formatWithToken({
+    amount: Math.abs(amount),
+    token: 'MEX',
+    short: true,
+  })
+
+  return (
+    <Row className={'gap-2'}>
+      <Col className={'mt-0.5'}>
+        <ChangeIcon
+          avatarSize={avatarSize}
+          slug={
+            contract?.slug
+              ? contractPathWithoutContract(
+                  contract.creatorUsername,
+                  contract.slug
+                )
+              : undefined
+          }
+          symbol={<FaArrowRightArrowLeft className={'h-4 w-4'} />}
+          className={amount >= 0 ? 'bg-teal-500' : 'bg-scarlet-400'}
+        />
+      </Col>
+      <Col className={'w-full overflow-x-hidden'}>
+        <Row className={'justify-between gap-2'}>
+          {contract?.slug ? (
+            <Link
+              href={contractPathWithoutContract(
+                contract.creatorUsername,
+                contract.slug
+              )}
+              className={clsx('line-clamp-2', linkClass)}
+            >
+              {contract.question}
+            </Link>
+          ) : (
+            <div className={clsx('line-clamp-2')}>{title}</div>
+          )}
+          <span
+            className={clsx(
+              'inline-flex whitespace-nowrap',
+              amount >= 0 ? 'text-teal-700' : 'text-ink-600'
+            )}
+          >
+            {amount >= 0 ? '+' : '-'}
+            {amountText}
+          </span>
+        </Row>
+        <Row>
+          <div className={clsx('text-ink-600 line-clamp-1')}>
+            {contract?.slug ? title : details}
+            {txHash ? ` · ${txHash.slice(0, 8)}...${txHash.slice(-6)}` : ''}
+          </div>
+        </Row>
+        <Row className={'text-ink-600'}>
+          {!hideBalance && (
+            <>
+              {formatWithToken({ amount: balance.mana, token: 'MEX' })}
+              {' · '}
+            </>
+          )}
           {customFormatTime(change.createdTime)}
         </Row>
       </Col>
@@ -618,14 +717,43 @@ const betChangeToText = (change: BetBalanceChange) => {
   const { type, bet } = change
   const { outcome } = bet
   return type === 'redeem_shares'
-    ? `Redeem shares`
+    ? `Canjear participaciones`
     : type === 'loan_payment'
-    ? `Pay back loan`
+    ? `Pagar credito`
     : type === 'fill_bet'
-    ? `Fill ${outcome} order`
+    ? `Orden ${outcome} ejecutada`
     : type === 'sell_shares'
-    ? `Sell ${outcome} shares`
-    : `Buy ${outcome}`
+    ? `Vender ${outcome}`
+    : `Abrir orden ${outcome}`
+}
+
+const mexasTreasuryTransferTitle = (
+  change: MexasTreasuryBalanceChange
+) => {
+  switch (change.transferType) {
+    case 'order-release':
+      return 'Liberacion de orden'
+    case 'resolution-payout':
+      return 'Pago de resolucion'
+    case 'resolution-cancel':
+      return 'Reembolso por cancelacion'
+    case 'withdrawal':
+      return 'Retiro de MEX'
+  }
+}
+
+const mexasTreasuryTransferDescription = (
+  change: MexasTreasuryBalanceChange
+) => {
+  const status =
+    change.status === 'confirmed'
+      ? 'confirmado'
+      : change.status === 'submitted'
+      ? 'enviado'
+      : change.status === 'processing'
+      ? 'procesando'
+      : 'pendiente'
+  return `${mexasTreasuryTransferTitle(change)} ${status}`
 }
 
 const txnTitle = (change: TxnBalanceChange) => {

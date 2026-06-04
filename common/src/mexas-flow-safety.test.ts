@@ -732,6 +732,9 @@ describe('MEXAS flow safety guardrails', () => {
     const balanceChangesSource = readRepoFile(
       'web/components/portfolio/balance-change-table.tsx'
     )
+    const balanceChangeModelSource = readRepoFile(
+      'common/src/balance-change.ts'
+    )
     const portfolioSummarySource = readRepoFile(
       'web/components/portfolio/portfolio-summary.tsx'
     )
@@ -818,7 +821,25 @@ describe('MEXAS flow safety guardrails', () => {
     )
     expect(balanceChangesSource).toContain('mexasOnly: true')
     expect(balanceChangesSource).toContain('filter(isMexasBalanceChange)')
+    expect(balanceChangesSource).toContain('isMexasTreasuryChange(change)')
+    expect(balanceChangesSource).toContain(
+      'MexasTreasuryBalanceChangeRow'
+    )
+    expect(balanceChangesSource).toContain('mexasTreasuryTransferTitle')
+    expect(balanceChangesSource).toContain('Liberacion de orden')
+    expect(balanceChangesSource).toContain('Pago de resolucion')
+    expect(balanceChangesSource).toContain('Reembolso por cancelacion')
     expect(balanceChangesSource).not.toContain("useAPIGetter('get-cashouts'")
+    expect(balanceChangeModelSource).toContain(
+      'export type MexasTreasuryBalanceChange'
+    )
+    expect(balanceChangeModelSource).toContain(
+      "type: 'mexas_treasury_transfer'"
+    )
+    expect(balanceChangeModelSource).toContain('isMexasTreasuryChange')
+    expect(balanceChangeModelSource).toContain(
+      "!('bet' in change) && !isMexasTreasuryChange(change)"
+    )
     expect(portfolioSummarySource).toContain('mexasOnly: true')
     expect(portfolioSummarySource).not.toContain('topicSlug="recent"')
     expect(portfolioValueSource).toContain('mexasOnly = false')
@@ -831,6 +852,22 @@ describe('MEXAS flow safety guardrails', () => {
       'getMexasUserLimitOrdersWithContracts'
     )
     expect(mexasProfileApiSource).toContain('getMexasBalanceChanges')
+    expect(mexasProfileApiSource).toContain(
+      ".from('mexas_treasury_transfers')"
+    )
+    expect(mexasProfileApiSource).toContain(
+      ".in('status', ['submitted', 'confirmed'])"
+    )
+    expect(mexasProfileApiSource).toContain("key: `${bet.id}-open`")
+    expect(mexasProfileApiSource).toContain('amount: -amount')
+    expect(mexasProfileApiSource).toContain('isMexasTestUnwound')
+    expect(mexasProfileApiSource).toContain(
+      "type: 'mexas_treasury_transfer'"
+    )
+    expect(mexasProfileApiSource).toContain(
+      "transferType === 'withdrawal' ? -amount : amount"
+    )
+    expect(mexasProfileApiSource).toContain('txHash: row.tx_hash')
     expect(mexasProfileApiSource).toContain('searchMexasContracts')
     expectMarkersInOrder(proxySource, [
       "'get-balance-changes'",
