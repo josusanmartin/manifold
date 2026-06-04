@@ -1899,6 +1899,10 @@ async function checkUrl(url: string) {
   }
 }
 
+function isVercelChallengeResponse(response: Response) {
+  return response.headers.get('x-vercel-mitigated') === 'challenge'
+}
+
 function describeSiteResponse(response: Awaited<ReturnType<typeof checkUrl>>) {
   if (response.mitigated !== 'challenge') return `${response.status}`
 
@@ -1941,6 +1945,17 @@ async function checkPrivyAllowedOrigin(
     )
     const allowedOrigin = response.headers.get('access-control-allow-origin')
     const contentType = response.headers.get('content-type') ?? ''
+
+    if (isVercelChallengeResponse(response)) {
+      const body = await response.text().catch(() => '')
+      const bodyPreview = body ? ` Body: ${compactDiagnosticText(body)}` : ''
+      return fail(
+        'Privy allowed origin',
+        `Could not verify Privy allowed origin for ${origin}: Privy app config endpoint returned a Vercel Security Checkpoint with status ${
+          response.status
+        }. This is not evidence that ${origin} is missing from the Privy allowlist. Re-run after the challenge clears or verify manually in Privy Dashboard > Configuration > App settings > Domains > Allowed origins.${bodyPreview}`
+      )
+    }
 
     if (
       response.status >= 200 &&

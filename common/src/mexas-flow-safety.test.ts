@@ -1748,6 +1748,11 @@ describe('MEXAS flow safety guardrails', () => {
     expect(readinessSource).toContain("'privy-app-id': appId")
     expect(readinessSource).toContain("'access-control-allow-origin'")
     expect(readinessSource).toContain('Privy allowed origin')
+    expect(readinessSource).toContain('isVercelChallengeResponse')
+    expect(readinessSource).toContain('Vercel Security Checkpoint')
+    expect(readinessSource).toContain(
+      'This is not evidence that ${origin} is missing from the Privy allowlist.'
+    )
     expect(readinessSource).toContain('Allowed origins')
     expect(readinessSource).toContain('Configuration > App settings > Domains')
     expectMarkersInOrder(readinessSource, [
@@ -3988,6 +3993,8 @@ describe('MEXAS flow safety guardrails', () => {
       'Vercel WAF challenge rule',
       '$ vercel firewall attack-mode disable',
       'Privy allowed origin',
+      'Vercel Security Checkpoint',
+      'not evidence that the domain is missing',
       'Allowed origins',
       'https://mexas-manifold.vercel.app',
       'Re-run `check:mexas-launch`',

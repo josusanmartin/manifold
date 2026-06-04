@@ -89,8 +89,14 @@ If the readiness script fails, resolve blockers in this order:
    $ vercel firewall attack-mode disable
    ```
 
-5. If `Privy allowed origin` fails, open Privy Dashboard > Configuration > App
-   settings > Domains > Allowed origins and add:
+5. If `Privy allowed origin` fails with `Vercel Security Checkpoint`, the
+   Privy app config endpoint could not be verified from this server. That is
+   not evidence that the domain is missing from Privy. Re-run after the
+   challenge clears, or manually verify Privy Dashboard > Configuration > App
+   settings > Domains > Allowed origins.
+
+   If the failure says the app does not accept the origin without a Vercel
+   challenge, add:
 
    ```text
    https://mexas-manifold.vercel.app
