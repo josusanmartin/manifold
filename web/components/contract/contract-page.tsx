@@ -103,9 +103,13 @@ export function ContractPageContent(props: ContractParams) {
       isPromoted: liveContract.boosted,
     },
     true,
-    [user?.id] // track user view market event if they sign up/sign in on this page
+    [user?.id], // track user view market event if they sign up/sign in on this page
+    !isMexasOrderBookOnly
   )
-  useSaveContractVisitsLocally(user === null, props.contract.id)
+  useSaveContractVisitsLocally(
+    user === null && !isMexasOrderBookOnly,
+    props.contract.id
+  )
 
   useEffect(() => {
     if ('answers' in props.contract) {
@@ -429,12 +433,13 @@ export function ContractPageContent(props: ContractParams) {
                 </Link>
               </span>
             ) : (
-              <ContractDescription
-                contractId={props.contract.id}
-                creatorId={props.contract.creatorId}
-                isSweeps={isCashContract}
-                description={description}
-              />
+                <ContractDescription
+                  contractId={props.contract.id}
+                  creatorId={props.contract.creatorId}
+                  hidePendingClarifications={isMexasOrderBookOnly}
+                  isSweeps={isCashContract}
+                  description={description}
+                />
             )}
             {props.contract.isRanked !== false && !isMexasOrderBookOnly && (
               <MarketContext contractId={props.contract.id} />

@@ -89,7 +89,18 @@ If the readiness script fails, resolve blockers in this order:
    $ vercel firewall attack-mode disable
    ```
 
-5. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
+5. If `Privy allowed origin` fails, open Privy Dashboard > Configuration > App
+   settings > Domains > Allowed origins and add:
+
+   ```text
+   https://mexas-manifold.vercel.app
+   ```
+
+   Do not use a generic `https://*.vercel.app` wildcard for the production app
+   ID. Privy rejects generic preview wildcards and browser signup will fail with
+   CORS until the exact production origin is allowlisted.
+
+6. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
    markets unless every launch-readiness line is `PASS`.
 
 As of the 2026-06-04 production readiness pass, the treasury has Arbitrum gas,

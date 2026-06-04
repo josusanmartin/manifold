@@ -17,10 +17,17 @@ import { PendingClarifications } from './pending-clarifications'
 export function ContractDescription(props: {
   contractId: string // the description is stored on this contract
   creatorId: string
+  hidePendingClarifications?: boolean
   isSweeps: boolean
   description: string | JSONContent
 }) {
-  const { contractId, creatorId, isSweeps, description } = props
+  const {
+    contractId,
+    creatorId,
+    hidePendingClarifications = false,
+    isSweeps,
+    description,
+  } = props
 
   const isModOrAdmin = useAdminOrMod()
   const user = useUser()
@@ -43,7 +50,9 @@ export function ContractDescription(props: {
           />
         )}
 
-        <PendingClarifications contractId={contractId} isCreator={isCreator} />
+        {!hidePendingClarifications && (
+          <PendingClarifications contractId={contractId} isCreator={isCreator} />
+        )}
 
         <div
           className={clsx(

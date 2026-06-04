@@ -1737,6 +1737,27 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('launch checks diagnose Privy production origin allowlist failures explicitly', () => {
+    const readinessSource = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+
+    expect(readinessSource).toContain('checkPrivyAllowedOrigin')
+    expect(readinessSource).toContain('NEXT_PUBLIC_PRIVY_APP_ID')
+    expect(readinessSource).toContain('https://auth.privy.io/api/v1/apps/')
+    expect(readinessSource).toContain("'privy-app-id': appId")
+    expect(readinessSource).toContain("'access-control-allow-origin'")
+    expect(readinessSource).toContain('Privy allowed origin')
+    expect(readinessSource).toContain('Allowed origins')
+    expect(readinessSource).toContain('Configuration > App settings > Domains')
+    expectMarkersInOrder(readinessSource, [
+      'const siteUrl =',
+      'await checkPrivyAllowedOrigin',
+      "getEnvOrVercelValue('NEXT_PUBLIC_PRIVY_APP_ID'",
+      'const commitInfo = getCurrentGitCommitInfo()',
+    ])
+  })
+
   test('production smoke covers broad legacy page redirects and rejects legacy redirect destinations', () => {
     const smokeSource = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'
@@ -1943,6 +1964,11 @@ describe('MEXAS flow safety guardrails', () => {
     const contractPage = readRepoFile(
       'web/components/contract/contract-page.tsx'
     )
+    const contractDescription = readRepoFile(
+      'web/components/contract/contract-description.tsx'
+    )
+    const liveContractHook = readRepoFile('web/hooks/use-contract.ts')
+    const trackingHook = readRepoFile('web/hooks/use-tracking.ts')
     const yourTrades = readRepoFile('web/components/contract/your-trades.tsx')
     const betPanel = readRepoFile('web/components/bet/bet-panel.tsx')
     const chartPositions = readRepoFile('web/hooks/use-chart-positions.ts')
@@ -1968,6 +1994,36 @@ describe('MEXAS flow safety guardrails', () => {
       'const orderBookOnly = isMexasOrderBookOnlyContract(contract)',
       "api('bets', params)",
       'enabled: !orderBookOnly',
+    ])
+    expectMarkersInOrder(liveContractHook, [
+      'const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(initial)',
+      'useBatchedGetter<C>',
+      'isPageVisible && !isMexasOrderBookOnly',
+    ])
+    expectMarkersInOrder(contractPage, [
+      'useTracking(',
+      '[user?.id],',
+      '!isMexasOrderBookOnly',
+    ])
+    expectMarkersInOrder(trackingHook, [
+      'enabled = true',
+      'if (!enabled) return',
+      'track(eventName, eventProperties)',
+    ])
+    expectMarkersInOrder(contractPage, [
+      'useSaveContractVisitsLocally(',
+      'user === null && !isMexasOrderBookOnly',
+      'props.contract.id',
+    ])
+    expectMarkersInOrder(contractPage, [
+      '<ContractDescription',
+      'hidePendingClarifications={isMexasOrderBookOnly}',
+      'description={description}',
+    ])
+    expectMarkersInOrder(contractDescription, [
+      'hidePendingClarifications = false',
+      '!hidePendingClarifications',
+      '<PendingClarifications',
     ])
   })
 
@@ -3931,6 +3987,9 @@ describe('MEXAS flow safety guardrails', () => {
       'Vercel Firewall challenge active',
       'Vercel WAF challenge rule',
       '$ vercel firewall attack-mode disable',
+      'Privy allowed origin',
+      'Allowed origins',
+      'https://mexas-manifold.vercel.app',
       'Re-run `check:mexas-launch`',
     ])
   })

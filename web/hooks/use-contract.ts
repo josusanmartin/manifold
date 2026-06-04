@@ -11,6 +11,7 @@ import { db } from 'web/lib/supabase/db'
 import { useBatchedGetter } from 'client-common/hooks/use-batched-getter'
 import { queryHandlers } from 'web/lib/supabase/batch-query-handlers'
 import { useContractUpdates } from 'client-common/hooks/use-contract-updates'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 
 export const usePublicContracts = (
   contractIds: string[] | undefined,
@@ -96,13 +97,14 @@ export function useLiveAllNewContracts(limit: number) {
 
 export function useLiveContract<C extends Contract = Contract>(initial: C): C {
   const isPageVisible = useIsPageVisible()
+  const isMexasOrderBookOnly = isMexasOrderBookOnlyContract(initial)
   // ian: Batching is helpful on pages like /browse
   const [contract, setContract] = useBatchedGetter<C>(
     queryHandlers,
     'markets',
     initial.id,
     initial,
-    isPageVisible
+    isPageVisible && !isMexasOrderBookOnly
   )
 
   useContractUpdates(initial, setContract)

@@ -7,12 +7,14 @@ export const useTracking = (
   eventName: string,
   eventProperties?: any,
   excludeIframe?: boolean,
-  extraDeps?: any[]
+  extraDeps?: any[],
+  enabled = true
 ) => {
   const isAuthed = useIsAuthorized()
   useEffect(() => {
+    if (!enabled) return
     if (isAuthed === undefined) return
     if (excludeIframe && inIframe()) return
     track(eventName, eventProperties)
-  }, [isAuthed, eventName, excludeIframe, ...(extraDeps ?? [])])
+  }, [enabled, isAuthed, eventName, excludeIframe, ...(extraDeps ?? [])])
 }

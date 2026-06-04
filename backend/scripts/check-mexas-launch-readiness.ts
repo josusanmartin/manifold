@@ -84,6 +84,7 @@ const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
 const TREASURY_SIGNER_SECRET_PATTERN = /^0x[0-9a-fA-F]{64}$/
 const ZERO_EVM_ADDRESS = '0x0000000000000000000000000000000000000000'
 const ERC20_BALANCE_OF_SELECTOR = '0x70a08231'
+const PRIVY_APP_CONFIG_TIMEOUT_MS = 15_000
 const EPSILON = 1e-9
 
 type OpenMexasOrder = {
@@ -1904,6 +1905,74 @@ function describeSiteResponse(response: Awaited<ReturnType<typeof checkUrl>>) {
   return `${response.status} Vercel Firewall challenge active. Disable Attack Challenge Mode interactively with "vercel firewall attack-mode disable" or adjust the Vercel WAF challenge rule before launch.`
 }
 
+async function checkPrivyAllowedOrigin(
+  appId: string | undefined,
+  siteUrl: string
+) {
+  if (!appId) {
+    return fail(
+      'Privy allowed origin',
+      'NEXT_PUBLIC_PRIVY_APP_ID is not readable from production env.'
+    )
+  }
+
+  const origin = new URL(siteUrl).origin
+  const hostname = new URL(siteUrl).hostname
+  const isLocalOrigin =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '[::1]'
+
+  if (isLocalOrigin) {
+    return warn(
+      'Privy allowed origin',
+      `Skipped Privy allowed-origin check for local smoke origin ${origin}.`
+    )
+  }
+
+  try {
+    const response = await fetch(
+      `https://auth.privy.io/api/v1/apps/${encodeURIComponent(appId)}`,
+      {
+        headers: { Origin: origin, 'privy-app-id': appId },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(PRIVY_APP_CONFIG_TIMEOUT_MS),
+      }
+    )
+    const allowedOrigin = response.headers.get('access-control-allow-origin')
+    const contentType = response.headers.get('content-type') ?? ''
+
+    if (
+      response.status >= 200 &&
+      response.status < 300 &&
+      (allowedOrigin === origin || allowedOrigin === '*')
+    ) {
+      return pass(
+        'Privy allowed origin',
+        `${origin} is accepted by Privy app ${appId}.`
+      )
+    }
+
+    const body = await response.text().catch(() => '')
+    const bodyPreview = body ? ` Body: ${compactDiagnosticText(body)}` : ''
+    return fail(
+      'Privy allowed origin',
+      `Privy app ${appId} does not accept ${origin}. Status ${
+        response.status
+      }; access-control-allow-origin=${allowedOrigin ?? 'missing'}; content-type=${
+        contentType || 'missing'
+      }. Add ${origin} in Privy Dashboard > Configuration > App settings > Domains > Allowed origins.${bodyPreview}`
+    )
+  } catch (error) {
+    return fail(
+      'Privy allowed origin',
+      `Could not verify Privy allowed origin for ${origin}: ${formatDiagnosticError(
+        error
+      )}`
+    )
+  }
+}
+
 async function runChecks() {
   loadEnvFiles()
 
@@ -2264,6 +2333,13 @@ async function runChecks() {
     process.env.MEXAS_SITE_URL ||
     process.env.NEXT_PUBLIC_SITE_URL ||
     'https://mexas-manifold.vercel.app'
+  checks.push(
+    await checkPrivyAllowedOrigin(
+      getEnvOrVercelValue('NEXT_PUBLIC_PRIVY_APP_ID', vercelEnvValues) ||
+        getEnvOrVercelValue('PRIVY_APP_ID', vercelEnvValues),
+      siteUrl
+    )
+  )
 
   const commitInfo = getCurrentGitCommitInfo()
   const deployment = getVercelProductionDeployment(siteUrl)
