@@ -956,17 +956,13 @@ describe('MEXAS flow safety guardrails', () => {
     expect(settingsSource).not.toContain('cash prize raffles')
   })
 
-  test('does not query legacy admin reports during MEXAS static builds', () => {
+  test('does not query legacy admin reports during MEXAS builds', () => {
     const reportsSource = readRepoFile('web/pages/admin/reports.tsx')
 
-    expectMarkersInOrder(reportsSource, [
-      'function isMexasStaticBuild()',
-      'NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS',
-      'export async function getStaticProps()',
-      'if (isMexasStaticBuild())',
-      'return { props: { reports: [] }, revalidate: 3600 }',
-      'const reports = await getReports',
-    ])
+    expect(reportsSource).toContain("import { GetServerSideProps } from 'next'")
+    expect(reportsSource).toContain('export const getServerSideProps')
+    expect(reportsSource).toContain("destination: '/checkout'")
+    expect(reportsSource).not.toContain('getReports')
   })
 
   test('renders and validates MEX order amounts as MEX, not MANA or M$', () => {
@@ -1804,9 +1800,20 @@ describe('MEXAS flow safety guardrails', () => {
     expect(smokeSource).toContain('function decodeURIComponentSafe')
     for (const path of [
       "path: '/admin/cash-stats'",
+      "path: '/admin/cash-txns'",
+      "path: '/admin/journeys'",
+      "path: '/admin/merch'",
+      "path: '/admin/new-users'",
       "path: '/admin/prize'",
+      "path: '/admin/redemptions'",
+      "path: '/admin/reports'",
       "path: '/admin/sales'",
+      "path: '/admin/spam'",
+      "path: '/admin/test-user'",
+      "path: '/admin/tickets'",
       "path: '/admin/txns'",
+      "path: '/admin/update-user'",
+      "path: '/admin/user-info'",
       "path: '/admin/whales'",
       "path: '/ai/test'",
       "path: '/analytics'",
