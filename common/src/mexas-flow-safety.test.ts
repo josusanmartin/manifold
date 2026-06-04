@@ -2748,6 +2748,42 @@ describe('MEXAS flow safety guardrails', () => {
     expect(schemaSource).toContain('mexas_treasury_settlement_ledger_ready')
   })
 
+  test('launch SQL hardens the treasury ledger for Supabase advisors', () => {
+    const hardeningMigration = readRepoFile(
+      'backend/supabase/migrations/2026060401_harden_mexas_treasury_ledger.sql'
+    )
+    const applySource = readRepoFile(
+      'backend/scripts/apply-mexas-launch-sql.ts'
+    )
+    const sqlTestSource = readRepoFile(
+      'backend/scripts/test-mexas-orderbook-sql.ts'
+    )
+
+    expectMarkersInOrder(hardeningMigration, [
+      'drop policy if exists mexas_treasury_transfers_service_role_only',
+      'create policy mexas_treasury_transfers_service_role_only',
+      'to service_role',
+      'using (true)',
+      'with check (true)',
+      'mexas_treasury_transfers_bet_id_idx',
+      'bet_id is not null',
+      'or replace function public.mexas_treasury_settlement_ledger_ready',
+      "p.polname = 'mexas_treasury_transfers_service_role_only'",
+      "to_regclass('public.mexas_treasury_transfers_bet_id_idx') is not null",
+    ])
+    expect(applySource).toContain(
+      '2026060401_harden_mexas_treasury_ledger.sql'
+    )
+    expect(applySource).toContain(
+      'treasury settlement ledger service-role policy missing'
+    )
+    expect(applySource).toContain(
+      'treasury settlement ledger bet_id FK index missing'
+    )
+    expect(sqlTestSource).toContain('treasury bet_id FK index exists')
+    expect(sqlTestSource).toContain('treasury service-role policy exists')
+  })
+
   test('escrow capture verification is idempotent and stays behind launch readiness', () => {
     const helperSource = readRepoFile('web/lib/api/mexas-escrow-capture.ts')
     const migrationSource = readRepoFile(

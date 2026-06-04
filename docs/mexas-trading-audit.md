@@ -10,7 +10,11 @@ y Arbitrum para leer balances ERC-20 y verificar recibos de transferencia.
 
 - Las ordenes MEXAS requieren autenticacion Privy server-side.
 - Las ordenes MEXAS solo aceptan ordenes limite.
-- Cada orden abierta descuenta saldo interno y guarda `mexasFundsReserved`.
+- En modo wallet-reserved, cada orden abierta descuenta saldo interno y guarda
+  `mexasFundsReserved`.
+- En modo treasury-escrowed, cada orden abierta exige una transferencia ERC-20
+  exacta wallet -> treasury, guarda metadata de captura y no debita saldo interno
+  como fuente de settlement.
 - El saldo disponible se sincroniza como MEX on-chain menos reservas abiertas;
   no se calcula por delta bruto cuando hay ordenes pendientes.
 - Las ordenes expiradas o cerradas se cancelan y devuelven solo la reserva
@@ -62,9 +66,9 @@ de una operacion llena.
 
 Para no crear saldos internos no respaldados, el API bloquea:
 
-- nuevos cruces de ordenes siempre, hasta que exista un motor atomico de
-  settlement; los flags de entorno no deben poder activar el matcher local
-  porque actualiza filas maker/taker fuera de una unica transaccion;
+- nuevos cruces de ordenes si no esta listo el modo treasury-escrowed; los flags
+  de entorno no deben poder activar el matcher local porque actualiza filas
+  maker/taker fuera de una unica transaccion;
 - el boton solo debe bloquear una orden si el precio cruza liquidez existente;
   una orden limite que descansa en el libro puede reservar MEX y quedarse
   abierta;
@@ -73,12 +77,18 @@ Para no crear saldos internos no respaldados, el API bloquea:
   implementadas. Los flags de override no deben permitir launch sin escrow.
 
 Abrir ordenes limite que no cruzan sigue permitido, porque esas ordenes pueden
-cancelarse si el balance on-chain deja de respaldarlas.
+cancelarse si el balance on-chain deja de respaldarlas o, en modo escrowed,
+devolverse desde treasury con clave idempotente.
 
 ## Estado de readiness
 
 La auditoria automatica actual pasa estos checks de seguridad:
 
+- treasury signer y gas ETH en Arbitrum;
+- SQL de launch aplicado en Supabase;
+- RPC de matching listo;
+- ledger de tesoreria listo;
+- guard de captura escrow listo;
 - reservas abiertas activas;
 - ausencia de locks persistentes en mercados MEXAS;
 - respaldo on-chain de ordenes abiertas;
@@ -86,6 +96,41 @@ La auditoria automatica actual pasa estos checks de seguridad:
 - ausencia de libros cruzados persistentes;
 - ausencia de exposicion de settlement llenada;
 - despliegue de produccion fresco contra el HEAD auditado.
+
+## Auditoria 2026-06-04
+
+Se aplico `mexas-launch.sql` en Supabase produccion mediante MCP `execute_sql`.
+La verificacion SQL devolvio:
+
+- `mexas_orderbook_matching_engine_ready = true`;
+- `mexas_treasury_settlement_ledger_ready = true`;
+- `mexas_escrow_capture_ready = true`;
+- `mexwcwin26a`, `ukrwarend26a` y `wcupwin26a` con `token=MEX` y
+  `data_token=MEX`.
+
+Despues de aplicar SQL, pasaron:
+
+- `COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts check:mexas-launch`;
+- `COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts check:mexas-smoke`.
+
+El readiness de ordenes en produccion ahora reporta `canPlaceOrders=true`,
+`escrowCaptureEnabled=true` y `matchingEngineReady=true` para los mercados MEXAS
+activos.
+
+Despues se ejecuto Supabase MCP `get_advisors` para seguridad y performance. La
+parte MEXAS nueva tenia dos mejoras de advisor: `mexas_treasury_transfers` tenia
+RLS sin policy explicita y el FK `bet_id` necesitaba indice con `bet_id` como
+columna lider. Se aplico `2026060401_harden_mexas_treasury_ledger.sql` mediante
+MCP `execute_sql`. La verificacion live devolvio `ledger_ready=true`,
+`has_bet_id_idx=true`, `has_service_role_policy=true`,
+`anon_can_select=false`, `authenticated_can_select=false` y
+`anon_can_execute_ready=false`.
+
+Los advisors siguen listando warnings/errors historicos de tablas y funciones
+legacy de Manifold, pero la tabla de tesoreria MEXAS ya no aparece como RLS sin
+policy ni como FK sin indice. Los indices MEXAS nuevos aparecen como `unused`
+porque el libro live aun tiene poco uso; no se deben eliminar antes de trafico
+real.
 
 ## Auditoria 2026-06-03
 
@@ -127,19 +172,9 @@ Escenarios probados:
   idempotente de prueba por 1 MEX y se marco el bet con `mexasTestUnwound=true`
   para que no pueda recibir payout de resolucion adicional.
 
-Los blockers de launch real siguen siendo estructurales:
-
-- fondear la treasury `0xcdD889cb41E6ae9E03871ad26FfF771d63e57b21` con al
-  menos `0.0001 ETH` en Arbitrum para gas de pagos ERC-20 salientes;
-- aplicar el SQL de launch en Supabase produccion para `contracts.token = 'MEX'`,
-  indices de libro, RPC `mexas_orderbook_matching_engine_ready`, ledger
-  `mexas_treasury_transfers` y guard de captura escrow
-  `mexas_escrow_capture_ready`. El SQL manual se imprime con
-  `COREPACK_ENABLE_STRICT=0 corepack yarn --silent --cwd backend/scripts print:mexas-launch-sql > /tmp/mexas-launch.sql`;
-- aunque `MEXAS_ENABLE_ESCROW_CAPTURE_ORDERS` este configurado, el runtime debe
-  mantener `escrowCaptureEnabled=false` hasta que el SQL de produccion, gas y
-  scheduler runtime esten verificados;
-- desplegar/confirmar el scheduler runtime despues de aplicar el SQL.
+Los blockers estructurales de esa auditoria fueron corregidos el 2026-06-04:
+treasury tiene gas, Supabase tiene el SQL de launch aplicado, y el runtime ya
+puede exigir captura escrow para ordenes live.
 
 ## Superficie publica MEXAS
 
@@ -165,5 +200,7 @@ de estas dos piezas:
 - custodia treasury: al abrir una orden, la wallet transfiere MEX a una treasury;
   al resolver/retirar, un servicio backend firma pagos desde esa treasury.
 
-Sin una de esas dos piezas y un motor transaccional, el orderbook puede listar
-ordenes, pero no debe prometer settlement real ni ejecutar cruces.
+El modo actual usa custodia treasury: al abrir una orden live, la wallet
+transfiere MEX a treasury; al cancelar/resolver, el backend firma pagos
+salientes desde treasury con un ledger idempotente. El motor transaccional de
+matching es el RPC Supabase `mexas_match_orderbook_limit_order`.

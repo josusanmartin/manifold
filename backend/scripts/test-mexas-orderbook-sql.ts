@@ -13,6 +13,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060301_add_mexas_treasury_settlement_ledger.sql',
   'backend/supabase/migrations/2026060302_add_mexas_escrow_capture_guard.sql',
   'backend/supabase/migrations/2026060303_add_mexas_treasury_processing_status.sql',
+  'backend/supabase/migrations/2026060401_harden_mexas_treasury_ledger.sql',
 ]
 
 const ROOT = resolve(__dirname, '../..')
@@ -567,6 +568,38 @@ async function testTreasuryLedgerIdempotencyAndRls(client: PgClient) {
       rows[0]?.status,
       'processing',
       'treasury processing status is accepted'
+    )
+
+    const { rows: hardeningRows } = await client.query(
+      `
+        select
+          to_regclass('public.mexas_treasury_transfers_bet_id_idx') is not null as has_bet_id_idx,
+          exists (
+            select 1
+            from pg_policy p
+            join pg_class c on c.oid = p.polrelid
+            join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public'
+              and c.relname = 'mexas_treasury_transfers'
+              and p.polname = 'mexas_treasury_transfers_service_role_only'
+          ) as has_service_role_policy,
+          public.mexas_treasury_settlement_ledger_ready() as ledger_ready
+      `
+    )
+    assertEqual(
+      hardeningRows[0]?.has_bet_id_idx,
+      true,
+      'treasury bet_id FK index exists'
+    )
+    assertEqual(
+      hardeningRows[0]?.has_service_role_policy,
+      true,
+      'treasury service-role policy exists'
+    )
+    assertEqual(
+      hardeningRows[0]?.ledger_ready,
+      true,
+      'treasury readiness includes advisor hardening'
     )
 
     await expectSqlError(

@@ -11,6 +11,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060301_add_mexas_treasury_settlement_ledger.sql',
   'backend/supabase/migrations/2026060302_add_mexas_escrow_capture_guard.sql',
   'backend/supabase/migrations/2026060303_add_mexas_treasury_processing_status.sql',
+  'backend/supabase/migrations/2026060401_harden_mexas_treasury_ledger.sql',
 ]
 
 const REQUIRED_CONTRACT_IDS = ['mexwcwin26a', 'ukrwarend26a']
@@ -168,6 +169,18 @@ begin
 
   if not exists (
     select 1
+    from pg_policy p
+    join pg_class c on c.oid = p.polrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'mexas_treasury_transfers'
+      and p.polname = 'mexas_treasury_transfers_service_role_only'
+  ) then
+    v_failures := array_append(v_failures, 'treasury settlement ledger service-role policy missing');
+  end if;
+
+  if not exists (
+    select 1
     from pg_constraint con
     join pg_class c on c.oid = con.conrelid
     join pg_namespace n on n.oid = c.relnamespace
@@ -187,6 +200,10 @@ begin
 
   if to_regclass('public.contract_bets_mexas_escrow_tx_hash_idx') is null then
     v_failures := array_append(v_failures, 'escrow capture tx hash index missing');
+  end if;
+
+  if to_regclass('public.mexas_treasury_transfers_bet_id_idx') is null then
+    v_failures := array_append(v_failures, 'treasury settlement ledger bet_id FK index missing');
   end if;
 
   if not has_function_privilege(

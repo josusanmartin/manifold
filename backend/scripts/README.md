@@ -52,7 +52,7 @@ $ yarn --cwd backend/scripts check:mexas-launch
 
 This script loads local `.env` files, checks production Vercel env names, verifies the Supabase matching health RPC, checks required settlement flags, and smoke-tests the main public MEXAS pages. A failing result means production is not ready to launch with live matching.
 
-Current launch blockers should be resolved in this order:
+If the readiness script fails, resolve blockers in this order:
 
 1. Fund the treasury wallet with enough Arbitrum ETH for outgoing ERC-20
    transfers. The readiness script enforces `MEXAS_TREASURY_MIN_GAS_WEI`,
@@ -90,7 +90,13 @@ Current launch blockers should be resolved in this order:
    ```
 
 5. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
-   markets until every launch-readiness line is `PASS`.
+   markets unless every launch-readiness line is `PASS`.
+
+As of the 2026-06-04 production readiness pass, the treasury has Arbitrum gas,
+the launch SQL is applied in Supabase, the RPC matching engine reports ready,
+the treasury ledger reports ready, the escrow capture guard reports ready, the
+treasury ledger has the explicit service-role RLS policy plus bet-id FK index
+from the Supabase advisor follow-up, and the production smoke checks pass.
 
 `MEXAS_TREASURY_SIGNER_SECRET` is already expected in Vercel production and must
 derive exactly to `MEXAS_TREASURY_WALLET_ADDRESS`. If either treasury env fails
