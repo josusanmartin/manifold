@@ -13,6 +13,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060303_add_mexas_treasury_processing_status.sql',
   'backend/supabase/migrations/2026060401_harden_mexas_treasury_ledger.sql',
   'backend/supabase/migrations/2026060402_lock_down_legacy_supabase_surface.sql',
+  'backend/supabase/migrations/20260604144518_lock_down_legacy_rpc_surface.sql',
 ]
 
 const REQUIRED_CONTRACT_IDS = ['mexwcwin26a', 'ukrwarend26a']

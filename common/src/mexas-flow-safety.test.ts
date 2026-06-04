@@ -2788,6 +2788,9 @@ describe('MEXAS flow safety guardrails', () => {
     const migration = readRepoFile(
       'backend/supabase/migrations/2026060402_lock_down_legacy_supabase_surface.sql'
     )
+    const rpcMigration = readRepoFile(
+      'backend/supabase/migrations/20260604144518_lock_down_legacy_rpc_surface.sql'
+    )
     const applySource = readRepoFile(
       'backend/scripts/apply-mexas-launch-sql.ts'
     )
@@ -2810,8 +2813,25 @@ describe('MEXAS flow safety guardrails', () => {
       'grant',
       'service_role',
     ])
+    expectMarkersInOrder(rpcMigration, [
+      'close_contract_embeddings',
+      'get_non_empty_private_message_channel_ids',
+      'install_available_extensions_and_test',
+      'pgrst_ddl_watch',
+      'pgrst_drop_watch',
+      'search_contract_embeddings',
+      'revoke execute on function %s from public, anon, authenticated',
+      'public.mexas_legacy_surface_locked_down',
+      "has_function_privilege('anon', f.signature, 'EXECUTE')",
+      "search_path=public",
+      'grant',
+      'service_role',
+    ])
     expect(applySource).toContain(
       '2026060402_lock_down_legacy_supabase_surface.sql'
+    )
+    expect(applySource).toContain(
+      '20260604144518_lock_down_legacy_rpc_surface.sql'
     )
     expect(applySource).toContain('legacy Supabase surface health RPC missing')
     expect(applySource).toContain(
