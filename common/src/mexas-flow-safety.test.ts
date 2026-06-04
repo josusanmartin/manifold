@@ -1694,6 +1694,9 @@ describe('MEXAS flow safety guardrails', () => {
       'json orderbook mexwcwin26a',
     ])
     expectMarkersInOrder(source, [
+      'async function checkPageHeadNotChallenged',
+      "method: 'HEAD'",
+      'isVercelChallenge(response)',
       'async function checkBetsArray',
       '/api/v0/bets?contractId=mexwcwin26a&kinds=open-limit',
       'bets mexwcwin26a open-limit',

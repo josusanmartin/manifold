@@ -479,6 +479,21 @@ async function checkPage(path: string, required: string[]) {
   return results
 }
 
+async function checkPageHeadNotChallenged(path: string) {
+  const response = await smokeFetch(path, {
+    method: 'HEAD',
+    redirect: 'manual',
+  })
+
+  if (isVercelChallenge(response)) {
+    return fail(`browser challenge ${path}`, describeResponseStatus(response))
+  }
+
+  return response.status >= 200 && response.status < 400
+    ? pass(`browser challenge ${path}`, `HEAD ${response.status}`)
+    : fail(`browser challenge ${path}`, describeResponseStatus(response))
+}
+
 async function checkStaticFile(path: string, required: string[]) {
   const results: SmokeResult[] = []
   const { response, text } = await fetchText(path)
@@ -904,6 +919,7 @@ async function runSmoke() {
 
   for (const page of PAGES) {
     results.push(...(await checkPage(page.path, page.required)))
+    results.push(await checkPageHeadNotChallenged(page.path))
   }
 
   for (const file of STATIC_FILES) {
