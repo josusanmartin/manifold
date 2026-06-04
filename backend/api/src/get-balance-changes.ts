@@ -9,17 +9,18 @@ import { charities } from 'common/charity'
 import { convertTxn } from 'common/supabase/txns'
 import { LiquidityProvision } from 'common/liquidity-provision'
 import { getContractsDirect } from 'shared/supabase/contracts'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 
 // market creation fees
 export const getBalanceChanges: APIHandler<'get-balance-changes'> = async (
   props
 ) => {
-  const { userId, before, after } = props
+  const { userId, before, after, mexasOnly } = props
   const [betBalanceChanges, txnBalanceChanges, liquidityChanges] =
     await Promise.all([
-      getBetBalanceChanges(before, after, userId),
-      getTxnBalanceChanges(before, after, userId),
-      getLiquidityBalanceChanges(before, after, userId),
+      getBetBalanceChanges(before, after, userId, mexasOnly),
+      getTxnBalanceChanges(before, after, userId, mexasOnly),
+      getLiquidityBalanceChanges(before, after, userId, mexasOnly),
     ])
   const allChanges = orderBy(
     [...betBalanceChanges, ...txnBalanceChanges, ...liquidityChanges],
@@ -32,7 +33,8 @@ export const getBalanceChanges: APIHandler<'get-balance-changes'> = async (
 const getTxnBalanceChanges = async (
   before: number | undefined,
   after: number,
-  userId: string
+  userId: string,
+  mexasOnly: boolean
 ) => {
   const pg = createSupabaseDirectClient()
   const balanceChanges = [] as TxnBalanceChange[]
@@ -63,6 +65,9 @@ const getTxnBalanceChanges = async (
   )
   for (const txn of txns) {
     const contract = contracts.find((c) => c.id === getContractIdFromTxn(txn))
+    if (mexasOnly && (!contract || !isMexasOrderBookOnlyContract(contract))) {
+      continue
+    }
     const user = users.find((u) => u.id === getOtherUserIdFromTxn(txn, userId))
     const balanceChange: TxnBalanceChange = {
       key: txn.id,
@@ -101,7 +106,8 @@ const getTxnBalanceChanges = async (
 const getLiquidityBalanceChanges = async (
   before: number | undefined,
   after: number,
-  userId: string
+  userId: string,
+  mexasOnly: boolean
 ) => {
   const pg = createSupabaseDirectClient()
   const liquidityDocs = await pg.map(
@@ -121,6 +127,7 @@ const getLiquidityBalanceChanges = async (
   for (const doc of liquidityDocs) {
     const contract = contracts.find((c) => c.id === doc.contractId)
     if (!contract) continue
+    if (mexasOnly && !isMexasOrderBookOnlyContract(contract)) continue
     // We just used the ante txns in the balance log, no need to duplicate them
     if (Math.abs(doc.createdTime - contract.createdTime) < 100) continue
     const balanceChange: TxnBalanceChange = {
@@ -174,9 +181,15 @@ const getContractIdFromTxn = (txn: Txn) => {
 const getBetBalanceChanges = async (
   before: number | undefined,
   after: number,
-  userId: string
+  userId: string,
+  mexasOnly: boolean
 ) => {
   const pg = createSupabaseDirectClient()
+  const mexasOnlySQL = mexasOnly
+    ? `and coalesce(c.data->>'token', c.token) = 'MEX'
+       and c.mechanism = 'cpmm-1'
+       and c.outcome_type = 'BINARY'`
+    : ''
   const contractToBets: {
     [contractId: string]: {
       bets: (Bet & { answerText?: string | undefined })[]
@@ -191,7 +204,7 @@ const getBetBalanceChanges = async (
        c.slug,
        c.visibility,
        c.data->>'creatorUsername' as creator_username,
-       c.token
+       coalesce(c.data->>'token', c.token) as token
      from contract_bets cb
         join contracts c on cb.contract_id = c.id
         left join answers a on a.id = cb.answer_id
@@ -199,6 +212,7 @@ const getBetBalanceChanges = async (
         ($1 is null or cb.updated_time < millis_to_ts($1))
         and cb.updated_time >= millis_to_ts($2)
         and cb.user_id = $3
+        ${mexasOnlySQL}
      group by c.id;
     `,
     [before, after, userId],

@@ -19,7 +19,7 @@ import {
   MarketContract,
 } from 'common/contract'
 import { ContractMetric, getMaxSharesOutcome } from 'common/contract-metric'
-import { SWEEPIES_MARKET_TOOLTIP } from 'common/envs/constants'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { buildArray } from 'common/util/array'
 import { formatWithToken } from 'common/util/format'
 import { floatingEqual } from 'common/util/math'
@@ -30,7 +30,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { ContractBetsTable } from 'web/components/bet/contract-bets-table'
 import { OrderTable } from 'web/components/bet/order-book'
 import { BetsSummary } from 'web/components/bet/user-bet-summary'
-import { PillButton } from 'web/components/buttons/pill-button'
 import { Input } from 'web/components/widgets/input'
 import { useIsMobile } from 'web/hooks/use-is-mobile'
 import { useIsPageVisible } from 'web/hooks/use-page-visible'
@@ -39,13 +38,11 @@ import { usePersistentQueryState } from 'web/hooks/use-persistent-query-state'
 import { useIsAuthorized, useUser } from 'web/hooks/use-user'
 import { api } from 'web/lib/api/api'
 import { User } from 'web/lib/firebase/users'
-import { SweepiesCoin } from 'web/public/custom-components/sweepiesCoin'
 import { ContractStatusLabel } from '../contract/contracts-table'
 import { Col } from '../layout/col'
 import { Row } from '../layout/row'
 import { BinaryOutcomeLabel, MultiOutcomeLabel } from '../outcome-label'
 import { RelativeTimestamp } from '../relative-timestamp'
-import { useSweepstakes } from '../sweepstakes-provider'
 import { LoadingIndicator } from '../widgets/loading-indicator'
 import { Tooltip } from '../widgets/tooltip'
 import { LoadMoreUntilNotVisible } from '../widgets/visibility-observer'
@@ -120,13 +117,25 @@ export function UserBetsTable(props: { user: User }) {
       offset: 0,
       // Hack for Ziddletwix
       limit: user.id === 'Iua2KQvL6KYcfGLGNI6PVeGkseo1' ? 10000 : 5000,
+      mexasOnly: true,
     }).then((res) => {
       const { contracts, metricsByContract } = res
+      const mexasContracts = contracts.filter(isMexasOrderBookOnlyContract)
+      const mexasContractIds = new Set(
+        mexasContracts.map((contract) => contract.id)
+      )
+      const mexasMetricsByContract = Object.fromEntries(
+        Object.entries(metricsByContract).filter(([contractId]) =>
+          mexasContractIds.has(contractId)
+        )
+      )
       setMetricsByContract(
-        mapValues(metricsByContract, (metrics) => metrics[0])
+        mapValues(mexasMetricsByContract, (metrics) => metrics[0])
       )
       setContracts((c) =>
-        uniqBy(buildArray([...(c ?? []), ...contracts]), 'id')
+        uniqBy(buildArray([...(c ?? []), ...mexasContracts]), 'id').filter(
+          isMexasOrderBookOnlyContract
+        )
       )
     })
   )
@@ -149,8 +158,6 @@ export function UserBetsTable(props: { user: User }) {
     }
   }, [filter])
 
-  const { prefersPlay, setPrefersPlay } = useSweepstakes()
-
   const [query, setQuery] = usePersistentQueryState('b', '')
 
   const onSetFilter = (f: BetFilter | 'limit_orders') => {
@@ -161,10 +168,6 @@ export function UserBetsTable(props: { user: User }) {
     // When selecting any other filter, turn off limit orders view
     setShowLimitOrders(false)
     setFilter(f as BetFilter)
-  }
-
-  const toggleTokenFilter = () => {
-    setPrefersPlay(!prefersPlay)
   }
 
   const nullableMetricsByContract = useMemo(() => {
@@ -212,26 +215,21 @@ export function UserBetsTable(props: { user: User }) {
           if (filter === 'sold') return !hasShares
           return hasShares
         })
-        .filter((c) => {
-          if (!prefersPlay) return c.token === 'CASH'
-          else return c.token !== 'CASH'
-        })
+        .filter(isMexasOrderBookOnlyContract)
     : []
-
-  const hasSweeps = contracts?.some((c) => c.token === 'CASH')
 
   // Define filter options
   const filterOptions: {
     label: string
     value: BetFilter | 'limit_orders'
   }[] = [
-    { label: 'All', value: 'all' },
-    { label: 'Open', value: 'open' },
-    { label: 'Sold', value: 'sold' },
-    { label: 'Closed', value: 'closed' },
-    { label: 'Resolved', value: 'resolved' },
+    { label: 'Todas', value: 'all' },
+    { label: 'Abiertas', value: 'open' },
+    { label: 'Cerradas', value: 'sold' },
+    { label: 'Finalizadas', value: 'closed' },
+    { label: 'Resueltas', value: 'resolved' },
     {
-      label: 'Limit Orders',
+      label: 'Ordenes limite',
       value: 'limit_orders',
     },
   ]
@@ -240,10 +238,10 @@ export function UserBetsTable(props: { user: User }) {
     label: string
     value: LimitOrderFilter
   }[] = [
-    { label: 'Open', value: 'active' },
-    { label: 'Expired', value: 'expired' },
-    { label: 'Filled', value: 'filled' },
-    { label: 'Cancelled', value: 'cancelled' },
+    { label: 'Abiertas', value: 'active' },
+    { label: 'Expiradas', value: 'expired' },
+    { label: 'Ejecutadas', value: 'filled' },
+    { label: 'Canceladas', value: 'cancelled' },
   ]
 
   // Define sort options for the dropdown in the main component
@@ -253,37 +251,37 @@ export function UserBetsTable(props: { user: User }) {
     direction: 'asc' | 'desc'
     hiddenUntilSorted?: boolean
   }[] = [
-    { label: 'Newest', field: 'newest', direction: 'desc' },
-    { label: 'Oldest', field: 'newest', direction: 'asc' },
-    { label: 'Highest Value', field: 'value', direction: 'desc' },
-    { label: 'Lowest Value', field: 'value', direction: 'asc' },
-    { label: 'Highest Position', field: 'position', direction: 'desc' },
-    { label: 'Lowest Position', field: 'position', direction: 'asc' },
-    { label: 'Highest Profit', field: 'profit', direction: 'desc' },
-    { label: 'Lowest Profit', field: 'profit', direction: 'asc' },
-    { label: 'Highest 1d Change', field: 'day', direction: 'desc' },
-    { label: 'Lowest 1d Change', field: 'day', direction: 'asc' },
-    { label: 'Highest 1w Change', field: 'week', direction: 'desc' },
-    { label: 'Lowest 1w Change', field: 'week', direction: 'asc' },
-    { label: 'Closing Soon', field: 'closeTime', direction: 'asc' },
+    { label: 'Mas recientes', field: 'newest', direction: 'desc' },
+    { label: 'Mas antiguas', field: 'newest', direction: 'asc' },
+    { label: 'Mayor valor', field: 'value', direction: 'desc' },
+    { label: 'Menor valor', field: 'value', direction: 'asc' },
+    { label: 'Mayor posicion', field: 'position', direction: 'desc' },
+    { label: 'Menor posicion', field: 'position', direction: 'asc' },
+    { label: 'Mayor ganancia', field: 'profit', direction: 'desc' },
+    { label: 'Menor ganancia', field: 'profit', direction: 'asc' },
+    { label: 'Mayor cambio 1d', field: 'day', direction: 'desc' },
+    { label: 'Menor cambio 1d', field: 'day', direction: 'asc' },
+    { label: 'Mayor cambio 1s', field: 'week', direction: 'desc' },
+    { label: 'Menor cambio 1s', field: 'week', direction: 'asc' },
+    { label: 'Cierre cercano', field: 'closeTime', direction: 'asc' },
     {
-      label: 'Highest Loan',
+      label: 'Mayor credito',
       field: 'loan',
       direction: 'desc',
     },
     {
-      label: 'Lowest Loan',
+      label: 'Menor credito',
       field: 'loan',
       direction: 'asc',
     },
     {
-      label: '↓ ∆ Last Trade',
+      label: '↓ cambio desde trade',
       field: 'priceDiff',
       direction: 'desc',
       hiddenUntilSorted: true,
     },
     {
-      label: '↑ ∆ Last Trade',
+      label: '↑ cambio desde trade',
       field: 'priceDiff',
       direction: 'asc',
       hiddenUntilSorted: true,
@@ -319,7 +317,9 @@ export function UserBetsTable(props: { user: User }) {
             }
           >
             <Input
-              placeholder={isYou ? 'Search your bets' : 'Search bets'}
+              placeholder={
+                isYou ? 'Buscar tus operaciones' : 'Buscar operaciones'
+              }
               className={'w-full min-w-[30px]'}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -331,9 +331,9 @@ export function UserBetsTable(props: { user: User }) {
                   <MenuButton className="bg-canvas-0 border-ink-200 hover:bg-canvas-50 inline-flex h-full w-32 items-center justify-between rounded-md border px-3 py-1.5 text-sm shadow-sm">
                     <span>
                       {showLimitOrders
-                        ? 'Limit Orders'
+                        ? 'Ordenes limite'
                         : filterOptions.find((opt) => opt.value === filter)
-                            ?.label || 'Filter'}
+                            ?.label || 'Filtro'}
                     </span>
                     <ChevronDownIcon className="ml-2 h-4 w-4" />
                   </MenuButton>
@@ -372,7 +372,7 @@ export function UserBetsTable(props: { user: User }) {
                       <span>
                         {limitOrderFilterOptions.find(
                           (opt) => opt.value === orderFilter
-                        )?.label || 'Open'}
+                        )?.label || 'Abiertas'}
                       </span>
                       <ChevronDownIcon className="ml-2 h-4 w-4" />
                     </MenuButton>
@@ -409,7 +409,7 @@ export function UserBetsTable(props: { user: User }) {
                           (opt) =>
                             opt.field === sortOption.field &&
                             opt.direction === sortOption.direction
-                        )?.label || 'Sort'}
+                        )?.label || 'Ordenar'}
                       </span>
                       <ChevronDownIcon className="ml-2 h-4 w-4" />
                     </MenuButton>
@@ -445,16 +445,6 @@ export function UserBetsTable(props: { user: User }) {
               )}
             </Row>
           </Col>
-          {hasSweeps && filter === 'resolved' && (
-            <Row>
-              <PillButton
-                selected={!(prefersPlay ?? false)}
-                onSelect={toggleTokenFilter}
-              >
-                Sweepcash
-              </PillButton>
-            </Row>
-          )}
         </Col>
       </div>
 
@@ -501,8 +491,11 @@ const NoBets = ({ user }: { user: User }) => {
   return (
     <>
       {user.id === me?.id && (
-        <Link href="/home" className="text-primary-500 mt-2 hover:underline">
-          Find a question to trade on!
+        <Link
+          href="/checkout"
+          className="text-primary-500 mt-2 hover:underline"
+        >
+          Ver mercados MEXAS
         </Link>
       )}
     </>
@@ -510,27 +503,27 @@ const NoBets = ({ user }: { user: User }) => {
 }
 const availableColumns: { value: BetSort; label: string; tooltip?: string }[] =
   [
-    { value: 'value', label: 'Value' },
-    { value: 'position', label: 'Position' },
-    { value: 'profit', label: 'Profit' },
-    { value: 'profitPercent', label: 'Profit %' },
-    { value: 'day', label: '1d Profit' },
-    { value: 'dayPctChange', label: '1d Profit %' },
-    { value: 'week', label: '1w Profit' },
-    { value: 'closeTime', label: 'Close Time' },
-    { value: 'costBasis', label: 'Cost Basis' },
+    { value: 'value', label: 'Valor' },
+    { value: 'position', label: 'Posicion' },
+    { value: 'profit', label: 'Ganancia' },
+    { value: 'profitPercent', label: 'Ganancia %' },
+    { value: 'day', label: 'Ganancia 1d' },
+    { value: 'dayPctChange', label: 'Ganancia 1d %' },
+    { value: 'week', label: 'Ganancia 1s' },
+    { value: 'closeTime', label: 'Cierre' },
+    { value: 'costBasis', label: 'Costo base' },
     {
       value: 'loan',
-      label: 'Loan',
-      tooltip: 'Outstanding loan amount on this position',
+      label: 'Credito',
+      tooltip: 'Credito pendiente de esta posicion',
     },
-    { value: 'dayPriceChange', label: '1d Price' },
-    { value: 'volume24h', label: '1d Volume' },
-    { value: 'liquidity', label: 'Liquidity' },
+    { value: 'dayPriceChange', label: 'Precio 1d' },
+    { value: 'volume24h', label: 'Volumen 1d' },
+    { value: 'liquidity', label: 'Liquidez' },
     {
       value: 'priceDiff',
-      label: 'Last Trade ∆',
-      tooltip: 'Percent change in market probability since your last trade',
+      label: 'Cambio desde trade',
+      tooltip: 'Cambio porcentual desde tu ultima operacion',
     },
   ]
 
@@ -653,14 +646,14 @@ function BetsTable(props: {
         <Menu as="div" className="relative">
           <MenuButton
             className="text-ink-500 hover:text-ink-700 flex items-center"
-            aria-label="Customize columns"
+            aria-label="Configurar columnas"
           >
             <CogIcon className="h-4 w-4" />
-            <span className="ml-1 text-sm">Columns</span>
+            <span className="ml-1 text-sm">Columnas</span>
           </MenuButton>
           <MenuItems className="bg-canvas-0 border-ink-200 absolute right-0 z-20 mt-1 h-80 w-48 overflow-y-auto rounded-md border shadow-lg">
             <div className="border-ink-200 border-b px-4 py-2 text-xs font-semibold">
-              Customize Columns
+              Configurar columnas
             </div>
             {availableColumns.map((column) => (
               <MenuItem key={column.value}>
@@ -749,14 +742,6 @@ function BetsTable(props: {
                         'bg-canvas-0 group-hover:bg-canvas-50 sticky left-0 z-10'
                       )}
                     >
-                      {contract.token == 'CASH' && (
-                        <Tooltip
-                          text={SWEEPIES_MARKET_TOOLTIP}
-                          className="relative mr-0.5 inline-flex h-[1em] w-[1.1em] items-baseline"
-                        >
-                          <SweepiesCoin className="absolute inset-0 top-[0.2em]" />
-                        </Tooltip>
-                      )}
                       <Link
                         href={contractPath(contract)}
                         onClick={(e) => e.stopPropagation()}
@@ -810,7 +795,7 @@ function BetsTable(props: {
                         </span>
                         {sortOption.field === 'closeTime' && closeDate ? (
                           <span className="text-ink-500 ml-1 whitespace-nowrap">
-                            • {closeDate < Date.now() ? 'closed' : 'closes in'}{' '}
+                            • {closeDate < Date.now() ? 'cerrado' : 'cierra en'}{' '}
                             <RelativeTimestamp
                               time={closeDate}
                               className="text-ink-500"
@@ -862,7 +847,7 @@ function BetsTable(props: {
                                         text={`${formatWithToken({
                                           amount: metric.profit,
                                           token: contract.token,
-                                        })} total profit`}
+                                        })} ganancia total`}
                                       >
                                         <span
                                           className={clsx(
@@ -1038,14 +1023,14 @@ function BetsTable(props: {
                                       shortened
                                     />
                                   ) : (
-                                    'No close'
+                                    'Sin cierre'
                                   )}
                                 </div>
                                 <div className="text-ink-500 text-sm">
                                   {contract.isResolved
-                                    ? 'Resolved'
+                                    ? 'Resuelto'
                                     : closeDate && closeDate < Date.now()
-                                    ? 'Closed'
+                                    ? 'Cerrado'
                                     : ''}
                                 </div>
                               </>

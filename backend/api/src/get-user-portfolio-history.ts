@@ -9,7 +9,10 @@ export const getUserPortfolioHistory: APIHandler<
   'get-user-portfolio-history'
 > = async (props) => {
   const pg = createSupabaseDirectClient()
-  const { userId, period } = props
+  const { userId, period, mexasOnly } = props
+  if (mexasOnly) {
+    return []
+  }
   const isAllTime = period === 'allTime'
   const cutoff = isAllTime ? getCutoff('monthly') : getCutoff(period)
 

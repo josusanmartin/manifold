@@ -11,10 +11,22 @@ import { APIHandler } from './helpers/endpoint'
 export const getUserContractMetricsWithContracts: APIHandler<
   'get-user-contract-metrics-with-contracts'
 > = async (props, auth) => {
-  const { userId, limit, offset = 0, perAnswer = false, order } = props
+  const {
+    userId,
+    limit,
+    offset = 0,
+    perAnswer = false,
+    order,
+    mexasOnly,
+  } = props
   const visibilitySQL = getContractPrivacyWhereSQLFilter(auth?.uid, 'c.id')
   const pg = createSupabaseDirectClient()
   const metricFilterSQL = `(c.mechanism <> 'cpmm-multi-1' OR ucm.answer_id is not null)`
+  const mexasOnlySQL = mexasOnly
+    ? `AND coalesce(c.data->>'token', c.token) = 'MEX'
+       AND c.mechanism = 'cpmm-1'
+       AND c.outcome_type = 'BINARY'`
+    : ''
   const rankedOrderBySQL =
     order === 'profit'
       ? `total_profit DESC`
@@ -34,6 +46,7 @@ export const getUserContractMetricsWithContracts: APIHandler<
           WHERE ${visibilitySQL}
             AND ucm.user_id = $1
             AND ${metricFilterSQL}
+            ${mexasOnlySQL}
           GROUP BY c.id
           ORDER BY ${rankedOrderBySQL}
           OFFSET $2 LIMIT $3

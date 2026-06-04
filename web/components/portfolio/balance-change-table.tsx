@@ -55,6 +55,7 @@ export const BalanceChangeTable = (props: { user: User }) => {
     userId: user.id,
     before,
     after,
+    mexasOnly: true,
   })
 
   const [query, setQuery] = useState('')
@@ -62,30 +63,32 @@ export const BalanceChangeTable = (props: { user: User }) => {
     userId: user.id,
   })
   const [showCashoutModal, setShowCashoutModal] = useState(false)
-  const balanceChanges = (allBalanceChanges ?? []).filter((change) => {
-    const { type } = change
-    const contractQuestion =
-      ('contract' in change && change.contract?.question) || ''
-    const changeType = type
-    const userName = 'user' in change ? change.user?.name ?? '' : ''
-    const userUsername = 'user' in change ? change.user?.username ?? '' : ''
-    const answerText = 'answer' in change ? change.answer?.text ?? '' : ''
-    const betText = 'bet' in change ? betChangeToText(change) : ''
-    return (
-      contractQuestion.toLowerCase().includes(query.toLowerCase()) ||
-      changeType.toLowerCase().includes(query.toLowerCase()) ||
-      (txnTypeToDescription(changeType) || '')
-        .toLowerCase()
-        .includes(query.toLowerCase()) ||
-      answerText.toLowerCase().includes(query.toLowerCase()) ||
-      ((isTxnChange(change) && txnTitle(change)) || '')
-        .toLowerCase()
-        .includes(query.toLowerCase()) ||
-      userName.toLowerCase().includes(query.toLowerCase()) ||
-      userUsername.toLowerCase().includes(query.toLowerCase()) ||
-      betText.toLowerCase().includes(query.toLowerCase())
-    )
-  })
+  const balanceChanges = (allBalanceChanges ?? [])
+    .filter(isMexasBalanceChange)
+    .filter((change) => {
+      const { type } = change
+      const contractQuestion =
+        ('contract' in change && change.contract?.question) || ''
+      const changeType = type
+      const userName = 'user' in change ? change.user?.name ?? '' : ''
+      const userUsername = 'user' in change ? change.user?.username ?? '' : ''
+      const answerText = 'answer' in change ? change.answer?.text ?? '' : ''
+      const betText = 'bet' in change ? betChangeToText(change) : ''
+      return (
+        contractQuestion.toLowerCase().includes(query.toLowerCase()) ||
+        changeType.toLowerCase().includes(query.toLowerCase()) ||
+        (txnTypeToDescription(changeType) || '')
+          .toLowerCase()
+          .includes(query.toLowerCase()) ||
+        answerText.toLowerCase().includes(query.toLowerCase()) ||
+        ((isTxnChange(change) && txnTitle(change)) || '')
+          .toLowerCase()
+          .includes(query.toLowerCase()) ||
+        userName.toLowerCase().includes(query.toLowerCase()) ||
+        userUsername.toLowerCase().includes(query.toLowerCase()) ||
+        betText.toLowerCase().includes(query.toLowerCase())
+      )
+    })
   const pendingCashouts =
     cashouts?.filter((c) => c.txn.gidxStatus === 'Pending')?.length ?? 0
 
@@ -94,15 +97,15 @@ export const BalanceChangeTable = (props: { user: User }) => {
   const relativeDateText = before
     ? `${formatJustDateShort(after)} - ${formatJustDateShort(before)}`
     : after === fourteenDaysAgo
-    ? 'Last 14 days'
-    : `Since ${formatJustDateShort(after)}`
+    ? 'Ultimos 14 dias'
+    : `Desde ${formatJustDateShort(after)}`
 
   return (
     <Col className={'w-full justify-center gap-4 py-1'}>
       <Input
         type={'text'}
         className="w-full"
-        placeholder={'Search your balance changes'}
+        placeholder={'Buscar movimientos'}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
@@ -119,7 +122,7 @@ export const BalanceChangeTable = (props: { user: User }) => {
                 setAfter(dayjs(e.target.value).startOf('day').valueOf())
               }
             />
-            <span className="text-ink-700 text-sm">to</span>
+            <span className="text-ink-700 text-sm">a</span>
             <Input
               type="date"
               className="dark:date-range-input-white text-ink-700 !h-8 w-[120px] !px-2 !py-1 text-sm"
@@ -139,7 +142,7 @@ export const BalanceChangeTable = (props: { user: User }) => {
               size="xs"
               onClick={() => setShowDateFilters(false)}
             >
-              Hide dates
+              Ocultar fechas
             </Button>
           </Row>
         ) : (
@@ -152,7 +155,7 @@ export const BalanceChangeTable = (props: { user: User }) => {
               onClick={() => setShowDateFilters(true)}
             >
               <CalendarIcon className="mr-1 h-4 w-4" />
-              Filter dates
+              Filtrar fechas
             </Button>
           </Row>
         )}
@@ -160,8 +163,8 @@ export const BalanceChangeTable = (props: { user: User }) => {
           <DropdownMenu
             items={[
               {
-                name: `View ${maybePluralize('redemption', cashouts.length)} ${
-                  pendingCashouts > 0 ? `(${pendingCashouts} pending)` : ''
+                name: `Ver ${maybePluralize('retiro', cashouts.length)} ${
+                  pendingCashouts > 0 ? `(${pendingCashouts} pendientes)` : ''
                 }`,
                 onClick: () => setShowCashoutModal(true),
               },
@@ -174,19 +177,19 @@ export const BalanceChangeTable = (props: { user: User }) => {
       {!!before && before < Date.now() && (
         <Row className="text-ink-400 mt-4 items-center justify-center gap-6">
           <div className="border-ink-400 grow border" />
-          <span>Cutoff: {formatJustDateShort(before)}</span>
+          <span>Corte: {formatJustDateShort(before)}</span>
           <span className="flex gap-2">
             <button
               className="text-primary-500 hover:underline"
               onClick={() => setBefore(before + 7 * DAY_MS)}
             >
-              Load 1W
+              Cargar 1s
             </button>
             <button
               className="text-primary-500 hover:underline"
               onClick={() => setBefore(undefined)}
             >
-              Clear
+              Limpiar
             </button>
           </span>
           <div className="border-ink-400 grow border" />
@@ -201,13 +204,13 @@ export const BalanceChangeTable = (props: { user: User }) => {
       />
       <Row className="text-ink-400 mt-4 items-center justify-center gap-6">
         <div className="border-ink-400 grow border" />
-        <span>Cutoff: {formatJustDateShort(after)}</span>
+        <span>Corte: {formatJustDateShort(after)}</span>
         <span className="flex gap-2">
           <button
             className="text-primary-500 hover:underline"
             onClick={() => setAfter(after - 7 * DAY_MS)}
           >
-            Load 1W
+            Cargar 1s
           </button>
           <button
             className="text-primary-500 hover:underline"
@@ -230,9 +233,9 @@ export const BalanceChangeTable = (props: { user: User }) => {
           <table className="w-full">
             <thead>
               <tr>
-                <th className="text-left">Amount</th>
-                <th className="text-left">Date</th>
-                <th className="text-left">Status</th>
+                <th className="text-left">Cantidad</th>
+                <th className="text-left">Fecha</th>
+                <th className="text-left">Estado</th>
               </tr>
             </thead>
             <tbody>
@@ -253,6 +256,12 @@ export const BalanceChangeTable = (props: { user: User }) => {
       </Modal>
     </Col>
   )
+}
+
+function isMexasBalanceChange(change: AnyBalanceChangeType) {
+  if (isBetChange(change)) return change.contract.token === 'MEX'
+  if (isTxnChange(change)) return change.contract?.token === 'MEX'
+  return false
 }
 
 function RenderBalanceChanges(props: {

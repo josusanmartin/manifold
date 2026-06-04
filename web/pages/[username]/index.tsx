@@ -6,55 +6,42 @@ import {
   ViewListIcon,
 } from '@heroicons/react/outline'
 import clsx from 'clsx'
-import { DIVISION_NAMES, getLeaguePath } from 'common/leagues'
 import { getUserForStaticProps } from 'common/supabase/users'
 import { buildArray } from 'common/util/array'
 import { removeUndefinedProps } from 'common/util/object'
 import Head from 'next/head'
-import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import { UserBetsTable } from 'web/components/bet/user-bets-table'
-import { TextButton } from 'web/components/buttons/text-button'
 import { UserSettingButton } from 'web/components/buttons/user-settings-button'
 import { BackButton } from 'web/components/contract/back-button'
-import { FollowList } from 'web/components/follow-list'
 import { JsonLd } from 'web/components/JsonLd'
 import { Col } from 'web/components/layout/col'
-import { Modal } from 'web/components/layout/modal'
 import { Page } from 'web/components/layout/page'
 import { Row } from 'web/components/layout/row'
 import { Spacer } from 'web/components/layout/spacer'
-import { QueryUncontrolledTabs, Tabs } from 'web/components/layout/tabs'
+import { QueryUncontrolledTabs } from 'web/components/layout/tabs'
 import { BalanceChangeTable } from 'web/components/portfolio/balance-change-table'
 import { PortfolioSummary } from 'web/components/portfolio/portfolio-summary'
 import { PortfolioValueSection } from 'web/components/portfolio/portfolio-value-section'
 import { BlockedUser } from 'web/components/profile/blocked-user'
-import { RedeemSweepsButtons } from 'web/components/profile/redeem-sweeps-buttons'
 import { UserContractsList } from 'web/components/profile/user-contracts-list'
-import { UserLikedContractsButton } from 'web/components/profile/user-liked-contracts-button'
-import { UserWatchedContractsButton } from 'web/components/notifications/watched-markets'
 import { SEO } from 'web/components/SEO'
 import { Avatar } from 'web/components/widgets/avatar'
 import { FullscreenConfetti } from 'web/components/widgets/fullscreen-confetti'
 import ImageWithBlurredShadow from 'web/components/widgets/image-with-blurred-shadow'
 import { Linkify } from 'web/components/widgets/linkify'
-import { linkClass } from 'web/components/widgets/site-link'
 import { Title } from 'web/components/widgets/title'
 import { StackedUserNames, UserLink } from 'web/components/widgets/user-link'
 import { useAdminOrMod } from 'web/hooks/use-admin'
-import { useFollowers, useFollows } from 'web/hooks/use-follows'
 import { useHeaderIsStuck } from 'web/hooks/use-header-is-stuck'
 import { useIsMobile } from 'web/hooks/use-is-mobile'
-import { useLeagueInfo } from 'web/hooks/use-leagues'
 import { useSaveReferral } from 'web/hooks/use-save-referral'
 import { usePrivateUser, useUser, useWebsocketUser } from 'web/hooks/use-user'
 import { useUserBans } from 'web/hooks/use-user-bans'
 import { User } from 'web/lib/firebase/users'
 import { buildPersonProfile } from 'web/lib/json-ld'
-import TrophyIcon from 'web/lib/icons/trophy-icon.svg'
 import { db } from 'web/lib/supabase/db'
-import { api } from 'web/lib/api/api'
 import Custom404 from 'web/pages/404'
 import { UserPayments } from 'web/pages/payments'
 
@@ -67,13 +54,17 @@ export const getStaticProps = async (props: {
 
   const user = await getUserForStaticProps(db, username)
 
-  const [contracts, posts] = user
-    ? await Promise.all([
-        db.from('contracts').select('id').eq('creator_id', user.id).limit(1),
-        db.from('old_posts').select('id').eq('creator_id', user.id).limit(1),
-      ])
-    : []
-  const hasCreatedQuestion = contracts?.data?.length || posts?.data?.length
+  const contracts = user
+    ? await db
+        .from('contracts')
+        .select('id')
+        .eq('creator_id', user.id)
+        .eq('data->>token', 'MEX')
+        .eq('mechanism', 'cpmm-1')
+        .eq('outcome_type', 'BINARY')
+        .limit(1)
+    : undefined
+  const hasCreatedQuestion = !!contracts?.data?.length
 
   return {
     props: removeUndefinedProps({
@@ -160,7 +151,6 @@ function UserProfile(props: {
     }
   }, [user.isBannedFromPosting, user.userDeleted, currentUser, user.id])
   const [showConfetti, setShowConfetti] = useState(false)
-  const [followsYou, setFollowsYou] = useState(false)
   const { bans: userBans } = useUserBans(user.id)
   const { ref: titleRef, headerStuck } = useHeaderIsStuck()
 
@@ -196,20 +186,6 @@ function UserProfile(props: {
       { shallow: true }
     )
   }, [router.isReady, router.query.tab])
-
-  useEffect(() => {
-    if (currentUser && currentUser.id !== user.id) {
-      db.from('user_follows')
-        .select('user_id')
-        .eq('follow_id', currentUser.id)
-        .eq('user_id', user.id)
-        .then(({ data }) => {
-          setFollowsYou(
-            data?.some(({ user_id }) => user_id === user.id) ?? false
-          )
-        })
-    }
-  }, [currentUser?.id, user?.id])
 
   const balanceChangesKey = 'balance-changes'
 
@@ -306,7 +282,6 @@ function UserProfile(props: {
                 usernameClassName={'sm:text-base'}
                 className={'font-bold sm:mr-0 sm:text-xl'}
                 user={user}
-                followsYou={followsYou}
                 displayContext="profile_page"
                 bans={userBans}
               />
@@ -331,7 +306,6 @@ function UserProfile(props: {
                 usernameClassName={'sm:text-base'}
                 className={'font-bold sm:mr-0 sm:text-xl'}
                 user={user}
-                followsYou={followsYou}
                 displayContext="profile_page"
                 bans={userBans}
               />
@@ -344,21 +318,12 @@ function UserProfile(props: {
         </Row>
         {expandProfileInfo && (
           <Col className={'mx-4 mt-1 gap-2'}>
-            <ProfilePublicStats user={user} currentUser={currentUser} />
             {user.bio && (
               <div className="sm:text-md mt-1 text-sm">
                 <Linkify text={user.bio}></Linkify>
               </div>
             )}
           </Col>
-        )}
-
-        {isCurrentUser && (
-          <RedeemSweepsButtons
-            user={user}
-            className="m-2 w-48"
-            redeemableCash={user.cashBalance}
-          />
         )}
 
         <Col className="mx-4">
@@ -391,6 +356,7 @@ function UserProfile(props: {
                           defaultTimePeriod={
                             currentUser?.id === user.id ? 'weekly' : 'monthly'
                           }
+                          mexasOnly
                         />
 
                         <div className="text-ink-800 border-ink-300 mx-2 mt-6 gap-2 border-t pt-4 text-xl font-semibold lg:mx-0">
@@ -442,119 +408,5 @@ function UserProfile(props: {
         </Col>
       </Col>
     </Page>
-  )
-}
-
-type FollowsDialogTab = 'following' | 'followers'
-
-function ProfilePublicStats(props: {
-  user: User
-  currentUser: User | undefined | null
-  className?: string
-}) {
-  const { user, className, currentUser } = props
-  const isCurrentUser = user.id === currentUser?.id
-  const [followsOpen, setFollowsOpen] = useState(false)
-  const [followsTab, setFollowsTab] = useState<FollowsDialogTab>('following')
-  const followingIds = useFollows(user.id)
-  const followerIds = useFollowers(user.id)
-  const openFollowsDialog = (tabName: FollowsDialogTab) => {
-    setFollowsOpen(true)
-    setFollowsTab(tabName)
-  }
-
-  const leagueInfo = useLeagueInfo(user.id)
-
-  return (
-    <Row
-      className={clsx(
-        'text-ink-600 flex-wrap items-center gap-x-2 text-sm',
-        className
-      )}
-    >
-      <TextButton onClick={() => openFollowsDialog('following')}>
-        <span className={clsx('font-semibold')}>
-          {followingIds?.length ?? ''}
-        </span>{' '}
-        Siguiendo
-      </TextButton>
-      <TextButton onClick={() => openFollowsDialog('followers')}>
-        <span className={clsx('font-semibold')}>
-          {followerIds?.length ?? ''}
-        </span>{' '}
-        Seguidores
-      </TextButton>
-
-      {isCurrentUser && <UserLikedContractsButton user={user} />}
-      {isCurrentUser && <UserWatchedContractsButton user={user} />}
-
-      {leagueInfo && (
-        <Link
-          className={linkClass}
-          href={getLeaguePath(
-            leagueInfo.season,
-            leagueInfo.division,
-            leagueInfo.cohort,
-            user.id
-          )}
-        >
-          <TrophyIcon className="mb-1 mr-1 inline h-4 w-4" />
-          <span className={clsx('font-semibold')}>
-            {DIVISION_NAMES[leagueInfo.division ?? '']}
-          </span>{' '}
-          Puesto {leagueInfo.rank}
-        </Link>
-      )}
-
-      {/* {isCurrentUser && (
-        <Link href={`/${user.username}/partner`} className={linkClass}>
-          <FaCrown className="mb-1 mr-1 inline h-4 w-4" />
-          Partner
-        </Link>
-      )} */}
-
-      <FollowsDialog
-        user={user}
-        defaultTab={followsTab}
-        followingIds={followingIds}
-        followerIds={followerIds}
-        isOpen={followsOpen}
-        setIsOpen={setFollowsOpen}
-      />
-    </Row>
-  )
-}
-
-function FollowsDialog(props: {
-  user: User
-  followingIds: string[] | undefined
-  followerIds: string[] | undefined
-  defaultTab: FollowsDialogTab
-  isOpen: boolean
-  setIsOpen: (isOpen: boolean) => void
-}) {
-  const { user, followingIds, followerIds, defaultTab, isOpen, setIsOpen } =
-    props
-
-  return (
-    <Modal open={isOpen} setOpen={setIsOpen}>
-      <Col className="bg-canvas-0 max-h-[90vh] rounded pt-6">
-        <div className="px-6 pb-1 text-center text-xl">{user.name}</div>
-        <Tabs
-          className="mx-6"
-          tabs={[
-            {
-              title: 'Siguiendo',
-              content: <FollowList userIds={followingIds} />,
-            },
-            {
-              title: 'Seguidores',
-              content: <FollowList userIds={followerIds} />,
-            },
-          ]}
-          defaultIndex={defaultTab === 'following' ? 0 : 1}
-        />
-      </Col>
-    </Modal>
   )
 }

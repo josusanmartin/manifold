@@ -4,7 +4,7 @@ import { getUserPortfolioInternal } from 'shared/get-user-portfolio-internal'
 export const getUserPortfolio: APIHandler<'get-user-portfolio'> = async (
   props
 ) => {
-  return await getUserPortfolioInternal(props.userId)
+  return await getUserPortfolioInternal(props.userId, props.mexasOnly)
 }
 
 // Below is the start of the calculation of investment value in just sql.

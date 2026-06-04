@@ -34,7 +34,6 @@ import { PencilIcon } from '@heroicons/react/solid'
 import { useLiveContract } from 'web/hooks/use-contract'
 import { getContracts } from 'common/supabase/contracts'
 import { db } from 'web/lib/supabase/db'
-import { SweepiesCoin } from 'web/public/custom-components/sweepiesCoin'
 import { linkClass } from '../widgets/site-link'
 import { DocumentDuplicateIcon } from '@heroicons/react/outline'
 
@@ -83,13 +82,16 @@ export function LimitOrdersTable(props: {
       includeExpired,
       includeFilled,
       includeCancelled,
+      mexasOnly: true,
     }
   )
   const [limitUpdates, setLimitUpdates] = useState<LimitBet[]>([])
   listenToUserOrders(user.id, setLimitUpdates, true)
   const allLimitBets = uniqBy([...limitUpdates, ...(data?.bets ?? [])], 'id')
   const [missingContracts, setMissingContracts] = useState<MarketContract[]>([])
-  const contracts = [...(data?.contracts ?? []), ...missingContracts]
+  const contracts = [...(data?.contracts ?? []), ...missingContracts].filter(
+    isMexasOrderBookOnlyContract
+  )
   useEffect(() => {
     const missingContractIds = limitUpdates
       .map((b) => b.contractId)
@@ -358,7 +360,6 @@ export function LimitOrdersTable(props: {
                   />
                 </span>
                 <span className="text-ink-600 line-clamp-1">
-                  {contract.token == 'CASH' && <SweepiesCoin />}
                   {contract.question}
                 </span>
               </Link>

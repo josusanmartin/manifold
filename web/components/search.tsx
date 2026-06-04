@@ -27,6 +27,7 @@ import { TopLevelPost } from 'common/top-level-post'
 import { SEARCH_TOPICS_TO_SUBTOPICS } from 'common/topics'
 import { removeEmojis } from 'common/util/string'
 import { DAY_MS } from 'common/util/time'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { isEqual } from 'lodash'
 import { LoadMoreUntilNotVisible } from 'web/components/widgets/visibility-observer'
 import { useAPIGetter } from 'web/hooks/use-api-getter'
@@ -179,6 +180,7 @@ export type SupabaseAdditionalFilter = {
   excludeContractIds?: string[]
   excludeGroupSlugs?: string[]
   excludeUserIds?: string[]
+  mexasOnly?: boolean
 }
 
 export type SearchState = {
@@ -967,6 +969,7 @@ export const useSearchResults = (props: {
 
       const shouldSearchPostsWithContracts =
         SORTS_MIXING_POSTS_AND_MARKETS.includes(sort) &&
+        !additionalFilter?.mexasOnly &&
         (!contractsOnly || !!state.posts?.length) &&
         !topicSlug &&
         forYou === '0' &&
@@ -1001,6 +1004,21 @@ export const useSearchResults = (props: {
         }
         try {
           if (contractType === 'POSTS') {
+            if (additionalFilter?.mexasOnly) {
+              setState({
+                contracts: [],
+                users: undefined,
+                topics: undefined,
+                posts: [],
+                shouldLoadMore: false,
+              })
+              if (freshQuery) {
+                setLastSearchParams(searchParams)
+              }
+              clearTimeout(timeoutId)
+              setLoading(false)
+              return false
+            }
             const posts = await api('get-posts', postApiParams)
             const shouldLoadMore = posts.length === postApiParams.limit
             setState({
@@ -1207,6 +1225,7 @@ export const useSearchResults = (props: {
     ? uniqBy(
         state.contracts.filter((c) => {
           return (
+            (!additionalFilter?.mexasOnly || isMexasOrderBookOnlyContract(c)) &&
             !additionalFilter?.excludeContractIds?.includes(c.id) &&
             !additionalFilter?.excludeGroupSlugs?.some((slug) =>
               c.groupSlugs?.includes(slug)
@@ -1226,7 +1245,7 @@ export const useSearchResults = (props: {
     shouldLoadMore: state.shouldLoadMore,
     loadMoreContracts: () => querySearchResults(false, true),
     refreshContracts: () => querySearchResults(true, true),
-    posts: state.posts,
+    posts: additionalFilter?.mexasOnly ? [] : state.posts,
   }
 }
 

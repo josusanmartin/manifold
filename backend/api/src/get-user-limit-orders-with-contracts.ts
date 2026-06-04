@@ -7,9 +7,20 @@ import { convertBet } from 'common/supabase/bets'
 export const getUserLimitOrdersWithContracts: APIHandler<
   'get-user-limit-orders-with-contracts'
 > = async (props) => {
-  const { count, userId, includeExpired, includeCancelled, includeFilled } =
-    props
+  const {
+    count,
+    userId,
+    includeExpired,
+    includeCancelled,
+    includeFilled,
+    mexasOnly,
+  } = props
   const pg = createSupabaseDirectClient()
+  const mexasOnlySQL = mexasOnly
+    ? `where coalesce(contracts.data->>'token', contracts.token) = 'MEX'
+       and contracts.mechanism = 'cpmm-1'
+       and contracts.outcome_type = 'BINARY'`
+    : ''
   const contracts = [] as MarketContract[]
   const bets = [] as LimitBet[]
   await pg.map(
@@ -41,6 +52,7 @@ export const getUserLimitOrdersWithContracts: APIHandler<
     group by contract_id
   ) as bets
   join contracts on contracts.id = bets.contract_id
+  ${mexasOnlySQL}
   limit $2
   `,
     [userId, count, includeExpired, includeFilled, includeCancelled],

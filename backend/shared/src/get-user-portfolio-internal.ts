@@ -10,8 +10,12 @@ import {
   calculateNewPortfolioMetricsWithContractMetrics,
   getUnresolvedContractMetricsContractsAnswers,
 } from './update-user-portfolio-histories-core'
+import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 
-export const getUserPortfolioInternal = async (userId: string) => {
+export const getUserPortfolioInternal = async (
+  userId: string,
+  mexasOnly = false
+) => {
   const user = await getUser(userId)
   if (!user) {
     throw new APIError(404, 'User not found')
@@ -19,8 +23,26 @@ export const getUserPortfolioInternal = async (userId: string) => {
 
   const pg = createSupabaseDirectClient()
   const startTime = Date.now()
-  const { metrics, contracts, answers } =
+  const {
+    metrics: allMetrics,
+    contracts: allContracts,
+    answers: allAnswers,
+  } =
     await getUnresolvedContractMetricsContractsAnswers(pg, [userId])
+  const mexasContractIds = new Set(
+    allContracts
+      .filter((contract) => isMexasOrderBookOnlyContract(contract))
+      .map((contract) => contract.id)
+  )
+  const contracts = mexasOnly
+    ? allContracts.filter((contract) => mexasContractIds.has(contract.id))
+    : allContracts
+  const metrics = mexasOnly
+    ? allMetrics.filter((metric) => mexasContractIds.has(metric.contractId))
+    : allMetrics
+  const answers = mexasOnly
+    ? allAnswers.filter((answer) => mexasContractIds.has(answer.contractId))
+    : allAnswers
   log(`Loaded ${metrics.length} metrics.`)
   log(`Loaded ${contracts.length} contracts and ${answers.length} answers.`)
 

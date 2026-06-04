@@ -9,18 +9,22 @@ import { api } from 'web/lib/api/api'
 export type PeriodToSnapshots = {
   [time: number]: PortfolioSnapshot[]
 }
-export const usePortfolioHistory = (userId: string, period: Period) => {
+export const usePortfolioHistory = (
+  userId: string,
+  period: Period,
+  mexasOnly = false
+) => {
   const cutoff = getCutoff(period)
   const [portfolioHistories, setPortfolioHistories] =
     usePersistentInMemoryState<PeriodToSnapshots>(
       {},
-      `user-portfolio-history-${userId}`
+      `user-portfolio-history-${userId}-${mexasOnly ? 'mexas' : 'all'}`
     )
 
   useEffect(() => {
     if (portfolioHistories[cutoff]) return
 
-    api('get-user-portfolio-history', { userId, period })
+    api('get-user-portfolio-history', { userId, period, mexasOnly })
       .then((portfolioHistory) => {
         setPortfolioHistories((prev) => ({
           ...prev,
@@ -30,7 +34,7 @@ export const usePortfolioHistory = (userId: string, period: Period) => {
       .catch((e) => {
         console.error('Failed to get portfolio history', e)
       })
-  }, [userId, setPortfolioHistories, cutoff])
+  }, [userId, setPortfolioHistories, cutoff, mexasOnly])
 
   return portfolioHistories[cutoff] as PortfolioSnapshot[] | undefined
 }

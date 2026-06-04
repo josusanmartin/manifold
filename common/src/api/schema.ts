@@ -534,6 +534,7 @@ export const API = (_apiTypeCheck = {
         includeExpired: coerceBoolean.optional().default(false),
         includeCancelled: coerceBoolean.optional().default(false),
         includeFilled: coerceBoolean.optional().default(false),
+        mexasOnly: coerceBoolean.optional().default(false),
       })
       .strict(),
   },
@@ -1742,6 +1743,7 @@ export const API = (_apiTypeCheck = {
         before: z.coerce.number().optional(),
         after: z.coerce.number().default(0),
         userId: z.string(),
+        mexasOnly: coerceBoolean.optional().default(false),
       })
       .strict(),
   },
@@ -1896,6 +1898,7 @@ export const API = (_apiTypeCheck = {
     cache: LIGHT_CACHE_STRATEGY,
     props: z.object({
       userId: z.string(),
+      mexasOnly: coerceBoolean.optional().default(false),
     }),
     returns: {} as LivePortfolioMetrics,
   },
@@ -1907,6 +1910,7 @@ export const API = (_apiTypeCheck = {
     props: z.object({
       userId: z.string(),
       period: z.enum(PERIODS),
+      mexasOnly: coerceBoolean.optional().default(false),
     }),
     returns: {} as PortfolioMetrics[],
   },
@@ -2681,6 +2685,7 @@ export const API = (_apiTypeCheck = {
         offset: z.coerce.number().gte(0).optional(),
         perAnswer: coerceBoolean.optional(),
         order: z.enum(['lastBetTime', 'profit']).optional(),
+        mexasOnly: coerceBoolean.optional().default(false),
       })
       .strict(),
   },

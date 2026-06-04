@@ -720,6 +720,36 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('keeps profile tabs and wallet payments on the Spanish MEXAS surface', () => {
     const profileSource = readRepoFile('web/pages/[username]/index.tsx')
+    const userContractsSource = readRepoFile(
+      'web/components/profile/user-contracts-list.tsx'
+    )
+    const userBetsSource = readRepoFile(
+      'web/components/bet/user-bets-table.tsx'
+    )
+    const limitOrdersSource = readRepoFile(
+      'web/components/bet/limit-orders-table.tsx'
+    )
+    const balanceChangesSource = readRepoFile(
+      'web/components/portfolio/balance-change-table.tsx'
+    )
+    const portfolioSummarySource = readRepoFile(
+      'web/components/portfolio/portfolio-summary.tsx'
+    )
+    const portfolioValueSource = readRepoFile(
+      'web/components/portfolio/portfolio-value-section.tsx'
+    )
+    const metricsApiSource = readRepoFile(
+      'backend/api/src/get-user-contract-metrics-with-contracts.ts'
+    )
+    const limitOrdersApiSource = readRepoFile(
+      'backend/api/src/get-user-limit-orders-with-contracts.ts'
+    )
+    const balanceChangesApiSource = readRepoFile(
+      'backend/api/src/get-balance-changes.ts'
+    )
+    const portfolioApiSource = readRepoFile(
+      'backend/shared/src/get-user-portfolio-internal.ts'
+    )
     const paymentsSource = readRepoFile('web/pages/payments.tsx')
     const smokeSource = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'
@@ -739,9 +769,15 @@ describe('MEXAS flow safety guardrails', () => {
       "title: 'Movimientos'",
       "title: 'Wallet'",
     ])
-    expect(profileSource).toContain('Puesto {leagueInfo.rank}')
-    expect(profileSource).toContain("title: 'Siguiendo'")
-    expect(profileSource).toContain("title: 'Seguidores'")
+    expect(profileSource).toContain(".eq('data->>token', 'MEX')")
+    expect(profileSource).toContain('mexasOnly')
+    expect(profileSource).not.toContain('old_posts')
+    expect(profileSource).not.toContain('ProfilePublicStats')
+    expect(profileSource).not.toContain('RedeemSweepsButtons')
+    expect(profileSource).not.toContain('user_follows')
+    expect(profileSource).not.toContain('Puesto {leagueInfo.rank}')
+    expect(profileSource).not.toContain("title: 'Siguiendo'")
+    expect(profileSource).not.toContain("title: 'Seguidores'")
     expect(profileSource).not.toContain("title: 'Following'")
     expect(profileSource).not.toContain("title: 'Followers'")
     expect(profileSource).not.toContain('Rank {leagueInfo.rank}')
@@ -756,6 +792,37 @@ describe('MEXAS flow safety guardrails', () => {
     expect(profileSource).not.toContain('getUserRating')
     expect(profileSource).not.toContain('getAverageUserRating')
     expect(profileSource).not.toContain('isUserLikelySpammer')
+    expect(userContractsSource).toContain(
+      'additionalFilter: { creatorId: creator.id, mexasOnly: true }'
+    )
+    expect(userContractsSource).toContain(".eq('data->>token', 'MEX')")
+    expect(userContractsSource).not.toContain('ContractFilters')
+    expect(userContractsSource).not.toContain('CreateQuestionButton')
+    expect(userContractsSource).not.toContain('UserReviews')
+    expect(userBetsSource).toContain('mexasOnly: true')
+    expect(userBetsSource).toContain('.filter(isMexasOrderBookOnlyContract)')
+    expect(userBetsSource).not.toContain('Sweepcash')
+    expect(limitOrdersSource).toContain('mexasOnly: true')
+    expect(limitOrdersSource).toContain(
+      '.filter(\n    isMexasOrderBookOnlyContract\n  )'
+    )
+    expect(balanceChangesSource).toContain('mexasOnly: true')
+    expect(balanceChangesSource).toContain('filter(isMexasBalanceChange)')
+    expect(portfolioSummarySource).toContain('mexasOnly: true')
+    expect(portfolioSummarySource).not.toContain('topicSlug="recent"')
+    expect(portfolioValueSource).toContain('mexasOnly = false')
+    expect(metricsApiSource).toContain(
+      "coalesce(c.data->>'token', c.token) = 'MEX'"
+    )
+    expect(limitOrdersApiSource).toContain(
+      "coalesce(contracts.data->>'token', contracts.token) = 'MEX'"
+    )
+    expect(balanceChangesApiSource).toContain(
+      "coalesce(c.data->>'token', c.token) = 'MEX'"
+    )
+    expect(portfolioApiSource).toContain(
+      '.filter((contract) => isMexasOrderBookOnlyContract(contract))'
+    )
     expectMarkersInOrder(smokeSource, [
       "path: '/josusanmartin?tab=comments'",
       "destination: '/josusanmartin?tab=summary'",

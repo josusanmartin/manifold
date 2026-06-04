@@ -59,6 +59,7 @@ export const PortfolioValueSection = memo(
     portfolio?: LivePortfolioMetrics
     graphContainerClassName?: string
     size?: 'sm' | 'md'
+    mexasOnly?: boolean
   }) {
     const {
       user,
@@ -66,11 +67,16 @@ export const PortfolioValueSection = memo(
       portfolio,
       graphContainerClassName,
       size = 'md',
+      mexasOnly = false,
     } = props
     const [currentTimePeriod, setCurrentTimePeriod] =
       useState<Period>(defaultTimePeriod)
 
-    const portfolioHistory = usePortfolioHistory(user.id, currentTimePeriod)
+    const portfolioHistory = usePortfolioHistory(
+      user.id,
+      currentTimePeriod,
+      mexasOnly
+    )
 
     const [portfolioFocus, setPortfolioFocus] = useState<PortfolioMode>('all')
 
