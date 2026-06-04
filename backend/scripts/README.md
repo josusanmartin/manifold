@@ -153,16 +153,20 @@ interactively before using the production URL. The script installs
 already available in local `node_modules`, so it does not add browser binaries
 to Vercel production installs.
 
-When running the browser smoke locally, load the repo `.env` after the pulled
-Vercel env files. The Vercel local env files can contain empty placeholders for
-server-only Supabase secrets, while `.env` holds the local service key used by
-the API routes:
+When running the browser smoke locally, refresh the root Vercel production env
+file first, rebuild, then load the repo `.env` after the pulled Vercel env.
+The pulled Vercel file can contain empty placeholders for server-only Supabase
+secrets, while `.env` holds the local service key used by the API routes. Do
+not source `web/.vercel/.env.production.local`; that nested copy can be stale.
 
 ```shell
+$ COREPACK_ENABLE_STRICT=0 npx vercel pull --yes --environment=production
+$ COREPACK_ENABLE_STRICT=0 npx vercel build --prod
 $ cd web
-$ set -a; [ -f ../.vercel/.env.production.local ] && . ../.vercel/.env.production.local; [ -f .vercel/.env.production.local ] && . .vercel/.env.production.local; [ -f ../.env ] && . ../.env; set +a
+$ set -a; [ -f ../.vercel/.env.production.local ] && . ../.vercel/.env.production.local; [ -f ../.env ] && . ../.env; set +a
 $ COREPACK_ENABLE_STRICT=0 yarn next start -p 3053
 $ MEXAS_SITE_URL=http://127.0.0.1:3053 yarn --cwd ../backend/scripts check:mexas-browser
+$ MEXAS_SITE_URL=http://127.0.0.1:3053 yarn --cwd ../backend/scripts check:mexas-smoke
 ```
 
 For an isolated SQL integration audit of the MEXAS orderbook matcher, run:
