@@ -5,6 +5,7 @@ import {
   getTotalMexasRemainingReservedAmount,
   getUnbackedMexasOrderIds,
   hasMexasEscrowedStake,
+  hasInactiveMexasOrderDataFlags,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
 import { getMexasOrderReleaseCreditKey } from 'common/mexas-resolution'
@@ -612,7 +613,11 @@ async function loadOpenReservedMexasOrderRows(
     const { data, error } = await query
     if (error) throw error
 
-    rows.push(...((data ?? []) as Row<'contract_bets'>[]))
+    rows.push(
+      ...((data ?? []) as Row<'contract_bets'>[]).filter(
+        (row) => !hasInactiveMexasOrderDataFlags(getBetData(row))
+      )
+    )
     if ((data ?? []).length < OPEN_RESERVED_ORDER_PAGE_SIZE) break
   }
 

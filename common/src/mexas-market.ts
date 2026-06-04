@@ -20,6 +20,9 @@ export type MexasReservedOrderData = {
   createdTime?: number
   amount?: number
   orderAmount?: number
+  isCancelled?: boolean
+  isFilled?: boolean
+  isRedemption?: boolean
   mexasReservedAmount?: number
   mexasFundsReserved?: boolean
   mexasFundsReleased?: boolean
@@ -39,6 +42,19 @@ export type MexasReservedOrderData = {
 
 export function hasActiveMexasReservation(order: MexasReservedOrderData) {
   return order.mexasFundsReserved === true && order.mexasFundsReleased !== true
+}
+
+export function hasInactiveMexasOrderDataFlags(
+  order: Pick<
+    MexasReservedOrderData,
+    'isCancelled' | 'isFilled' | 'isRedemption'
+  >
+) {
+  return (
+    order.isCancelled === true ||
+    order.isFilled === true ||
+    order.isRedemption === true
+  )
 }
 
 export function hasActiveMexasWalletReservation(order: MexasReservedOrderData) {

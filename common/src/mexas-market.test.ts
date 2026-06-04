@@ -5,6 +5,7 @@ import {
   hasActiveMexasWalletReservation,
   hasMexasEscrowCaptureMetadata,
   hasMexasEscrowedStake,
+  hasInactiveMexasOrderDataFlags,
   isMexasTestUnwound,
   isMexasOrderBookOnlyContract,
   getTotalMexasRemainingReservedAmount,
@@ -93,6 +94,23 @@ describe('MEXAS reserved order backing', () => {
     expect(getUnbackedMexasOrderIds([active, released, unreserved], 0)).toEqual(
       ['active']
     )
+  })
+
+  test('detects inactive lifecycle flags from raw order data', () => {
+    expect(hasInactiveMexasOrderDataFlags(order({ id: 'active' }))).toBe(false)
+    expect(
+      hasInactiveMexasOrderDataFlags(
+        order({ id: 'cancelled', isCancelled: true })
+      )
+    ).toBe(true)
+    expect(
+      hasInactiveMexasOrderDataFlags(order({ id: 'filled', isFilled: true }))
+    ).toBe(true)
+    expect(
+      hasInactiveMexasOrderDataFlags(
+        order({ id: 'redemption', isRedemption: true })
+      )
+    ).toBe(true)
   })
 
   test('excludes escrowed stake from wallet reservation backing', () => {

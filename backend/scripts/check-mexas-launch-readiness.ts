@@ -12,6 +12,7 @@ import {
 import { MEXAS_PUBLIC_RPC_URL, MEXAS_TOKEN } from 'common/crypto/mexas'
 import {
   hasActiveMexasWalletReservation,
+  hasInactiveMexasOrderDataFlags,
   hasMexasEscrowCaptureMetadata,
   hasMexasEscrowedStake,
   getMexasRemainingReservedAmount,
@@ -917,6 +918,7 @@ async function loadOpenReservedMexasOrders(
     if (error) throw error
 
     for (const row of (data ?? []) as Row<'contract_bets'>[]) {
+      if (hasInactiveMexasOrderDataFlags(getRowData(row))) continue
       const bet = convertBet(row)
       if ((bet as any).mexasFundsReleased === true) continue
       if (!hasActiveMexasWalletReservation(bet as any)) continue
@@ -991,6 +993,7 @@ async function loadOpenMexasLimitOrders(
     if (error) throw error
 
     for (const row of (data ?? []) as Row<'contract_bets'>[]) {
+      if (hasInactiveMexasOrderDataFlags(getRowData(row))) continue
       const bet = convertBet(row)
       if (bet.answerId) continue
       if (bet.outcome !== 'YES' && bet.outcome !== 'NO') continue
@@ -1051,6 +1054,7 @@ async function loadUnsafeOpenMexasLimitOrders(
     if (error) throw error
 
     for (const row of (data ?? []) as Row<'contract_bets'>[]) {
+      if (hasInactiveMexasOrderDataFlags(getRowData(row))) continue
       const bet = convertBet(row)
       if (bet.answerId) continue
       if (bet.outcome !== 'YES' && bet.outcome !== 'NO') continue
@@ -1104,6 +1108,7 @@ async function loadOpenEscrowedMexasLimitOrders(
     if (error) throw error
 
     for (const row of (data ?? []) as Row<'contract_bets'>[]) {
+      if (hasInactiveMexasOrderDataFlags(getRowData(row))) continue
       const bet = convertBet(row)
       if (bet.answerId) continue
       if (bet.outcome !== 'YES' && bet.outcome !== 'NO') continue
@@ -1154,6 +1159,7 @@ async function loadOpenWalletReservedMexasLimitOrders(
     if (error) throw error
 
     for (const row of (data ?? []) as Row<'contract_bets'>[]) {
+      if (hasInactiveMexasOrderDataFlags(getRowData(row))) continue
       const bet = convertBet(row)
       if (bet.answerId) continue
       if (bet.outcome !== 'YES' && bet.outcome !== 'NO') continue

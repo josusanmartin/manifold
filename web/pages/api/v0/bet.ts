@@ -6,6 +6,7 @@ import { MarketContract } from 'common/contract'
 import {
   getMexasRemainingReservedAmount,
   getMexasSyncedAvailableBalance,
+  hasInactiveMexasOrderDataFlags,
   hasMexasEscrowedStake,
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
@@ -126,6 +127,13 @@ function getUserData(row: Row<'users'> | null) {
 function getContractData(row: Row<'contracts'> | null) {
   const data = row?.data
   return data && typeof data === 'object' && !Array.isArray(data) ? data : {}
+}
+
+function getBetData(row: Row<'contract_bets'> | null) {
+  const data = row?.data
+  return data && typeof data === 'object' && !Array.isArray(data)
+    ? (data as Record<string, unknown>)
+    : {}
 }
 
 function getPrivyWalletAddress(row: Row<'users'> | null) {
@@ -679,6 +687,7 @@ async function loadMexasCrossingOrderRows(
   }
 
   const rows = data
+    .filter((row) => !hasInactiveMexasOrderDataFlags(getBetData(row)))
     .map((row) => ({
       row: row as Row<'contract_bets'>,
       bet: convertBet(row as Row<'contract_bets'>),

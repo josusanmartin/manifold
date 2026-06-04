@@ -1,7 +1,10 @@
 import { API } from 'common/api/schema'
 import { APIError } from 'common/api/utils'
 import type { Bet } from 'common/bet'
-import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
+import {
+  hasInactiveMexasOrderDataFlags,
+  isMexasOrderBookOnlyContract,
+} from 'common/mexas-market'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import {
@@ -46,6 +49,13 @@ function normalizeQuery(query: NextApiRequest['query']) {
     delete normalized['contractId[]']
   }
   return normalized
+}
+
+function getBetData(row: Row<'contract_bets'> | null) {
+  const data = row?.data
+  return data && typeof data === 'object' && !Array.isArray(data)
+    ? (data as Record<string, unknown>)
+    : {}
 }
 
 async function getContractIdFromSlug(db: SupabaseClient, slug: string) {
@@ -197,7 +207,11 @@ export default async function handler(
 
     return res
       .status(200)
-      .json((data ?? []).map((row) => convertBet(row as Row<'contract_bets'>)))
+      .json(
+        ((data ?? []) as Row<'contract_bets'>[])
+          .filter((row) => !hasInactiveMexasOrderDataFlags(getBetData(row)))
+          .map((row) => convertBet(row))
+      )
   } catch (error) {
     console.error('MEXAS bets fetch failed', error)
 

@@ -1056,10 +1056,12 @@ describe('MEXAS flow safety guardrails', () => {
     )
 
     expectMarkersInOrder(apiSource, [
+      'hasInactiveMexasOrderDataFlags,',
       'async function loadMexasCrossingOrderRows',
       'takerUserId: string',
       ".eq('data->>mexasFundsReserved', 'true')",
       ".eq('data->>mexasFundsReleased', 'false')",
+      '.filter((row) => !hasInactiveMexasOrderDataFlags(getBetData(row)))',
       'bet.userId !== takerUserId',
       'isMexasExecutableLimitOrder(',
       'executionMode',
@@ -1074,6 +1076,45 @@ describe('MEXAS flow safety guardrails', () => {
       'takerUserId,',
     ])
     expect(sqlSource).toContain('and b.user_id <> v_taker.user_id')
+  })
+
+  test('filters JSON-inactive MEXAS orders before converting rows into visible liquidity', () => {
+    const marketSource = readRepoFile('common/src/mexas-market.ts')
+    const betSource = readRepoFile('web/pages/api/v0/bet.ts')
+    const orderBookSource = readRepoFile('web/pages/api/mexas-order-book.ts')
+    const betsSource = readRepoFile('web/pages/api/v0/bets.ts')
+    const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')
+
+    expectMarkersInOrder(marketSource, [
+      'isCancelled?: boolean',
+      'isFilled?: boolean',
+      'isRedemption?: boolean',
+      'export function hasInactiveMexasOrderDataFlags',
+      'order.isCancelled === true',
+      'order.isFilled === true',
+      'order.isRedemption === true',
+    ])
+    expectMarkersInOrder(betSource, [
+      'function getBetData',
+      'async function loadMexasCrossingOrderRows',
+      '.filter((row) => !hasInactiveMexasOrderDataFlags(getBetData(row)))',
+      'convertBet(row as Row',
+    ])
+    expectMarkersInOrder(orderBookSource, [
+      'function getBetData',
+      '.filter((row) => !hasInactiveMexasOrderDataFlags(getBetData(row)))',
+      '.map((row) => convertBet(row))',
+    ])
+    expectMarkersInOrder(betsSource, [
+      'function getBetData',
+      '.filter((row) => !hasInactiveMexasOrderDataFlags(getBetData(row)))',
+      '.map((row) => convertBet(row))',
+    ])
+    expectMarkersInOrder(ordersSource, [
+      'async function loadOpenReservedMexasOrderRows',
+      '(row) => !hasInactiveMexasOrderDataFlags(getBetData(row))',
+      '.map((row) => convertBet(row) as LimitBet & MexasReservedOrderData)',
+    ])
   })
 
   test('blocks MEXAS crossing orders unless escrow capture readiness is enabled', () => {
@@ -2780,6 +2821,12 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('funds not reserved')
     expect(source).toContain('funds already released')
     expect(source).toContain('funds release flag missing')
+    expect(
+      countOccurrences(
+        source,
+        'hasInactiveMexasOrderDataFlags(getRowData(row))'
+      )
+    ).toBeGreaterThanOrEqual(5)
   })
 
   test('launch readiness fails unresolved MEXAS markets with lock residue', () => {
@@ -3198,6 +3245,7 @@ describe('MEXAS flow safety guardrails', () => {
       ".eq('is_cancelled', false)",
       ".eq('data->>mexasFundsReserved', 'true')",
       ".eq('data->>mexasFundsReleased', 'false')",
+      'hasInactiveMexasOrderDataFlags(getRowData(row))',
       'hasActiveMexasWalletReservation(bet)',
       'function printPlan',
       'async function applyCancellation',

@@ -1,5 +1,6 @@
 import { LimitBet, type Bet } from 'common/bet'
 import {
+  hasInactiveMexasOrderDataFlags,
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
@@ -43,6 +44,13 @@ function getSupabaseAdminClient() {
 
 function getSingleQueryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
+}
+
+function getBetData(row: Row<'contract_bets'> | null) {
+  const data = row?.data
+  return data && typeof data === 'object' && !Array.isArray(data)
+    ? (data as Record<string, unknown>)
+    : {}
 }
 
 async function getMexasOrderExecutionMode(
@@ -186,6 +194,7 @@ export default async function handler(
 
     const bets = getBestOpenMexasOrders(
       rows
+        .filter((row) => !hasInactiveMexasOrderDataFlags(getBetData(row)))
         .map((row) => convertBet(row))
         .filter((bet): bet is LimitBet =>
           isVisibleMexasLimitOrder(bet, executionMode)

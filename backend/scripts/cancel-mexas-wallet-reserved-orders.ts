@@ -6,6 +6,7 @@ import { LimitBet } from 'common/bet'
 import {
   getMexasRemainingReservedAmount,
   hasActiveMexasWalletReservation,
+  hasInactiveMexasOrderDataFlags,
   isMexasOrderBookOnlyContract,
   type MexasReservedOrderData,
 } from 'common/mexas-market'
@@ -25,6 +26,13 @@ type WalletReservedOrder = {
   bet: LimitBet & MexasReservedOrderData
   contractQuestion: string
   row: Row<'contract_bets'>
+}
+
+function getRowData(row: { data: unknown } | null) {
+  const data = row?.data
+  return data && typeof data === 'object' && !Array.isArray(data)
+    ? (data as Record<string, unknown>)
+    : {}
 }
 
 function compactDiagnosticText(text: string) {
@@ -205,6 +213,7 @@ async function loadActiveWalletReservedOrders(db: SupabaseClient) {
       }
 
       for (const row of (data ?? []) as Row<'contract_bets'>[]) {
+        if (hasInactiveMexasOrderDataFlags(getRowData(row))) continue
         const bet = convertBet(row) as LimitBet & MexasReservedOrderData
         if (bet.answerId) continue
         if (bet.outcome !== 'YES' && bet.outcome !== 'NO') continue
