@@ -178,8 +178,11 @@ begin
       and b.bet_id <> v_taker.bet_id
       and b.user_id <> v_taker.user_id
       and coalesce(b.is_cancelled, false) = false
+      and coalesce((b.data ->> 'isCancelled')::boolean, false) = false
       and coalesce(b.is_filled, false) = false
+      and coalesce((b.data ->> 'isFilled')::boolean, false) = false
       and coalesce(b.is_redemption, false) = false
+      and coalesce((b.data ->> 'isRedemption')::boolean, false) = false
       and (b.expires_at is null or b.expires_at > v_now_ts)
       and b.data ->> 'answerId' is null
       and b.data ->> 'limitProb' is not null
@@ -369,7 +372,9 @@ begin
     where
       b.user_id = v_maker.user_id
       and coalesce(b.is_cancelled, false) = false
+      and coalesce((b.data ->> 'isCancelled')::boolean, false) = false
       and coalesce(b.is_filled, false) = false
+      and coalesce((b.data ->> 'isFilled')::boolean, false) = false
       and (b.expires_at is null or b.expires_at > v_now_ts)
       and b.data ->> 'orderAmount' is not null
       and coalesce((b.data ->> 'mexasFundsReserved')::boolean, false) = true
@@ -505,7 +510,9 @@ begin
   where
     b.user_id = v_taker.user_id
     and coalesce(b.is_cancelled, false) = false
+    and coalesce((b.data ->> 'isCancelled')::boolean, false) = false
     and coalesce(b.is_filled, false) = false
+    and coalesce((b.data ->> 'isFilled')::boolean, false) = false
     and (b.expires_at is null or b.expires_at > v_now_ts)
     and b.data ->> 'orderAmount' is not null
     and coalesce((b.data ->> 'mexasFundsReserved')::boolean, false) = true

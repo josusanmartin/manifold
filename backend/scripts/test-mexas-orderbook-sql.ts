@@ -323,6 +323,9 @@ async function seedOrder(
     expiresAt?: Date
     fundsReleased?: boolean
     id: string
+    dataIsCancelled?: boolean
+    dataIsFilled?: boolean
+    dataIsRedemption?: boolean
     isCancelled?: boolean
     isFilled?: boolean
     limitProb: number
@@ -342,9 +345,9 @@ async function seedOrder(
     outcome: params.outcome,
     orderAmount: params.orderAmount,
     limitProb: params.limitProb,
-    isFilled: params.isFilled ?? false,
-    isCancelled: params.isCancelled ?? false,
-    isRedemption: false,
+    isFilled: params.dataIsFilled ?? params.isFilled ?? false,
+    isCancelled: params.dataIsCancelled ?? params.isCancelled ?? false,
+    isRedemption: params.dataIsRedemption ?? false,
     fills: [],
     mexasFundsReserved: true,
     mexasFundsReleased: params.fundsReleased ?? false,
@@ -747,6 +750,9 @@ async function testPriceTimePriority(client: PgClient) {
     'same-user',
     'maker-cheap',
     'maker-cancelled',
+    'maker-json-cancelled',
+    'maker-json-filled',
+    'maker-json-redemption',
     'maker-old',
     'maker-new',
     'maker-expired',
@@ -795,6 +801,36 @@ async function testPriceTimePriority(client: PgClient) {
     outcome: 'NO',
     shares: 4,
     userId: 'maker-filled',
+  })
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:02.225Z'),
+    dataIsCancelled: true,
+    id: 'json-cancelled-best-ask',
+    limitProb: 0.535,
+    orderAmount: 5,
+    outcome: 'NO',
+    userId: 'maker-json-cancelled',
+  })
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:02.250Z'),
+    dataIsFilled: true,
+    id: 'json-filled-best-ask',
+    limitProb: 0.537,
+    orderAmount: 5,
+    outcome: 'NO',
+    userId: 'maker-json-filled',
+  })
+  await seedOrder(client, {
+    contractId,
+    createdTime: new Date('2026-06-03T00:00:02.275Z'),
+    dataIsRedemption: true,
+    id: 'json-redemption-best-ask',
+    limitProb: 0.539,
+    orderAmount: 5,
+    outcome: 'NO',
+    userId: 'maker-json-redemption',
   })
   await seedOrder(client, {
     contractId,
@@ -869,6 +905,24 @@ async function testPriceTimePriority(client: PgClient) {
   assertEqual(Number(cancelledAsk.amount), 0, 'cancelled ask stays untouched')
   const filledAsk = await loadOrder(client, 'filled-best-ask')
   assertEqual(Number(filledAsk.amount), 2, 'filled ask stays untouched')
+  const jsonCancelledAsk = await loadOrder(client, 'json-cancelled-best-ask')
+  assertEqual(
+    Number(jsonCancelledAsk.amount),
+    0,
+    'json-cancelled ask stays untouched'
+  )
+  const jsonFilledAsk = await loadOrder(client, 'json-filled-best-ask')
+  assertEqual(
+    Number(jsonFilledAsk.amount),
+    0,
+    'json-filled ask stays untouched'
+  )
+  const jsonRedemptionAsk = await loadOrder(client, 'json-redemption-best-ask')
+  assertEqual(
+    Number(jsonRedemptionAsk.amount),
+    0,
+    'json-redemption ask stays untouched'
+  )
   const releasedAsk = await loadOrder(client, 'released-best-ask')
   assertEqual(Number(releasedAsk.amount), 0, 'released ask stays untouched')
 }
