@@ -81,10 +81,6 @@ function mexasAmountToUnits(amount: number) {
   )
 }
 
-function mexasUnitsToAmount(units: bigint) {
-  return Number(formatMexasUnits(units))
-}
-
 function minUnits(a: bigint, b: bigint) {
   return a < b ? a : b
 }
@@ -349,6 +345,7 @@ function MexasWalletPanelInner() {
       return
     }
     setWithdrawing(true)
+    let submittedHash: Hex | undefined
     try {
       const latestBalanceUnits = await getMexasBalanceUnits(walletAddress)
       setBalanceUnits(latestBalanceUnits)
@@ -387,27 +384,18 @@ function MexasWalletPanelInner() {
         ],
       })) as Hex
 
+      submittedHash = hash
       setWithdrawHash(hash)
-      setBalanceUnits((units) =>
-        units === null
-          ? units
-          : units > parsedWithdrawAmount
-          ? units - parsedWithdrawAmount
-          : 0n
-      )
-      setInternalAvailableAmount((amount) =>
-        amount === undefined
-          ? amount
-          : Math.max(0, amount - mexasUnitsToAmount(parsedWithdrawAmount))
-      )
+      const receipt = await mexasPublicClient.waitForTransactionReceipt({ hash })
+      if (receipt.status !== 'success') {
+        throw new Error('La transacción de retiro no se confirmó.')
+      }
+      await refreshWalletState()
       setWithdrawAmount('')
       setWithdrawAddress('')
-      mexasPublicClient
-        .waitForTransactionReceipt({ hash })
-        .then(refreshWalletState)
-        .catch(() => setTimeout(refreshWalletState, 4000))
     } catch (error) {
       console.error('Failed to withdraw MEX', error)
+      if (submittedHash) setTimeout(refreshWalletState, 4000)
       setWithdrawError(
         error instanceof Error
           ? error.message

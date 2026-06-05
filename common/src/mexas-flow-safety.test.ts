@@ -1288,13 +1288,20 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'eth_sendTransaction',
       'setWithdrawHash(hash)',
-      'setBalanceUnits((units) =>',
-      'units - parsedWithdrawAmount',
-      'setInternalAvailableAmount((amount) =>',
-      'mexasUnitsToAmount(parsedWithdrawAmount)',
-      'waitForTransactionReceipt({ hash })',
-      '.then(refreshWalletState)',
+      'const receipt = await mexasPublicClient.waitForTransactionReceipt({ hash })',
+      "if (receipt.status !== 'success')",
+      'await refreshWalletState()',
+      "setWithdrawAmount('')",
+      "setWithdrawAddress('')",
     ])
+    expectMarkersInOrder(source, [
+      'let submittedHash: Hex | undefined',
+      'submittedHash = hash',
+      'catch (error)',
+      'if (submittedHash) setTimeout(refreshWalletState, 4000)',
+    ])
+    expect(source).not.toContain('units - parsedWithdrawAmount')
+    expect(source).not.toContain('mexasUnitsToAmount(parsedWithdrawAmount)')
     expect(source).toContain('Disponible para retirar')
     expect(source).toContain('MEX en cadena')
     expect(source).toContain('Reservado en órdenes abiertas')
