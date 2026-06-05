@@ -25,6 +25,10 @@ import {
   acquireMexasUserBalanceLock,
   releaseMexasUserBalanceLock,
 } from 'web/lib/api/mexas-balance'
+import {
+  getMexasTotalDepositsAfterObservedWalletSync,
+  getMexasWalletSyncTimeMs,
+} from 'web/lib/api/mexas-wallet-sync'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
 
@@ -252,8 +256,13 @@ async function getMexasWalletSync(
     onChainDeltaAmount: deltaAmount,
     openReservedAmount,
   })
-  const totalDeposits =
-    deltaAmount > 0 ? row.total_deposits + deltaAmount : row.total_deposits
+  const totalDeposits = await getMexasTotalDepositsAfterObservedWalletSync({
+    currentTotalDeposits: row.total_deposits,
+    db,
+    previousSyncTimeMs: getMexasWalletSyncTimeMs(data),
+    walletAddress,
+    walletDeltaAmount: deltaAmount,
+  })
 
   return {
     data: {

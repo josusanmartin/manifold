@@ -53,6 +53,10 @@ import {
 import { verifyMexasEscrowCapture } from 'web/lib/api/mexas-escrow-capture'
 import { submitMexasTreasuryTransfer } from 'web/lib/api/mexas-treasury-transfer'
 import { matchMexasOrderbookLimitOrderRpc } from 'web/lib/api/mexas-rpc-matching'
+import {
+  getMexasTotalDepositsAfterObservedWalletSync,
+  getMexasWalletSyncTimeMs,
+} from 'web/lib/api/mexas-wallet-sync'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
 
@@ -264,9 +268,13 @@ async function syncMexasWalletBalance(
       openReservedAmount,
     })
     const totalDeposits =
-      deltaAmount > 0
-        ? latestUserRow.total_deposits + deltaAmount
-        : latestUserRow.total_deposits
+      await getMexasTotalDepositsAfterObservedWalletSync({
+        currentTotalDeposits: latestUserRow.total_deposits,
+        db,
+        previousSyncTimeMs: getMexasWalletSyncTimeMs(latestData),
+        walletAddress,
+        walletDeltaAmount: deltaAmount,
+      })
     const syncedData = {
       ...latestData,
       [MEXAS_WALLET_SYNC_UNITS_KEY]: currentUnits.toString(),

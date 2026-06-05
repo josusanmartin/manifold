@@ -3300,6 +3300,8 @@ describe('MEXAS flow safety guardrails', () => {
     const privySource = readRepoFile('web/pages/api/privy-user.ts')
     const betApiSource = readRepoFile('web/pages/api/v0/bet.ts')
     const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')
+    const walletSyncSource = readRepoFile('web/lib/api/mexas-wallet-sync.ts')
+    const walletModelSource = readRepoFile('common/src/mexas-wallet.ts')
     const balanceHelperSource = readRepoFile('web/lib/api/mexas-balance.ts')
     const profileApiSource = readRepoFile('web/lib/api/mexas-profile.ts')
     const balanceChangeModelSource = readRepoFile(
@@ -3388,6 +3390,7 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(privySource, [
       'const deltaUnits = walletBalance.units - previousUnits',
       'const deltaAmount = mexasUnitsDeltaToAmount(deltaUnits)',
+      'await getMexasTotalDepositsAfterObservedWalletSync',
       "[MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'existing-user'",
     ])
     expect(privySource).toContain(
@@ -3397,6 +3400,7 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(betApiSource, [
       'async function syncMexasWalletBalance',
       'const deltaUnits = currentUnits - previousUnits',
+      'await getMexasTotalDepositsAfterObservedWalletSync',
       "[MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'bet-sync'",
     ])
     expect(betApiSource).not.toContain('recordMexasWalletMovement')
@@ -3404,10 +3408,22 @@ describe('MEXAS flow safety guardrails', () => {
       'async function syncAvailableBalanceFromBacking',
       'const deltaUnits = params.onChainUnits - previousUnits',
       'const totalDeposits =',
+      'await getMexasTotalDepositsAfterObservedWalletSync',
       'await setMexasUserBalanceCas',
       "[MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'backing-sync'",
     ])
     expect(ordersSource).not.toContain('recordMexasWalletMovement')
+    expect(walletSyncSource).toContain(".from('mexas_treasury_transfers')")
+    expect(walletSyncSource).toContain(".eq('status', 'confirmed')")
+    expect(walletSyncSource).toContain(".eq('recipient_address', recipientAddress)")
+    expect(walletSyncSource).toContain(".gt('confirmed_time', confirmedAfterIso)")
+    expect(walletSyncSource).toContain(
+      'getMexasTotalDepositsAfterWalletSync'
+    )
+    expect(walletModelSource).toContain('getMexasExternalDepositDelta')
+    expect(walletModelSource).toContain(
+      'walletDeltaAmount -'
+    )
     expect(balanceHelperSource).toContain('totalDeposits?: number')
     expect(balanceHelperSource).toContain('total_deposits: options.totalDeposits')
     expect(profileApiSource).toContain(".from('mexas_wallet_movements')")

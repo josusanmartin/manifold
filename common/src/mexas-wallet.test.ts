@@ -1,4 +1,6 @@
 import {
+  getMexasExternalDepositDelta,
+  getMexasTotalDepositsAfterWalletSync,
   getMexasWithdrawButtonLabel,
   getMexasWithdrawDestinationIssue,
   getMexasWithdrawDisabledReason,
@@ -132,5 +134,55 @@ describe('MEXAS wallet withdraw validation', () => {
 
     expect(reason).toBeUndefined()
     expect(getMexasWithdrawButtonLabel(reason)).toBe('Retirar MEX')
+  })
+})
+
+describe('MEXAS wallet deposit accounting', () => {
+  test('counts direct wallet inflows as deposits', () => {
+    expect(
+      getMexasExternalDepositDelta({
+        walletDeltaAmount: 5,
+        treasuryWalletInflowAmount: 0,
+      })
+    ).toBe(5)
+    expect(
+      getMexasTotalDepositsAfterWalletSync({
+        currentTotalDeposits: 9,
+        walletDeltaAmount: 5,
+        treasuryWalletInflowAmount: 0,
+      })
+    ).toBe(14)
+  })
+
+  test('does not count treasury order releases as new deposits', () => {
+    expect(
+      getMexasExternalDepositDelta({
+        walletDeltaAmount: 1,
+        treasuryWalletInflowAmount: 1,
+      })
+    ).toBe(0)
+    expect(
+      getMexasTotalDepositsAfterWalletSync({
+        currentTotalDeposits: 9,
+        walletDeltaAmount: 1,
+        treasuryWalletInflowAmount: 1,
+      })
+    ).toBe(9)
+  })
+
+  test('counts only the external part when treasury and user deposits arrive together', () => {
+    expect(
+      getMexasExternalDepositDelta({
+        walletDeltaAmount: 6.123456789,
+        treasuryWalletInflowAmount: 1.123456789,
+      })
+    ).toBe(5)
+    expect(
+      getMexasTotalDepositsAfterWalletSync({
+        currentTotalDeposits: 9,
+        walletDeltaAmount: 6.123456789,
+        treasuryWalletInflowAmount: 1.123456789,
+      })
+    ).toBe(14)
   })
 })

@@ -23,6 +23,10 @@ import {
   getUserPrivyWalletAddress,
   submitMexasTreasuryTransfer,
 } from './mexas-treasury-transfer'
+import {
+  getMexasTotalDepositsAfterObservedWalletSync,
+  getMexasWalletSyncTimeMs,
+} from './mexas-wallet-sync'
 
 const EXPIRED_ORDER_PAGE_SIZE = 1000
 const OPEN_RESERVED_ORDER_PAGE_SIZE = 1000
@@ -104,9 +108,16 @@ async function syncAvailableBalanceFromBacking(params: {
     onChainDeltaAmount: deltaAmount,
     openReservedAmount,
   })
+  const walletAddress = userData.privyWalletAddress
   const totalDeposits =
-    deltaAmount > 0
-      ? userRow.total_deposits + deltaAmount
+    typeof walletAddress === 'string'
+      ? await getMexasTotalDepositsAfterObservedWalletSync({
+          currentTotalDeposits: userRow.total_deposits,
+          db: params.db,
+          previousSyncTimeMs: getMexasWalletSyncTimeMs(userData),
+          walletAddress,
+          walletDeltaAmount: deltaAmount,
+        })
       : userRow.total_deposits
   const updatedUserRow = await setMexasUserBalanceCas(
     params.db,

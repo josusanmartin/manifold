@@ -91,3 +91,32 @@ export function getMexasWithdrawButtonLabel(
       return 'Retirar MEX'
   }
 }
+
+function roundMexasAmount(amount: number) {
+  return Math.round(amount * 1e8) / 1e8
+}
+
+export function getMexasExternalDepositDelta(params: {
+  treasuryWalletInflowAmount: number
+  walletDeltaAmount: number
+}) {
+  if (params.walletDeltaAmount <= 0) return 0
+
+  return Math.max(
+    0,
+    roundMexasAmount(
+      params.walletDeltaAmount -
+        Math.max(0, params.treasuryWalletInflowAmount)
+    )
+  )
+}
+
+export function getMexasTotalDepositsAfterWalletSync(params: {
+  currentTotalDeposits: number
+  treasuryWalletInflowAmount: number
+  walletDeltaAmount: number
+}) {
+  return roundMexasAmount(
+    params.currentTotalDeposits + getMexasExternalDepositDelta(params)
+  )
+}
