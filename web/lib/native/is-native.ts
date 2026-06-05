@@ -2,7 +2,6 @@ import { IS_NATIVE_KEY, PLATFORM_KEY } from 'common/native-message'
 import { PrivateUser } from 'common/user'
 import { uniq } from 'lodash'
 import { safeLocalStorage, safeSessionStorage } from 'web/lib/util/local'
-import { api } from '../api/api'
 
 /**@deprecated, use useNativeInfo() instead */
 export const getIsNative = () => {
@@ -35,11 +34,12 @@ export const setIsNativeOld = (isNative: boolean, platform: string) => {
   }
 }
 
-export const setInstalledAppPlatform = (
+export const setInstalledAppPlatform = async (
   privateUser: PrivateUser,
   platform: string
 ) => {
   if (privateUser.installedAppPlatforms?.includes(platform)) return
+  const { api } = await import('../api/api')
   api('me/private/update', {
     installedAppPlatforms: uniq([
       ...(privateUser.installedAppPlatforms ?? []),

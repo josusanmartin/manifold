@@ -716,7 +716,7 @@ describe('MEXAS flow safety guardrails', () => {
   })
 
   test('keeps logged-in balance UI on Privy/MEX instead of Firebase/MANA', () => {
-    const authSource = readRepoFile('web/components/auth-context.tsx')
+    const authSource = readRepoFile('web/components/auth-live-user-sync.tsx')
     const meSource = readRepoFile('web/pages/me.tsx')
 
     expectMarkersInOrder(authSource, [
@@ -1872,6 +1872,9 @@ describe('MEXAS flow safety guardrails', () => {
     const contractPageSource = readRepoFile(
       'web/components/contract/contract-page.tsx'
     )
+    const mexasContractPageSource = readRepoFile(
+      'web/components/contract/mexas-contract-page.tsx'
+    )
 
     expect(source).toContain('import { isMexasOrderBookOnlyContract }')
     expectMarkersInOrder(source, [
@@ -1888,6 +1891,7 @@ describe('MEXAS flow safety guardrails', () => {
       'await Promise.all',
     ])
     expect(pageSource).toContain('import { isMexasOrderBookOnlyContract }')
+    expect(pageSource).toContain('import { MexasContractPageContent }')
     expect(pageSource).toContain('No se pudo cargar la pregunta')
     expect(pageSource).not.toContain('Unable to fetch question')
     expectMarkersInOrder(pageSource, [
@@ -1899,6 +1903,57 @@ describe('MEXAS flow safety guardrails', () => {
       'destination: `/${contract.creatorUsername}/${contract.slug}`',
       'if (contract.deleted)',
     ])
+    expect(pageSource).toContain('<MexasContractPageContent')
+    expect(pageSource).not.toContain(
+      "from 'web/components/contract/contract-page'"
+    )
+    expect(pageSource).not.toContain("from 'web/components/layout/page'")
+    expect(mexasContractPageSource).toContain(
+      'export function MexasContractPageContent'
+    )
+    expect(mexasContractPageSource).toContain('/api/mexas-order-book')
+    expect(mexasContractPageSource).toContain('/api/v0/bet/cancel/')
+    expect(mexasContractPageSource).toContain('<MexasLimitOrderPanel')
+    expect(mexasContractPageSource).toContain("authedMexasFetch('/api/v0/bet'")
+    expect(mexasContractPageSource).toContain(
+      'function MexasResolutionControl'
+    )
+    expect(mexasContractPageSource).toContain(
+      '/mexas-resolution-readiness'
+    )
+    expect(mexasContractPageSource).toContain('/resolve')
+    expect(mexasContractPageSource).toContain('captureMexasEscrowStake')
+    expect(mexasContractPageSource).toContain('mexasEscrowTxHash')
+    expect(mexasContractPageSource).not.toContain(
+      'useUnfilledBetsAndBalanceByUserId'
+    )
+    expect(mexasContractPageSource).not.toContain("api('users/by-id/balance'")
+    expect(mexasContractPageSource).not.toContain("from 'web/lib/api/api'")
+    expect(mexasContractPageSource).not.toContain(
+      "from 'web/components/bet/limit-order-panel'"
+    )
+    expect(mexasContractPageSource).not.toContain(
+      "from 'web/components/resolution-panel'"
+    )
+    expect(mexasContractPageSource).not.toContain(
+      "from './contract-description'"
+    )
+    expect(mexasContractPageSource).not.toContain("from 'web/hooks/use-contract'")
+    expect(mexasContractPageSource).not.toContain("from 'web/hooks/use-user'")
+    for (const legacyImport of [
+      'HeaderActions',
+      'ContractTabs',
+      'UserBetsSummary',
+      'YourTrades',
+      'DangerZone',
+      'ContractLeaderboard',
+      'ExplainerPanel',
+      "from 'web/components/bet/bet-panel'",
+      "from 'web/components/bet/order-book'",
+      "from './market-context'",
+    ]) {
+      expect(mexasContractPageSource).not.toContain(legacyImport)
+    }
     expectMarkersInOrder(contractPageSource, [
       'const showExplainerPanel =',
       '!isMexasOrderBookOnly',
@@ -2021,6 +2076,9 @@ describe('MEXAS flow safety guardrails', () => {
     const contractPage = readRepoFile(
       'web/components/contract/contract-page.tsx'
     )
+    const mexasContractPage = readRepoFile(
+      'web/components/contract/mexas-contract-page.tsx'
+    )
     const contractDescription = readRepoFile(
       'web/components/contract/contract-description.tsx'
     )
@@ -2047,6 +2105,9 @@ describe('MEXAS flow safety guardrails', () => {
       "kinds: orderBookOnly ? 'open-limit' : undefined",
       "api('bets', params)",
     ])
+    expect(mexasContractPage).toContain('/api/mexas-order-book')
+    expect(mexasContractPage).not.toContain("api('bets'")
+    expect(mexasContractPage).not.toContain("api('users/by-id/balance'")
     expectMarkersInOrder(chartPositions, [
       'const orderBookOnly = isMexasOrderBookOnlyContract(contract)',
       "api('bets', params)",

@@ -2,8 +2,7 @@
 import { createContext, ReactNode, useEffect, useState } from 'react'
 import { pickBy } from 'lodash'
 import { onIdTokenChanged, User as FirebaseUser } from 'firebase/auth'
-import { auth, firebaseLogout } from 'web/lib/firebase/users'
-import { createUser } from 'web/lib/api/api'
+import dynamic from 'next/dynamic'
 import { useStateCheckEquality } from 'web/hooks/use-state-check-equality'
 import {
   AUTH_COOKIE_NAME,
@@ -19,21 +18,21 @@ import {
 import { nativePassUsers, nativeSignOut } from 'web/lib/native/native-messages'
 import { safeLocalStorage } from 'web/lib/util/local'
 import { getSavedContractVisitsLocally } from 'web/hooks/use-save-visits'
-import { getSupabaseToken } from 'web/lib/api/api'
 
-import { useWebsocketUser, useWebsocketPrivateUser } from 'web/hooks/use-user'
-import { useEffectCheckEquality } from 'web/hooks/use-effect-check-equality'
 import { getPrivateUserSafe, getUserSafe } from 'web/lib/supabase/users'
-import toast from 'react-hot-toast'
 import { ensureDeviceToken } from 'web/lib/util/device-token'
-import { Row } from './layout/row'
-import { TokenNumber } from './widgets/token-number'
 import { updateSupabaseAuth } from 'web/lib/supabase/db'
 import {
   setLocalOnlyUserId,
   setPrivyAccessTokenProvider,
 } from 'common/util/api'
 import { usePrivyLogin } from 'web/components/crypto/privy-wallet-providers'
+
+const AuthLiveUserSync = dynamic(
+  () =>
+    import('./auth-live-user-sync').then((mod) => mod.AuthLiveUserSync),
+  { ssr: false }
+)
 
 const IS_LOCAL_ONLY =
   typeof process !== 'undefined' &&
@@ -130,10 +129,17 @@ export function AuthProvider(props: {
           ? 'Esta cuenta fue eliminada. Contacta a soporte de MEXAS para restaurarla.'
           : 'Esta cuenta no puede operar en MEXAS. Contacta a soporte si necesitas revisar el caso.'
 
-        const logout = isPrivyAuthEnabled ? privy.logout : firebaseLogout
-        logout().then(() => {
-          alert(message)
-        })
+        if (isPrivyAuthEnabled) {
+          privy.logout().then(() => {
+            alert(message)
+          })
+        } else {
+          import('web/lib/firebase/users')
+            .then(({ firebaseLogout }) => firebaseLogout())
+            .then(() => {
+              alert(message)
+            })
+        }
         return
       }
       // Persist to local storage, to reduce login blink next time.
@@ -292,106 +298,81 @@ export function AuthProvider(props: {
   useEffect(() => {
     if (IS_LOCAL_ONLY || isPrivyAuthEnabled) return // Skip Firebase auth in LOCAL_ONLY/Privy mode
 
-    return onIdTokenChanged(
-      auth,
-      async (fbUser) => {
-        if (fbUser) {
-          setUserCookie(fbUser.toJSON())
+    let unsubscribe: (() => void) | undefined
+    let cancelled = false
 
-          const [user, privateUser, supabaseJwt] = await Promise.all([
-            getUserSafe(fbUser.uid),
-            getPrivateUserSafe(),
-            getSupabaseToken().catch((e) => {
-              console.error('Error getting supabase token', e)
-              return null
-            }),
-          ])
-          // When testing on a mobile device, we'll be pointed at a local ip or ngrok address, so this will fail
-          if (supabaseJwt) updateSupabaseAuth(supabaseJwt.jwt)
+    import('web/lib/firebase/users').then(({ auth }) => {
+      if (cancelled) return
+      unsubscribe = onIdTokenChanged(
+        auth,
+        async (fbUser) => {
+          if (fbUser) {
+            setUserCookie(fbUser.toJSON())
 
-          if (!user || !privateUser) {
-            const deviceToken = ensureDeviceToken()
-            const adminToken = getAdminToken()
+            const [user, privateUser, supabaseJwt] = await Promise.all([
+              getUserSafe(fbUser.uid),
+              getPrivateUserSafe(),
+              import('web/lib/api/api')
+                .then(({ getSupabaseToken }) => getSupabaseToken())
+                .catch((e) => {
+                  console.error('Error getting supabase token', e)
+                  return null
+                }),
+            ])
+            // When testing on a mobile device, we'll be pointed at a local ip or ngrok address, so this will fail
+            if (supabaseJwt) updateSupabaseAuth(supabaseJwt.jwt)
 
-            const newUser = (await createUser({
-              deviceToken,
-              adminToken,
-              visitedContractIds: getSavedContractVisitsLocally(),
-            })) as UserAndPrivateUser
+            if (!user || !privateUser) {
+              const deviceToken = ensureDeviceToken()
+              const adminToken = getAdminToken()
 
-            onAuthLoad(fbUser, newUser.user, newUser.privateUser)
+              const { createUser } = await import('web/lib/api/api')
+              const newUser = (await createUser({
+                deviceToken,
+                adminToken,
+                visitedContractIds: getSavedContractVisitsLocally(),
+              })) as UserAndPrivateUser
+
+              onAuthLoad(fbUser, newUser.user, newUser.privateUser)
+            } else {
+              onAuthLoad(fbUser, user, privateUser)
+            }
           } else {
-            onAuthLoad(fbUser, user, privateUser)
+            // User logged out; reset to null
+            setUserCookie(undefined)
+            setUser(null)
+            setPrivateUser(undefined)
+            nativeSignOut()
+            // Clear local storage only if we were signed in, otherwise we'll clear referral info
+            if (safeLocalStorage?.getItem(CACHED_USER_KEY)) localStorage.clear()
           }
-        } else {
-          // User logged out; reset to null
-          setUserCookie(undefined)
-          setUser(null)
-          setPrivateUser(undefined)
-          nativeSignOut()
-          // Clear local storage only if we were signed in, otherwise we'll clear referral info
-          if (safeLocalStorage?.getItem(CACHED_USER_KEY)) localStorage.clear()
+        },
+        (e) => {
+          console.error(e)
         }
-      },
-      (e) => {
-        console.error(e)
-      }
-    )
+      )
+    })
+
+    return () => {
+      cancelled = true
+      unsubscribe?.()
+    }
   }, [isPrivyAuthEnabled])
 
   const uid = authUser ? authUser.user.id : authUser
 
-  const listenUser = useWebsocketUser(uid ?? undefined)
-  useEffectCheckEquality(() => {
-    if (authLoaded && listenUser) {
-      if (user) {
-        const balanceChange = listenUser.balance - user.balance
-        const cashBalanceChange = listenUser.cashBalance - user.cashBalance
-
-        if (balanceChange > 0 || cashBalanceChange > 0) {
-          showToast(balanceChange, cashBalanceChange)
-        }
-      }
-      setUser(listenUser)
-    }
-  }, [authLoaded, listenUser])
-
-  const listenPrivateUser = useWebsocketPrivateUser(uid ?? undefined)
-  useEffectCheckEquality(() => {
-    if (authLoaded && listenPrivateUser) setPrivateUser(listenPrivateUser)
-  }, [authLoaded, listenPrivateUser])
-
   return (
-    <AuthContext.Provider value={authUser}>{children}</AuthContext.Provider>
-  )
-}
-
-const showToast = (manaChange: number, cashChange: number) => {
-  toast.success(
-    <Row className="gap-1">
-      <span>Recibido</span>
-      {manaChange > 0 && (
-        <Row className="items-center justify-center">
-          +
-          <TokenNumber
-            amount={manaChange}
-            className="font-bold"
-            coinType="MEX"
-          />
-          {cashChange > 0 && <span className="mx-1">&</span>}
-        </Row>
+    <AuthContext.Provider value={authUser}>
+      {!isPrivyAuthEnabled && (
+        <AuthLiveUserSync
+          authLoaded={authLoaded}
+          setPrivateUser={setPrivateUser}
+          setUser={setUser}
+          uid={uid ?? undefined}
+          user={user}
+        />
       )}
-      {cashChange > 0 && (
-        <Row className="items-center justify-center">
-          +
-          <TokenNumber
-            amount={cashChange}
-            className="font-bold"
-            coinType="CASH"
-          />
-        </Row>
-      )}
-    </Row>,
-    { duration: 5000, icon: '🎉' }
+      {children}
+    </AuthContext.Provider>
   )
 }

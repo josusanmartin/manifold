@@ -1,11 +1,11 @@
 import type { AppProps } from 'next/app'
 import { Figtree } from 'next/font/google'
 import Head from 'next/head'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import { AuthProvider, AuthUser } from 'web/components/auth-context'
 import { PrivyWalletProviders } from 'web/components/crypto/privy-wallet-providers'
-import { NativeMessageProvider } from 'web/components/native-message-provider'
 import { OptimisticEntitlementsProvider } from 'web/hooks/use-optimistic-entitlements'
 import { useHasLoaded } from 'web/hooks/use-has-loaded'
 import { useIOSBodyFix } from 'web/hooks/use-ios-body-fix'
@@ -23,6 +23,14 @@ import { DevtoolsDetector, setupDevtoolsDetector } from 'web/lib/util/devtools'
 import '../styles/globals.css'
 // See https://nextjs.org/docs/basic-features/font-optimization#google-fonts
 // and if you add a font, you must add it to tailwind config as well for it to work.
+
+const NativeMessageProvider = dynamic(
+  () =>
+    import('web/components/native-message-provider').then(
+      (mod) => mod.NativeMessageProvider
+    ),
+  { ssr: false }
+)
 
 const mainFont = Figtree({
   weight: ['300', '400', '500', '600', '700'],
@@ -108,6 +116,14 @@ function MyApp({ Component, pageProps }: AppProps<ManifoldPageProps>) {
   // ian: Required by GambleId
   const devToolsOpen = false //useDevtoolsDetector()
   const router = useRouter()
+  const [shouldLoadNativeProvider, setShouldLoadNativeProvider] =
+    useState(false)
+
+  useEffect(() => {
+    setShouldLoadNativeProvider(
+      router.query.nativePlatform !== undefined || getIsNative()
+    )
+  }, [router.query.nativePlatform])
 
   useEffect(() => {
     const handleRouteChange = (url: string) => {
@@ -193,9 +209,13 @@ function MyApp({ Component, pageProps }: AppProps<ManifoldPageProps>) {
           <PrivyWalletProviders>
             <AuthProvider serverUser={pageProps.auth}>
               <OptimisticEntitlementsProvider>
-                <NativeMessageProvider>
+                {shouldLoadNativeProvider ? (
+                  <NativeMessageProvider>
+                    <Component {...pageProps} />
+                  </NativeMessageProvider>
+                ) : (
                   <Component {...pageProps} />
-                </NativeMessageProvider>
+                )}
               </OptimisticEntitlementsProvider>
             </AuthProvider>
           </PrivyWalletProviders>

@@ -4,9 +4,8 @@ import { base64toPoints } from 'common/edge/og'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
 import { getContractFromSlug } from 'common/supabase/contracts'
 import { removeUndefinedProps } from 'common/util/object'
-import { ContractPageContent } from 'web/components/contract/contract-page'
+import { MexasContractPageContent } from 'web/components/contract/mexas-contract-page'
 import { ContractSEO } from 'web/components/contract/contract-seo'
-import { Page } from 'web/components/layout/page'
 import { Title } from 'web/components/widgets/title'
 import { toPublicMexasContractParams } from 'web/lib/mexas-public-contract'
 import { initSupabaseAdmin } from 'web/lib/supabase/admin-db'
@@ -78,11 +77,11 @@ export async function getStaticPaths() {
 export default function ContractPage(props: MaybeAuthedContractParams) {
   if (props.state === 'deleted') {
     return (
-      <Page trackPageView={false}>
+      <div className="min-h-screen">
         <div className="flex h-[50vh] flex-col items-center justify-center">
           <Title>Pregunta eliminada</Title>
         </div>
-      </Page>
+      </div>
     )
   }
 
@@ -99,9 +98,9 @@ function NonPrivateContractPage(props: { contractParams: ContractParams }) {
   }
 
   return (
-    <Page trackPageView={false} className="xl:col-span-10">
+    <div className="min-h-screen">
       <ContractSEO contract={contract} points={pointsString} />
-      <ContractPageContent key={contract.id} {...props.contractParams} />
-    </Page>
+      <MexasContractPageContent key={contract.id} {...props.contractParams} />
+    </div>
   )
 }
