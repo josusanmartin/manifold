@@ -77,6 +77,21 @@ export async function assertMexasEscrowTxUnused(
       'This MEXAS escrow transaction is already attached to an order.'
     )
   }
+
+  const { data: transferData, error: transferError } = await db
+    .from('mexas_treasury_transfers')
+    .select('id,status')
+    .ilike('metadata->>mexasEscrowTxHash', txHash)
+    .in('status', ['pending', 'processing', 'submitted', 'confirmed'])
+    .limit(1)
+
+  if (transferError) throw transferError
+  if ((transferData ?? []).length > 0) {
+    throw new APIError(
+      403,
+      'This MEXAS escrow transaction was already refunded or queued for refund.'
+    )
+  }
 }
 
 export async function verifyMexasEscrowCapture(params: {

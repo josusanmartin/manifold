@@ -113,6 +113,16 @@ describe('MEXAS pending escrow order transactions', () => {
     ).toBe(true)
     expect(
       shouldClearMexasEscrowPendingOrderTxAfterError(
+        'This MEXAS escrow transaction was already refunded or queued for refund.'
+      )
+    ).toBe(true)
+    expect(
+      shouldClearMexasEscrowPendingOrderTxAfterError(
+        'La transferencia MEXAS fue devuelta porque la orden no pudo registrarse.'
+      )
+    ).toBe(true)
+    expect(
+      shouldClearMexasEscrowPendingOrderTxAfterError(
         'Invalid MEXAS escrow transaction hash.'
       )
     ).toBe(true)

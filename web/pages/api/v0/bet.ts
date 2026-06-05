@@ -51,6 +51,7 @@ import {
   getMexasEscrowRuntimeStatus,
 } from 'web/lib/api/mexas-settlement'
 import { verifyMexasEscrowCapture } from 'web/lib/api/mexas-escrow-capture'
+import { submitMexasTreasuryTransfer } from 'web/lib/api/mexas-treasury-transfer'
 import { matchMexasOrderbookLimitOrderRpc } from 'web/lib/api/mexas-rpc-matching'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
@@ -498,6 +499,52 @@ async function cancelInsertedMexasOrderAndRefund(
     refundAmount,
     `mexas-placement-refund:${bet.id}`
   )
+}
+
+async function hasMexasOrderForEscrowTx(db: SupabaseClient, txHash: string) {
+  const { data, error } = await db
+    .from('contract_bets')
+    .select('bet_id')
+    .ilike('data->>mexasEscrowTxHash', txHash)
+    .limit(1)
+
+  if (error) throw error
+  return (data ?? []).length > 0
+}
+
+async function refundUnattachedMexasEscrowCapture(params: {
+  bet: LimitBet
+  contractId: string
+  db: SupabaseClient
+  escrowCapture: {
+    capturedAmount: number
+    payerAddress: Address
+    treasuryAddress: Address
+    txHash: string
+  }
+  userId: string
+}) {
+  if (
+    await hasMexasOrderForEscrowTx(params.db, params.escrowCapture.txHash)
+  ) {
+    return
+  }
+
+  await submitMexasTreasuryTransfer({
+    amount: params.escrowCapture.capturedAmount,
+    contractId: params.contractId,
+    db: params.db,
+    idempotencyKey: `mexas-placement-refund:${params.escrowCapture.txHash}`,
+    metadata: {
+      attemptedBetId: params.bet.id,
+      mexasEscrowTxHash: params.escrowCapture.txHash,
+      releaseReason: 'placement-error',
+      treasuryAddress: params.escrowCapture.treasuryAddress,
+    },
+    recipientAddress: params.escrowCapture.payerAddress,
+    transferType: 'order-release',
+    userId: params.userId,
+  })
 }
 
 async function updateUserBalanceCas(
@@ -980,6 +1027,19 @@ async function placeBinaryBet(
             userId,
             reservedAmount,
             `mexas-insert-refund:${bet.id}`
+          )
+        }
+        if (escrowCapture && !inserted && bet) {
+          await refundUnattachedMexasEscrowCapture({
+            bet,
+            contractId: params.contractId,
+            db,
+            escrowCapture,
+            userId,
+          })
+          throw new APIError(
+            503,
+            'La transferencia MEXAS fue devuelta porque la orden no pudo registrarse. Intenta con una nueva transferencia.'
           )
         }
         if ((debited || escrowCapture) && inserted && bet) {

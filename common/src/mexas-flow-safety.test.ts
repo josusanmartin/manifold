@@ -3359,6 +3359,8 @@ describe('MEXAS flow safety guardrails', () => {
       'NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS',
       'export async function assertMexasEscrowTxUnused',
       ".ilike('data->>mexasEscrowTxHash', txHash)",
+      ".ilike('metadata->>mexasEscrowTxHash', txHash)",
+      ".in('status', ['pending', 'processing', 'submitted', 'confirmed'])",
       'export async function verifyMexasEscrowCapture',
       'getTransactionReceipt({ hash: txHash })',
       'getMexasEscrowCaptureCheck',
@@ -3404,6 +3406,37 @@ describe('MEXAS flow safety guardrails', () => {
       'duplicate escrow capture tx hash',
       "'verify escrow capture tx hash uniqueness'",
     ])
+  })
+
+  test('refunds verified escrow captures that fail before order attachment', () => {
+    const betSource = readRepoFile('web/pages/api/v0/bet.ts')
+    const helperSource = readRepoFile('web/lib/api/mexas-escrow-capture.ts')
+    const pendingSource = readRepoFile('common/src/mexas-escrow-pending.ts')
+
+    expectMarkersInOrder(betSource, [
+      'submitMexasTreasuryTransfer',
+      'async function hasMexasOrderForEscrowTx',
+      ".ilike('data->>mexasEscrowTxHash', txHash)",
+      'async function refundUnattachedMexasEscrowCapture',
+      'await hasMexasOrderForEscrowTx',
+      'idempotencyKey: `mexas-placement-refund:${params.escrowCapture.txHash}`',
+      'mexasEscrowTxHash: params.escrowCapture.txHash',
+      "releaseReason: 'placement-error'",
+      'recipientAddress: params.escrowCapture.payerAddress',
+      "transferType: 'order-release'",
+    ])
+    expectMarkersInOrder(betSource, [
+      'if (escrowCapture && !inserted && bet)',
+      'await refundUnattachedMexasEscrowCapture',
+      'La transferencia MEXAS fue devuelta porque la orden no pudo registrarse.',
+    ])
+    expect(helperSource).toContain(
+      'This MEXAS escrow transaction was already refunded or queued for refund.'
+    )
+    expect(pendingSource).toContain("normalizedMessage.includes('fue devuelta')")
+    expect(pendingSource).toContain(
+      "normalizedMessage.includes('queued for refund')"
+    )
   })
 
   test('treasury transfer helper signs outgoing MEXAS payments behind an idempotent processing claim', () => {

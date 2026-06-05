@@ -148,6 +148,9 @@ export function shouldClearMexasEscrowPendingOrderTxAfterError(
   const normalizedMessage = message.toLowerCase()
   return (
     normalizedMessage.includes('already attached to an order') ||
+    normalizedMessage.includes('already refunded') ||
+    normalizedMessage.includes('queued for refund') ||
+    normalizedMessage.includes('fue devuelta') ||
     normalizedMessage.includes('invalid mexas escrow transaction hash') ||
     normalizedMessage.includes('below required') ||
     normalizedMessage.includes('expected exactly')
