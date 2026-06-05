@@ -21,6 +21,7 @@ import {
   makeMexasEscrowPendingOrderTx,
   pruneMexasEscrowPendingOrderTxs,
   removeMexasEscrowPendingOrderTx,
+  shouldClearMexasEscrowPendingOrderTxAfterError,
   upsertMexasEscrowPendingOrderTx,
   type MexasEscrowPendingOrderIntent,
   type MexasEscrowPendingOrderTx,
@@ -627,13 +628,19 @@ export default function LimitOrderPanel(props: {
         const message = e.message.toString()
         if (
           mexasEscrowTxHash &&
-          message.includes('already attached to an order')
+          shouldClearMexasEscrowPendingOrderTxAfterError(message)
         ) {
           clearStoredMexasPendingEscrowOrderTx(mexasEscrowTxHash)
           setPendingMexasEscrowTxForIntent(undefined)
-          setError(
-            'La transferencia MEX ya está asociada a una orden. Actualiza el mercado para verla.'
-          )
+          if (message.includes('already attached to an order')) {
+            setError(
+              'La transferencia MEX ya está asociada a una orden. Actualiza el mercado para verla.'
+            )
+          } else {
+            setError(
+              `La transferencia MEX no se puede usar para registrar esta orden. ${message} Abre una nueva orden para enviar una nueva transferencia.`
+            )
+          }
         } else if (mexasEscrowTxHash) {
           setError(
             `Transferencia MEX enviada (${shortenTxHash(

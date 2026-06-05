@@ -141,3 +141,15 @@ export function removeMexasEscrowPendingOrderTx(
     (pending) => normalizeTxHash(pending.txHash) !== normalizedTxHash
   )
 }
+
+export function shouldClearMexasEscrowPendingOrderTxAfterError(
+  message: string
+) {
+  const normalizedMessage = message.toLowerCase()
+  return (
+    normalizedMessage.includes('already attached to an order') ||
+    normalizedMessage.includes('invalid mexas escrow transaction hash') ||
+    normalizedMessage.includes('below required') ||
+    normalizedMessage.includes('expected exactly')
+  )
+}

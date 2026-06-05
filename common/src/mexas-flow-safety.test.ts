@@ -1539,6 +1539,9 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('persists pending MEXAS escrow transactions before submitting the order', () => {
     const panelSource = readRepoFile('web/components/bet/limit-order-panel.tsx')
+    const mexasPageSource = readRepoFile(
+      'web/components/contract/mexas-contract-page.tsx'
+    )
     const pendingSource = readRepoFile('common/src/mexas-escrow-pending.ts')
 
     expectMarkersInOrder(pendingSource, [
@@ -1547,6 +1550,7 @@ describe('MEXAS flow safety guardrails', () => {
       'export function findReusableMexasEscrowPendingOrderTx',
       'export function upsertMexasEscrowPendingOrderTx',
       'export function removeMexasEscrowPendingOrderTx',
+      'export function shouldClearMexasEscrowPendingOrderTxAfterError',
     ])
     expectMarkersInOrder(panelSource, [
       'const intent = getMexasEscrowPendingOrderIntent',
@@ -1573,6 +1577,18 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expect(panelSource).toContain(
       'Reintenta la misma orden para registrarla sin otra transferencia.'
+    )
+    expect(panelSource).toContain(
+      'shouldClearMexasEscrowPendingOrderTxAfterError(message)'
+    )
+    expect(mexasPageSource).toContain(
+      'shouldClearMexasEscrowPendingOrderTxAfterError(message)'
+    )
+    expect(panelSource).toContain(
+      'Abre una nueva orden para enviar una nueva transferencia.'
+    )
+    expect(mexasPageSource).toContain(
+      'Abre una nueva orden para enviar una nueva transferencia.'
     )
   })
 

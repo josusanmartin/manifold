@@ -4,6 +4,7 @@ import {
   makeMexasEscrowPendingOrderTx,
   MEXAS_ESCROW_PENDING_ORDER_TX_TTL_MS,
   removeMexasEscrowPendingOrderTx,
+  shouldClearMexasEscrowPendingOrderTxAfterError,
   upsertMexasEscrowPendingOrderTx,
 } from './mexas-escrow-pending'
 
@@ -102,5 +103,33 @@ describe('MEXAS pending escrow order transactions', () => {
       pending,
     ])
     expect(removeMexasEscrowPendingOrderTx([pending], txHash)).toEqual([])
+  })
+
+  test('clears only definitely unusable pending transaction errors', () => {
+    expect(
+      shouldClearMexasEscrowPendingOrderTxAfterError(
+        'This MEXAS escrow transaction is already attached to an order.'
+      )
+    ).toBe(true)
+    expect(
+      shouldClearMexasEscrowPendingOrderTxAfterError(
+        'Invalid MEXAS escrow transaction hash.'
+      )
+    ).toBe(true)
+    expect(
+      shouldClearMexasEscrowPendingOrderTxAfterError(
+        'MEXAS escrow transfer captured 0 MEX, below required 5 MEX.'
+      )
+    ).toBe(true)
+    expect(
+      shouldClearMexasEscrowPendingOrderTxAfterError(
+        'MEXAS escrow transfer captured 6 MEX, expected exactly 5 MEX.'
+      )
+    ).toBe(true)
+    expect(
+      shouldClearMexasEscrowPendingOrderTxAfterError(
+        'MEXAS escrow transaction not found: transaction receipt not found'
+      )
+    ).toBe(false)
   })
 })
