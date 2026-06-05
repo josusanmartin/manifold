@@ -1,7 +1,7 @@
-alter table users add column if not exists is_bot boolean not null default false;
+alter table public.users add column if not exists is_bot boolean not null default false;
 
 -- Seed from the existing BOT_USERNAMES list (116 entries, case-sensitive match)
-update users set is_bot = true
+update public.users set is_bot = true
 where username in (
   'TenShinoBot', 'JDVance1', 'Merchant', 'benedict', 'subooferbot',
   'pos', 'v', 'acc', 'jerk', 'snap',

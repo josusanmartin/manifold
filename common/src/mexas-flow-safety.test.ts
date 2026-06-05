@@ -3037,7 +3037,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain(
       '2026060301_add_mexas_treasury_settlement_ledger.sql'
     )
-    expect(source).toContain('20260604212354_enforce_mex_contract_token.sql')
+    expect(source).toContain('20260604212653_enforce_mex_contract_token.sql')
     expect(source).toContain('contracts.token default is not MEX')
     expect(source).toContain('contracts_token_check is not MEX-only')
     expect(source).toContain('pg_get_constraintdef(con.oid)')
@@ -3060,7 +3060,7 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('launch SQL enforces MEX-only contract tokens at the database boundary', () => {
     const migration = readRepoFile(
-      'backend/supabase/migrations/20260604212354_enforce_mex_contract_token.sql'
+      'backend/supabase/migrations/20260604212653_enforce_mex_contract_token.sql'
     )
     const schemaSource = readRepoFile('backend/supabase/contracts.sql')
     const applySource = readRepoFile(
@@ -3083,12 +3083,12 @@ describe('MEXAS flow safety guardrails', () => {
     expect(schemaSource).toContain("check (token = 'MEX'::text)")
     expect(schemaSource).not.toContain("token text default 'MANA'")
     expect(applySource).toContain(
-      '20260604212354_enforce_mex_contract_token.sql'
+      '20260604212653_enforce_mex_contract_token.sql'
     )
     expect(applySource).toContain('contracts.token default is not MEX')
     expect(applySource).toContain('contracts_token_check is not MEX-only')
     expect(sqlTestSource).toContain(
-      '20260604212354_enforce_mex_contract_token.sql'
+      '20260604212653_enforce_mex_contract_token.sql'
     )
     expect(sqlTestSource).toContain('contract_token_default')
     expect(sqlTestSource).toContain('contracts_token_check')

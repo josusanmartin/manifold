@@ -14,7 +14,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060401_harden_mexas_treasury_ledger.sql',
   'backend/supabase/migrations/2026060402_lock_down_legacy_supabase_surface.sql',
   'backend/supabase/migrations/20260604144518_lock_down_legacy_rpc_surface.sql',
-  'backend/supabase/migrations/20260604212354_enforce_mex_contract_token.sql',
+  'backend/supabase/migrations/20260604212653_enforce_mex_contract_token.sql',
   'backend/supabase/migrations/2026060501_add_mexas_wallet_movements.sql',
   'backend/supabase/migrations/2026060502_add_mexas_wallet_sync_trigger.sql',
 ]

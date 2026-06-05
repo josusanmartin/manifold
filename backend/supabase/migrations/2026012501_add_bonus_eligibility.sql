@@ -63,5 +63,5 @@ WHERE EXISTS (
 -- UPDATE users SET data = data - 'idenfyVerifiedTime' WHERE data ? 'idenfyVerifiedTime';
 
 -- Create an index on bonusEligibility for efficient queries
-CREATE INDEX IF NOT EXISTS idx_users_bonus_eligibility 
-ON users ((data->>'bonusEligibility'));
+CREATE INDEX IF NOT EXISTS idx_users_bonus_eligibility
+ON public.users ((data->>'bonusEligibility'));
