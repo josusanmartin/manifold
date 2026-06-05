@@ -16,6 +16,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/20260604144518_lock_down_legacy_rpc_surface.sql',
   'backend/supabase/migrations/20260604212354_enforce_mex_contract_token.sql',
   'backend/supabase/migrations/2026060501_add_mexas_wallet_movements.sql',
+  'backend/supabase/migrations/2026060502_add_mexas_wallet_sync_trigger.sql',
 ]
 
 const REQUIRED_CONTRACT_IDS = ['mexwcwin26a', 'ukrwarend26a']
@@ -264,6 +265,24 @@ begin
 
   if to_regclass('public.mexas_wallet_movements_user_observed_idx') is null then
     v_failures := array_append(v_failures, 'wallet movements ledger user index missing');
+  end if;
+
+  if to_regprocedure('public.mexas_record_wallet_movement_from_user_sync()') is null then
+    v_failures := array_append(v_failures, 'wallet movements sync trigger function missing');
+  end if;
+
+  if not exists (
+    select 1
+    from pg_trigger t
+    join pg_class c on c.oid = t.tgrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'users'
+      and t.tgname = 'mexas_wallet_movement_from_user_sync'
+      and not t.tgisinternal
+      and t.tgenabled <> 'D'
+  ) then
+    v_failures := array_append(v_failures, 'wallet movements user sync trigger missing');
   end if;
 
   if to_regprocedure('public.mexas_legacy_surface_locked_down()') is null then

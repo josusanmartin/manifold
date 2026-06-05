@@ -53,7 +53,6 @@ import {
 import { verifyMexasEscrowCapture } from 'web/lib/api/mexas-escrow-capture'
 import { submitMexasTreasuryTransfer } from 'web/lib/api/mexas-treasury-transfer'
 import { matchMexasOrderbookLimitOrderRpc } from 'web/lib/api/mexas-rpc-matching'
-import { recordMexasWalletMovement } from 'web/lib/api/mexas-wallet-movements'
 import { formatMexasUnits, getMexasBalanceUnits } from 'web/lib/crypto/mexas'
 import { z } from 'zod'
 
@@ -62,6 +61,7 @@ type ErrorResponse = { message: string; details?: unknown }
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
 const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY = 'mexasWalletOpenReservedAmount'
+const MEXAS_WALLET_SYNC_CONTEXT_KEY = 'mexasWalletBalanceSyncContext'
 const BALANCE_UPDATE_ATTEMPTS = 5
 const ORDER_PAGE_SIZE = 1000
 const ORDER_LOCK_ATTEMPTS = 20
@@ -219,31 +219,6 @@ function mexasUnitsDeltaToAmount(deltaUnits: bigint) {
   return sign * mexasUnitsToAmount(absUnits)
 }
 
-function getWalletMovementAmount(deltaAmount: number) {
-  return Math.round(Math.abs(deltaAmount) * 1e8) / 1e8
-}
-
-function buildWalletMovementIdempotencyKey(params: {
-  context: 'bet-sync'
-  newUnits: bigint
-  previousSyncTime?: unknown
-  previousUnits: bigint
-  userId: string
-  walletAddress: string
-}) {
-  return [
-    'mexas-wallet-sync',
-    params.context,
-    params.userId,
-    params.walletAddress.toLowerCase(),
-    params.previousUnits.toString(),
-    params.newUnits.toString(),
-    typeof params.previousSyncTime === 'number'
-      ? String(params.previousSyncTime)
-      : 'none',
-  ].join(':')
-}
-
 async function syncMexasWalletBalance(
   db: SupabaseClient,
   userRow: Row<'users'>
@@ -297,6 +272,7 @@ async function syncMexasWalletBalance(
       [MEXAS_WALLET_SYNC_UNITS_KEY]: currentUnits.toString(),
       [MEXAS_WALLET_SYNC_TIME_KEY]: Date.now(),
       [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: openReservedAmount,
+      [MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'bet-sync',
     }
 
     const { data: updatedUserRow, error } = await db
@@ -313,33 +289,7 @@ async function syncMexasWalletBalance(
       .maybeSingle()
 
     if (error) throw error
-    if (updatedUserRow) {
-      if (deltaUnits !== 0n) {
-        await recordMexasWalletMovement(db, {
-          amount: getWalletMovementAmount(deltaAmount),
-          deltaUnits,
-          idempotencyKey: buildWalletMovementIdempotencyKey({
-            context: 'bet-sync',
-            userId: latestUserRow.id,
-            walletAddress,
-            previousUnits,
-            newUnits: currentUnits,
-            previousSyncTime: latestData[MEXAS_WALLET_SYNC_TIME_KEY],
-          }),
-          internalBalanceBefore: latestUserRow.balance,
-          internalBalanceAfter: balance,
-          newWalletAmount: onChainAmount,
-          newWalletUnits: currentUnits,
-          openReservedAmount,
-          previousWalletAmount: mexasUnitsToAmount(previousUnits),
-          previousWalletUnits: previousUnits,
-          userId: latestUserRow.id,
-          walletAddress,
-          metadata: { context: 'bet-sync' },
-        })
-      }
-      return updatedUserRow
-    }
+    if (updatedUserRow) return updatedUserRow
 
     const { data: refetchedUserRow, error: refetchError } = await db
       .from('users')

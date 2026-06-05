@@ -23,13 +23,13 @@ import {
   getUserPrivyWalletAddress,
   submitMexasTreasuryTransfer,
 } from './mexas-treasury-transfer'
-import { recordMexasWalletMovement } from './mexas-wallet-movements'
 
 const EXPIRED_ORDER_PAGE_SIZE = 1000
 const OPEN_RESERVED_ORDER_PAGE_SIZE = 1000
 const MEXAS_WALLET_SYNC_UNITS_KEY = 'mexasWalletBalanceUnitsSynced'
 const MEXAS_WALLET_SYNC_TIME_KEY = 'mexasWalletBalanceSyncedTime'
 const MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY = 'mexasWalletOpenReservedAmount'
+const MEXAS_WALLET_SYNC_CONTEXT_KEY = 'mexasWalletBalanceSyncContext'
 const MEXAS_RELEASE_REASON_EXPIRED = 'expired'
 const MEXAS_RELEASE_REASON_MARKET_CLOSED = 'market-closed'
 const MEXAS_RELEASE_REASON_CANCELLED = 'cancelled'
@@ -76,31 +76,6 @@ function parseSyncedMexasUnits(data: Record<string, unknown>) {
   return 0n
 }
 
-function getWalletMovementAmount(deltaAmount: number) {
-  return Math.round(Math.abs(deltaAmount) * 1e8) / 1e8
-}
-
-function buildWalletMovementIdempotencyKey(params: {
-  context: 'backing-sync'
-  newUnits: bigint
-  previousSyncTime?: unknown
-  previousUnits: bigint
-  userId: string
-  walletAddress: string
-}) {
-  return [
-    'mexas-wallet-sync',
-    params.context,
-    params.userId,
-    params.walletAddress.toLowerCase(),
-    params.previousUnits.toString(),
-    params.newUnits.toString(),
-    typeof params.previousSyncTime === 'number'
-      ? String(params.previousSyncTime)
-      : 'none',
-  ].join(':')
-}
-
 async function syncAvailableBalanceFromBacking(params: {
   db: SupabaseClient
   onChainAmount: number
@@ -117,7 +92,6 @@ async function syncAvailableBalanceFromBacking(params: {
   if (!userRow) return
 
   const userData = getUserData(userRow)
-  const walletAddress = userData.privyWalletAddress
   const previousUnits = parseSyncedMexasUnits(userData)
   const deltaUnits = params.onChainUnits - previousUnits
   const deltaAmount = mexasUnitsDeltaToAmount(deltaUnits)
@@ -144,34 +118,10 @@ async function syncAvailableBalanceFromBacking(params: {
         [MEXAS_WALLET_SYNC_UNITS_KEY]: params.onChainUnits.toString(),
         [MEXAS_WALLET_SYNC_TIME_KEY]: Date.now(),
         [MEXAS_WALLET_OPEN_RESERVED_AMOUNT_KEY]: openReservedAmount,
+        [MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'backing-sync',
       },
     }
   )
-
-  if (deltaUnits !== 0n && typeof walletAddress === 'string') {
-    await recordMexasWalletMovement(params.db, {
-      amount: getWalletMovementAmount(deltaAmount),
-      deltaUnits,
-      idempotencyKey: buildWalletMovementIdempotencyKey({
-        context: 'backing-sync',
-        userId: params.userId,
-        walletAddress,
-        previousUnits,
-        newUnits: params.onChainUnits,
-        previousSyncTime: userData[MEXAS_WALLET_SYNC_TIME_KEY],
-      }),
-      internalBalanceBefore: userRow.balance,
-      internalBalanceAfter: balance,
-      newWalletAmount: params.onChainAmount,
-      newWalletUnits: params.onChainUnits,
-      openReservedAmount,
-      previousWalletAmount: mexasUnitsToAmount(previousUnits),
-      previousWalletUnits: previousUnits,
-      userId: params.userId,
-      walletAddress,
-      metadata: { context: 'backing-sync' },
-    })
-  }
 
   return updatedUserRow
 }

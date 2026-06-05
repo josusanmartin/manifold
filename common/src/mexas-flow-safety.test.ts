@@ -1260,8 +1260,9 @@ describe('MEXAS flow safety guardrails', () => {
       'onChainDeltaAmount: deltaAmount',
     ])
     expect(ordersSource).toContain(
-      'await recordMexasWalletMovement(params.db, {'
+      "[MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'backing-sync'"
     )
+    expect(ordersSource).not.toContain('recordMexasWalletMovement')
   })
 
   test('limits wallet withdrawals to synced MEX and refreshes after the chain receipt', () => {
@@ -3291,7 +3292,11 @@ describe('MEXAS flow safety guardrails', () => {
     const migration = readRepoFile(
       'backend/supabase/migrations/2026060501_add_mexas_wallet_movements.sql'
     )
+    const triggerMigration = readRepoFile(
+      'backend/supabase/migrations/2026060502_add_mexas_wallet_sync_trigger.sql'
+    )
     const compactMigration = compactWhitespace(migration)
+    const compactTriggerMigration = compactWhitespace(triggerMigration)
     const privySource = readRepoFile('web/pages/api/privy-user.ts')
     const betApiSource = readRepoFile('web/pages/api/v0/bet.ts')
     const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')
@@ -3359,30 +3364,50 @@ describe('MEXAS flow safety guardrails', () => {
     expect(compactMigration).toContain(
       'revoke execute on function public.mexas_wallet_movements_ledger_ready () from public, anon, authenticated'
     )
+    expectMarkersInOrder(triggerMigration, [
+      'or replace function public.mexas_record_wallet_movement_from_user_sync',
+      "v_new_units_text text := v_new_data ->> 'mexasWalletBalanceUnitsSynced'",
+      "v_wallet_address := lower",
+      "v_idempotency_key := concat_ws",
+      'insert into public.mexas_wallet_movements',
+      "'users-wallet-sync-trigger'",
+      'on conflict (idempotency_key) do nothing',
+      'create trigger mexas_wallet_movement_from_user_sync',
+      'after insert or update of data, balance',
+      'on public.users',
+      'execute function public.mexas_record_wallet_movement_from_user_sync',
+    ])
+    expect(compactTriggerMigration).toContain(
+      'revoke execute on function public.mexas_record_wallet_movement_from_user_sync () from public, anon, authenticated'
+    )
+    expectMarkersInOrder(triggerMigration, [
+      'or replace function public.mexas_wallet_movements_ledger_ready',
+      "to_regprocedure('public.mexas_record_wallet_movement_from_user_sync()') as sync_trigger_fn",
+      "t.tgname = 'mexas_wallet_movement_from_user_sync'",
+    ])
     expectMarkersInOrder(privySource, [
       'const deltaUnits = walletBalance.units - previousUnits',
       'const deltaAmount = mexasUnitsDeltaToAmount(deltaUnits)',
-      'movement:',
-      'idempotencyKey: buildWalletMovementIdempotencyKey',
-      'await recordMexasWalletMovement(db, walletSync.movement)',
+      "[MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'existing-user'",
     ])
-    expect(privySource).toContain('context: \'new-user\'')
+    expect(privySource).toContain(
+      "[MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'new-user'"
+    )
+    expect(privySource).not.toContain('recordMexasWalletMovement')
     expectMarkersInOrder(betApiSource, [
-      "import { recordMexasWalletMovement } from 'web/lib/api/mexas-wallet-movements'",
       'async function syncMexasWalletBalance',
       'const deltaUnits = currentUnits - previousUnits',
-      'await recordMexasWalletMovement(db, {',
-      "metadata: { context: 'bet-sync' }",
+      "[MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'bet-sync'",
     ])
+    expect(betApiSource).not.toContain('recordMexasWalletMovement')
     expectMarkersInOrder(ordersSource, [
-      "import { recordMexasWalletMovement } from './mexas-wallet-movements'",
       'async function syncAvailableBalanceFromBacking',
       'const deltaUnits = params.onChainUnits - previousUnits',
       'const totalDeposits =',
       'await setMexasUserBalanceCas',
-      'await recordMexasWalletMovement(params.db, {',
-      "metadata: { context: 'backing-sync' }",
+      "[MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'backing-sync'",
     ])
+    expect(ordersSource).not.toContain('recordMexasWalletMovement')
     expect(balanceHelperSource).toContain('totalDeposits?: number')
     expect(balanceHelperSource).toContain('total_deposits: options.totalDeposits')
     expect(profileApiSource).toContain(".from('mexas_wallet_movements')")
@@ -3404,7 +3429,13 @@ describe('MEXAS flow safety guardrails', () => {
       '2026060501_add_mexas_wallet_movements.sql'
     )
     expect(applySource).toContain(
+      '2026060502_add_mexas_wallet_sync_trigger.sql'
+    )
+    expect(applySource).toContain(
       'wallet movements ledger health RPC missing'
+    )
+    expect(applySource).toContain(
+      'wallet movements user sync trigger missing'
     )
     expect(readinessSource).toContain(
       "db.rpc('mexas_wallet_movements_ledger_ready')"
