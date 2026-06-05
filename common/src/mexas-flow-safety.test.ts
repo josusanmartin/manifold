@@ -1915,12 +1915,8 @@ describe('MEXAS flow safety guardrails', () => {
     expect(mexasContractPageSource).toContain('/api/v0/bet/cancel/')
     expect(mexasContractPageSource).toContain('<MexasLimitOrderPanel')
     expect(mexasContractPageSource).toContain("authedMexasFetch('/api/v0/bet'")
-    expect(mexasContractPageSource).toContain(
-      'function MexasResolutionControl'
-    )
-    expect(mexasContractPageSource).toContain(
-      '/mexas-resolution-readiness'
-    )
+    expect(mexasContractPageSource).toContain('function MexasResolutionControl')
+    expect(mexasContractPageSource).toContain('/mexas-resolution-readiness')
     expect(mexasContractPageSource).toContain('/resolve')
     expect(mexasContractPageSource).toContain('captureMexasEscrowStake')
     expect(mexasContractPageSource).toContain('mexasEscrowTxHash')
@@ -1938,7 +1934,9 @@ describe('MEXAS flow safety guardrails', () => {
     expect(mexasContractPageSource).not.toContain(
       "from './contract-description'"
     )
-    expect(mexasContractPageSource).not.toContain("from 'web/hooks/use-contract'")
+    expect(mexasContractPageSource).not.toContain(
+      "from 'web/hooks/use-contract'"
+    )
     expect(mexasContractPageSource).not.toContain("from 'web/hooks/use-user'")
     for (const legacyImport of [
       'HeaderActions',
@@ -1969,10 +1967,16 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'const JSON_PAYLOADS = [',
       '/api/search-markets-full?limit=5&sort=newest&filter=all&contractType=ALL',
+      'json MEXAS profile Privy creator search',
+      'creatorId=did%3Aprivy%3Acmpu5pabd00040cl429wyvwgc',
       'json MEXAS profile metrics missing user',
       '/api/v0/get-user-contract-metrics-with-contracts?userId=__missing_user__&limit=5&offset=0',
+      'json MEXAS profile metrics Privy user',
+      'order=lastBetTime&mexasOnly=true',
       'json MEXAS profile limit orders missing user',
       '/api/get-user-limit-orders-with-contracts?userId=__missing_user__&count=5',
+      'json MEXAS profile limit orders refresh',
+      'includeFilled=false&mexasOnly=true&refreshKey=0',
       'json MEXAS profile movements missing user',
       '/api/get-balance-changes?userId=__missing_user__&after=0',
       'json orderbook mexwcwin26a',
@@ -4261,8 +4265,15 @@ describe('MEXAS flow safety guardrails', () => {
 
     expect(source).toContain('shouldDisableRealtimeClient')
     expect(source).toContain('isMexasBrowserHostname(window.location.hostname)')
-    expect(source).toContain('!process.env.NEXT_PUBLIC_API_URL')
-    expect(source).toContain(
+    expect(source).toContain('isMexasConfiguredApiUrl')
+    expect(source).toContain('process.env.NEXT_PUBLIC_API_URL')
+    expect(source).toContain('isMexasWebsocketUrl')
+    expect(source).toContain('getWebsocketUrl()')
+    expect(source.replace(/\s+/g, ' ')).toContain(
+      'isMexasBrowserHostname(window.location.hostname) || isMexasConfiguredApiUrl()'
+    )
+    expect(source).toContain('isMexasWebsocketUrl()')
+    expect(source.replace(/\s+/g, ' ')).toContain(
       "typeof window !== 'undefined' && !shouldDisableRealtimeClient"
     )
   })

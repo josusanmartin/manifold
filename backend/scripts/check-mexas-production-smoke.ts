@@ -309,12 +309,24 @@ const JSON_PAYLOADS = [
     path: '/api/search-markets-full?limit=5&sort=newest&filter=all&contractType=ALL',
   },
   {
+    name: 'json MEXAS profile Privy creator search',
+    path: '/api/search-markets-full?creatorId=did%3Aprivy%3Acmpu5pabd00040cl429wyvwgc&contractType=BINARY&filter=all&sort=newest&limit=50&mexasOnly=true',
+  },
+  {
     name: 'json MEXAS profile metrics missing user',
     path: '/api/v0/get-user-contract-metrics-with-contracts?userId=__missing_user__&limit=5&offset=0',
   },
   {
+    name: 'json MEXAS profile metrics Privy user',
+    path: '/api/v0/get-user-contract-metrics-with-contracts?userId=did%3Aprivy%3Acmpu5pabd00040cl429wyvwgc&limit=50&offset=0&order=lastBetTime&mexasOnly=true',
+  },
+  {
     name: 'json MEXAS profile limit orders missing user',
     path: '/api/get-user-limit-orders-with-contracts?userId=__missing_user__&count=5',
+  },
+  {
+    name: 'json MEXAS profile limit orders refresh',
+    path: '/api/get-user-limit-orders-with-contracts?userId=did%3Aprivy%3Acmpu5pabd00040cl429wyvwgc&count=100&includeExpired=false&includeCancelled=false&includeFilled=false&mexasOnly=true&refreshKey=0',
   },
   {
     name: 'json MEXAS profile movements missing user',

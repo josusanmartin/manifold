@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { coerceBoolean } from './zod-types'
 
 export const FIRESTORE_DOC_REF_ID_REGEX = /^[a-zA-Z0-9_-]{1,}$/
+const USER_ID_REGEX = /^[a-zA-Z0-9_:-]{1,128}$/
 
 export const searchProps = z
   .object({
@@ -68,7 +69,8 @@ export const searchProps = z
       .or(z.literal('followed'))
       .optional(),
     forYou: z.union([z.literal('1'), z.literal('0')]).default('0'),
-    creatorId: z.string().regex(FIRESTORE_DOC_REF_ID_REGEX).optional(),
+    creatorId: z.string().regex(USER_ID_REGEX).optional(),
+    mexasOnly: coerceBoolean.optional().default(false),
     isPrizeMarket: z
       .union([
         z.literal('true'),

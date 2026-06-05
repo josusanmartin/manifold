@@ -3,10 +3,29 @@ import { getWebsocketUrl, isMexasBrowserHostname } from 'common/api/utils'
 import { ServerMessage } from 'common/api/websockets'
 import { APIRealtimeClient } from 'common/api/websocket-client'
 
+function isMexasHostUrl(url: string) {
+  try {
+    const normalized = /^(https?|wss?):\/\//.test(url) ? url : `https://${url}`
+    return isMexasBrowserHostname(new URL(normalized).hostname)
+  } catch {
+    return false
+  }
+}
+
+function isMexasConfiguredApiUrl() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL
+  return apiUrl ? isMexasHostUrl(apiUrl) : false
+}
+
+function isMexasWebsocketUrl() {
+  return isMexasHostUrl(getWebsocketUrl())
+}
+
 const shouldDisableRealtimeClient =
   typeof window !== 'undefined' &&
-  !process.env.NEXT_PUBLIC_API_URL &&
-  isMexasBrowserHostname(window.location.hostname)
+  (isMexasBrowserHostname(window.location.hostname) ||
+    isMexasConfiguredApiUrl() ||
+    isMexasWebsocketUrl())
 
 const client =
   typeof window !== 'undefined' && !shouldDisableRealtimeClient

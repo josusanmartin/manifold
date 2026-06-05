@@ -261,6 +261,7 @@ function getServer(): Server {
             offset: params.offset,
             token: 'MANA' as const,
             forYou: '0' as const,
+            mexasOnly: false,
             isPrizeMarket: '0' as const,
             includeLiteAnswers: true,
           }

@@ -224,8 +224,10 @@ function UserProfile(props: {
         <Col className="mx-4">
           <QueryUncontrolledTabs
             trackingName={'profile tabs'}
-            labelsParentClassName={'gap-0 sm:gap-4'}
-            labelClassName={'pb-2 pt-2'}
+            labelsParentClassName={'gap-1 sm:gap-4'}
+            labelClassName={
+              '!mr-0 min-w-[4.25rem] justify-center pb-2 pt-2 text-xs sm:!mr-4 sm:min-w-0 sm:text-sm'
+            }
             saveTabInLocalStorageKey={
               isCurrentUser ? `profile-tabs-v2-${user.id}` : undefined
             }
@@ -234,7 +236,9 @@ function UserProfile(props: {
                 title: 'Resumen',
                 queryString: 'summary',
                 prerender: true,
-                stackedTabIcon: <PresentationChartLineIcon className="h-5" />,
+                stackedTabIcon: (
+                  <PresentationChartLineIcon className="hidden h-5 sm:block" />
+                ),
                 content: (
                   <MexasPublicProfileSummary
                     user={user}
@@ -245,9 +249,17 @@ function UserProfile(props: {
               },
               {
                 title: 'Operaciones',
+                titleElement: (
+                  <>
+                    <span className="sm:hidden">Ops.</span>
+                    <span className="hidden sm:inline">Operaciones</span>
+                  </>
+                ),
                 queryString: 'trades',
                 prerender: true,
-                stackedTabIcon: <ViewListIcon className="h-5 w-5" />,
+                stackedTabIcon: (
+                  <ViewListIcon className="hidden h-5 w-5 sm:block" />
+                ),
                 content: (
                   <>
                     <Spacer h={2} />
@@ -266,7 +278,7 @@ function UserProfile(props: {
                 title: 'Mercados',
                 queryString: 'markets',
                 prerender: true,
-                stackedTabIcon: <ScaleIcon className="h-5" />,
+                stackedTabIcon: <ScaleIcon className="hidden h-5 sm:block" />,
                 content: (
                   <>
                     <Spacer h={4} />
@@ -276,14 +288,22 @@ function UserProfile(props: {
               },
               {
                 title: 'Movimientos',
-                stackedTabIcon: <ViewListIcon className="h-5" />,
+                titleElement: (
+                  <>
+                    <span className="sm:hidden">Movs.</span>
+                    <span className="hidden sm:inline">Movimientos</span>
+                  </>
+                ),
+                stackedTabIcon: (
+                  <ViewListIcon className="hidden h-5 sm:block" />
+                ),
                 content: <MexasProfileMovements user={user} />,
                 queryString: balanceChangesKey,
               },
               {
                 title: 'Wallet',
                 queryString: 'payments',
-                stackedTabIcon: <CashIcon className="h-5" />,
+                stackedTabIcon: <CashIcon className="hidden h-5 sm:block" />,
                 content: (
                   <>
                     <Spacer h={4} />

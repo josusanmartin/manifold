@@ -535,6 +535,7 @@ export const API = (_apiTypeCheck = {
         includeCancelled: coerceBoolean.optional().default(false),
         includeFilled: coerceBoolean.optional().default(false),
         mexasOnly: coerceBoolean.optional().default(false),
+        refreshKey: z.coerce.number().gte(0).optional(),
       })
       .strict(),
   },
