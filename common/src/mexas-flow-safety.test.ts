@@ -2143,7 +2143,6 @@ describe('MEXAS flow safety guardrails', () => {
     }
     for (const blockedPrefix of [
       "'/achievement-badges/'",
-      "'/data/'",
       "'/merch/'",
       "'/political-candidates/'",
       "'/welcome/'",

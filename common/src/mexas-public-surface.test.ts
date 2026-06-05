@@ -16,7 +16,6 @@ describe('MEXAS public static surface', () => {
     '/achievement-badges/highestNetworthMana.png',
     '/buy-mana-graphics/100k.png',
     '/cards/back_green.png',
-    '/data/elections-data.ts',
     '/landing/stonks.png',
     '/lottie/money-bag.json',
     '/market-tiers/Premium.svg',
