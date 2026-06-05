@@ -110,7 +110,7 @@ async function authedMexasFetch(
   })
   const data = await response.json().catch(() => undefined)
   if (!response.ok) {
-    throw new Error(data?.message ?? 'No se pudo completar la operacion.')
+    throw new Error(data?.message ?? 'No se pudo completar la operación.')
   }
   return data
 }
@@ -321,7 +321,7 @@ export function MexasContractPageContent(props: ContractParams) {
                 <Metric
                   label="Precio"
                   value={mexasOrderBookPriceLabel(midPrice)}
-                  sublabel={midPrice == null ? 'solo ordenes limite' : 'medio'}
+                  sublabel={midPrice == null ? 'solo órdenes límite' : 'medio'}
                 />
                 <Metric
                   label="Volumen"
@@ -331,12 +331,12 @@ export function MexasContractPageContent(props: ContractParams) {
                 <Metric
                   label="Operadores"
                   value={shortFormatNumber(liveContract.uniqueBettorCount ?? 0)}
-                  sublabel="unicos"
+                  sublabel="únicos"
                 />
                 <Metric
                   label="Libro"
                   value={loading ? '...' : shortFormatNumber(orders.length)}
-                  sublabel="ordenes abiertas"
+                  sublabel="órdenes abiertas"
                 />
               </div>
 
@@ -360,10 +360,10 @@ export function MexasContractPageContent(props: ContractParams) {
                   <Row className="items-center justify-between gap-3">
                     <Col>
                       <span className="text-ink-1000 font-semibold">
-                        Resolucion
+                        Resolución
                       </span>
                       <span className="text-ink-500 text-sm">
-                        Cierra el mercado y liquida MEX desde tesoreria.
+                        Cierra el mercado y liquida MEX desde tesorería.
                       </span>
                     </Col>
                     <Button
@@ -397,7 +397,7 @@ export function MexasContractPageContent(props: ContractParams) {
                     Operar con MEX
                   </span>
                   <span className="text-ink-500 text-sm">
-                    Solo ordenes limite
+                    Solo órdenes límite
                   </span>
                 </Col>
                 {privy.walletAddress ? (
@@ -438,7 +438,7 @@ export function MexasContractPageContent(props: ContractParams) {
                 />
               ) : (
                 <div className="text-ink-500 border-ink-200 rounded-md border px-3 py-4 text-sm">
-                  Este mercado no acepta ordenes nuevas.
+                  Este mercado no acepta órdenes nuevas.
                 </div>
               )}
             </Col>
@@ -548,7 +548,7 @@ function MexasResolutionControl(props: {
         setError(
           e instanceof Error
             ? e.message
-            : 'No se pudo verificar la resolucion.'
+            : 'No se pudo verificar la resolución.'
         )
       })
 
@@ -602,7 +602,7 @@ function MexasResolutionControl(props: {
 
       <div className="border-ink-200 bg-canvas-50 rounded-md border px-3 py-2 text-sm">
         {!readiness && !error ? (
-          <span className="text-ink-500">Verificando liquidacion...</span>
+          <span className="text-ink-500">Verificando liquidación...</span>
         ) : readiness ? (
           <Col className="gap-1">
             <span>
@@ -739,7 +739,7 @@ function MexasLimitOrderPanel(props: {
     error ??
     (ordersPaused
       ? readiness?.message ??
-        'Las nuevas ordenes estan pausadas mientras se completa MEXAS.'
+        'Las nuevas órdenes están pausadas mientras se completa MEXAS.'
       : undefined) ??
     (crossingBlocked
       ? 'El precio cruza el libro. Abre una orden que agregue liquidez.'
@@ -774,11 +774,11 @@ function MexasLimitOrderPanel(props: {
     ) {
       throw new Error(
         latestReadiness.message ??
-          'Las ordenes MEXAS estan pausadas hasta completar la liquidacion on-chain.'
+          'Las órdenes MEXAS están pausadas hasta completar la liquidación on-chain.'
       )
     }
     if (!mexasTreasuryAddress || !isAddress(mexasTreasuryAddress)) {
-      throw new Error('La tesoreria MEXAS no esta configurada.')
+      throw new Error('La tesorería MEXAS no está configurada.')
     }
 
     const walletAddress =
@@ -878,7 +878,7 @@ function MexasLimitOrderPanel(props: {
         setPendingTx(undefined)
         if (message.includes('already attached to an order')) {
           setError(
-            'La transferencia MEX ya esta asociada a una orden. Actualiza el mercado para verla.'
+            'La transferencia MEX ya está asociada a una orden. Actualiza el mercado para verla.'
           )
         } else {
           setError(
@@ -965,7 +965,7 @@ function MexasLimitOrderPanel(props: {
             <span>{price === undefined ? '--' : formatPercent(price)}</span>
           </Row>
           <Row className="justify-between">
-            <span className="text-ink-500">Pago maximo</span>
+            <span className="text-ink-500">Pago máximo</span>
             <span>{formatMex(shares)}</span>
           </Row>
           <Row className="justify-between">
@@ -1007,7 +1007,7 @@ function MexasLimitOrderPanel(props: {
           : readinessLoading
           ? 'Verificando libro...'
           : ordersPaused
-          ? 'Ordenes pausadas'
+          ? 'Órdenes pausadas'
           : crossingBlocked
           ? 'El precio cruza el libro'
           : pendingTx
@@ -1062,7 +1062,7 @@ function MexasUserOrders(props: {
       <Row className="border-ink-200 items-center justify-between border-b px-4 py-3">
         <Col>
           <span className="text-ink-1000 font-semibold">
-            Tus ordenes abiertas
+            Tus órdenes abiertas
           </span>
           <span className="text-ink-500 text-xs">
             Puedes cancelar cualquier orden sin ejecutar.
@@ -1075,7 +1075,7 @@ function MexasUserOrders(props: {
 
       {userOrders.length === 0 ? (
         <div className="text-ink-500 px-4 py-4 text-sm">
-          No tienes ordenes abiertas en este mercado.
+          No tienes órdenes abiertas en este mercado.
         </div>
       ) : (
         <div className="overflow-x-auto px-4 py-2">
@@ -1084,7 +1084,7 @@ function MexasUserOrders(props: {
               <tr className="text-ink-500 border-ink-100 border-b text-left text-xs uppercase">
                 <th className="py-2 font-medium">Resultado</th>
                 <th className="py-2 font-medium">Precio</th>
-                <th className="py-2 font-medium">Tamano</th>
+                <th className="py-2 font-medium">Tamaño</th>
                 <th className="py-2 text-right font-medium"></th>
               </tr>
             </thead>
