@@ -735,6 +735,9 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('keeps profile tabs and wallet payments on the Spanish MEXAS surface', () => {
     const profileSource = readRepoFile('web/pages/[username]/index.tsx')
+    const mexasProfileTabsSource = readRepoFile(
+      'web/components/profile/mexas-profile-tabs.tsx'
+    )
     const userContractsSource = readRepoFile(
       'web/components/profile/user-contracts-list.tsx'
     )
@@ -795,13 +798,32 @@ describe('MEXAS flow safety guardrails', () => {
     expect(profileSource).toContain('hasCreatedQuestion={hasCreatedQuestion}')
     expect(profileSource).toContain('<Title>Cuenta eliminada</Title>')
     expect(profileSource).toContain('Esta cuenta fue eliminada.')
-    expect(profileSource).toContain('Perfil público')
-    expect(profileSource).toContain('pública de MEXAS')
+    expect(mexasProfileTabsSource).toContain('Perfil publico')
+    expect(mexasProfileTabsSource).toContain(
+      'Las operaciones visibles en esta plataforma se liquidan en MEX'
+    )
+    expect(mexasProfileTabsSource).toContain('MexasOpenOrders')
+    expect(mexasProfileTabsSource).toContain(
+      '/api/get-user-limit-orders-with-contracts'
+    )
+    expect(mexasProfileTabsSource).toContain(
+      '/api/v0/get-user-contract-metrics-with-contracts'
+    )
+    expect(mexasProfileTabsSource).toContain('/api/get-balance-changes')
+    expect(mexasProfileTabsSource).toContain('/api/search-markets-full')
+    expect(mexasProfileTabsSource).toContain('/api/v0/bet/cancel/')
     expect(profileSource).not.toContain('Deleted account')
     expect(profileSource).not.toContain("This user's account has been deleted.")
-    expect(profileSource).toContain(
+    expect(profileSource).not.toContain(
       'useUserBans(currentUser ? user.id : undefined)'
     )
+    expect(profileSource).not.toContain('UserBetsTable')
+    expect(profileSource).not.toContain('UserContractsList')
+    expect(profileSource).not.toContain('BalanceChangeTable')
+    expect(profileSource).not.toContain('UserPayments')
+    expect(profileSource).not.toContain('BlockedUser')
+    expect(profileSource).not.toContain('StackedUserNames')
+    expect(profileSource).not.toContain('Avatar')
     expect(profileSource).not.toContain('useWebsocketUser')
     expect(profileSource).not.toContain('PortfolioSummary')
     expect(profileSource).not.toContain('PortfolioValueSection')
@@ -843,9 +865,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(balanceChangesSource).toContain('mexasOnly: true')
     expect(balanceChangesSource).toContain('filter(isMexasBalanceChange)')
     expect(balanceChangesSource).toContain('isMexasTreasuryChange(change)')
-    expect(balanceChangesSource).toContain(
-      'MexasTreasuryBalanceChangeRow'
-    )
+    expect(balanceChangesSource).toContain('MexasTreasuryBalanceChangeRow')
     expect(balanceChangesSource).toContain('mexasTreasuryTransferTitle')
     expect(balanceChangesSource).toContain('Liberacion de orden')
     expect(balanceChangesSource).toContain('Pago de resolucion')
@@ -873,18 +893,14 @@ describe('MEXAS flow safety guardrails', () => {
       'getMexasUserLimitOrdersWithContracts'
     )
     expect(mexasProfileApiSource).toContain('getMexasBalanceChanges')
-    expect(mexasProfileApiSource).toContain(
-      ".from('mexas_treasury_transfers')"
-    )
+    expect(mexasProfileApiSource).toContain(".from('mexas_treasury_transfers')")
     expect(mexasProfileApiSource).toContain(
       ".in('status', ['submitted', 'confirmed'])"
     )
-    expect(mexasProfileApiSource).toContain("key: `${bet.id}-open`")
+    expect(mexasProfileApiSource).toContain('key: `${bet.id}-open`')
     expect(mexasProfileApiSource).toContain('amount: -amount')
     expect(mexasProfileApiSource).toContain('isMexasTestUnwound')
-    expect(mexasProfileApiSource).toContain(
-      "type: 'mexas_treasury_transfer'"
-    )
+    expect(mexasProfileApiSource).toContain("type: 'mexas_treasury_transfer'")
     expect(mexasProfileApiSource).toContain(
       "transferType === 'withdrawal' ? -amount : amount"
     )
@@ -1285,10 +1301,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain('setOpenReservedAmount')
     expect(source).toContain('órdenes abiertas descuentan MEX disponible')
     expect(source).toContain('las operaciones ejecutadas')
-    expectMarkersInOrder(walletPageSource, [
-      'u operaciones',
-      'ejecutadas.',
-    ])
+    expectMarkersInOrder(walletPageSource, ['u operaciones', 'ejecutadas.'])
     expect(source).toContain(
       'Cancela órdenes abiertas o espera la resolución de operaciones'
     )
@@ -2096,7 +2109,7 @@ describe('MEXAS flow safety guardrails', () => {
       "path: '/testimonials/testimonials.json'",
       '"testimonials": []',
       'const BLOCKED_STATIC_PATHS = [',
-      '...MEXAS_BLOCKED_PUBLIC_PATHS',
+      '...MEXAS_BLOCKED_PUBLIC_SMOKE_PATHS',
       "'/%6dana.svg'",
       "'//mana.svg'",
       'async function checkStaticFile',
@@ -2123,8 +2136,19 @@ describe('MEXAS flow safety guardrails', () => {
       "'/custom-components/manaCoin.tsx'",
       "'/mana.svg'",
       "'/predictle-logo.png'",
+      "'/logo.svg'",
+      "'/twitter-logo.svg'",
     ]) {
       expect(publicSurfaceSource).toContain(blockedPath)
+    }
+    for (const blockedPrefix of [
+      "'/achievement-badges/'",
+      "'/data/'",
+      "'/merch/'",
+      "'/political-candidates/'",
+      "'/welcome/'",
+    ]) {
+      expect(publicSurfaceSource).toContain(blockedPrefix)
     }
     expectMarkersInOrder(publicSurfaceSource, [
       'function decodePathname',
@@ -2134,7 +2158,10 @@ describe('MEXAS flow safety guardrails', () => {
       'trimmedPath.toLowerCase()',
       'const MEXAS_BLOCKED_PUBLIC_PATH_SET = new Set',
       'MEXAS_BLOCKED_PUBLIC_PATHS.map(normalizeMexasPublicPath)',
-      'MEXAS_BLOCKED_PUBLIC_PATH_SET.has(normalizeMexasPublicPath(pathname))',
+      'const MEXAS_BLOCKED_PUBLIC_PATH_PREFIXES_NORMALIZED',
+      'MEXAS_BLOCKED_PUBLIC_PATH_PREFIXES.map(normalizeMexasPublicPath)',
+      'MEXAS_BLOCKED_PUBLIC_PATH_SET.has(path)',
+      'path.startsWith(prefix)',
     ])
     for (const file of [sitemap, robots, opensearch]) {
       expect(file).toContain('mexas-manifold.vercel.app')
@@ -2902,9 +2929,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain(
       '2026060301_add_mexas_treasury_settlement_ledger.sql'
     )
-    expect(source).toContain(
-      '20260604212354_enforce_mex_contract_token.sql'
-    )
+    expect(source).toContain('20260604212354_enforce_mex_contract_token.sql')
     expect(source).toContain('contracts.token default is not MEX')
     expect(source).toContain('contracts_token_check is not MEX-only')
     expect(source).toContain('pg_get_constraintdef(con.oid)')
@@ -3144,9 +3169,7 @@ describe('MEXAS flow safety guardrails', () => {
       "p.polname = 'mexas_treasury_transfers_service_role_only'",
       "to_regclass('public.mexas_treasury_transfers_bet_id_idx') is not null",
     ])
-    expect(applySource).toContain(
-      '2026060401_harden_mexas_treasury_ledger.sql'
-    )
+    expect(applySource).toContain('2026060401_harden_mexas_treasury_ledger.sql')
     expect(applySource).toContain(
       'treasury settlement ledger service-role policy missing'
     )
@@ -3182,7 +3205,7 @@ describe('MEXAS flow safety guardrails', () => {
       'public.mexas_legacy_surface_locked_down',
       "has_table_privilege('anon', oid, 'SELECT')",
       "has_function_privilege('anon', f.signature, 'EXECUTE')",
-      "search_path=public",
+      'search_path=public',
       'grant',
       'service_role',
     ])
@@ -3196,7 +3219,7 @@ describe('MEXAS flow safety guardrails', () => {
       'revoke execute on function %s from public, anon, authenticated',
       'public.mexas_legacy_surface_locked_down',
       "has_function_privilege('anon', f.signature, 'EXECUTE')",
-      "search_path=public",
+      'search_path=public',
       'grant',
       'service_role',
     ])
@@ -4080,9 +4103,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain("...devices['iPhone 14']")
     expect(source).toContain("'/wallet'")
     expect(source).toContain("'/checkout'")
-    expect(source).toContain(
-      "'/mexas-test/ganara-mexico-la-copa-mundial-2026'"
-    )
+    expect(source).toContain("'/mexas-test/ganara-mexico-la-copa-mundial-2026'")
     expect(source).toContain(
       "'/mexas-test/terminara-la-guerra-entre-rusia-y-ucrania-antes-del-31-de-diciembre-de-2026'"
     )
@@ -4094,17 +4115,21 @@ describe('MEXAS flow safety guardrails', () => {
     expect(source).toContain("page.on('console'")
     expect(source).toContain("page.on('pageerror'")
     expect(source).toContain("page.on('requestfailed'")
-    expect(source).toContain("request.failure()?.errorText === 'net::ERR_ABORTED'")
+    expect(source).toContain(
+      "request.failure()?.errorText === 'net::ERR_ABORTED'"
+    )
     expect(source).toContain("page.on('response'")
     expect(source).toContain('horizontalOverflow')
     expect(source).toContain('function formatUnknownError')
     expect(source).toContain('function isIgnoredConsoleError')
     expect(source).toContain("message.includes('auth.privy.io/api/v1/apps/')")
     expect(source).toContain("message.includes(`from origin '${SITE_ORIGIN}'")
-    expect(source).toContain("message === 'error: Failed to load resource: net::ERR_FAILED'")
+    expect(source).toContain(
+      "message === 'error: Failed to load resource: net::ERR_FAILED'"
+    )
     expect(source).toContain('launch readiness origin check')
     expect(source).toContain("state: 'attached'")
-    expect(source).toContain("mkdirSync(ARTIFACT_DIR, { recursive: true })")
+    expect(source).toContain('mkdirSync(ARTIFACT_DIR, { recursive: true })')
     expect(source).toContain('async function checkVercelChallengePreflight')
     expect(source).toContain('(globalThis as any).fetch')
     expect(source).toContain("redirect: 'manual'")
@@ -4170,7 +4195,9 @@ describe('MEXAS flow safety guardrails', () => {
   })
 
   test('MEXAS Vercel hosts do not open the inherited backend websocket', () => {
-    const source = readRepoFile('client-common/src/hooks/use-api-subscription.ts')
+    const source = readRepoFile(
+      'client-common/src/hooks/use-api-subscription.ts'
+    )
 
     expect(source).toContain('shouldDisableRealtimeClient')
     expect(source).toContain('isMexasBrowserHostname(window.location.hostname)')

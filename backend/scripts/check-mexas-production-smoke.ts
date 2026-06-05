@@ -1,5 +1,5 @@
 import { MEXAS_BLOCKED_API_SMOKE_PATHS } from 'common/mexas-api-surface'
-import { MEXAS_BLOCKED_PUBLIC_PATHS } from 'common/mexas-public-surface'
+import { MEXAS_BLOCKED_PUBLIC_SMOKE_PATHS } from 'common/mexas-public-surface'
 
 type SmokeResult = {
   details: string
@@ -295,7 +295,7 @@ const STATIC_FILES = [
 ]
 
 const BLOCKED_STATIC_PATHS = [
-  ...MEXAS_BLOCKED_PUBLIC_PATHS,
+  ...MEXAS_BLOCKED_PUBLIC_SMOKE_PATHS,
   '/MANA.svg',
   '/%6dana.svg',
   '//mana.svg',

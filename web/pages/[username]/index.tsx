@@ -1,47 +1,38 @@
 import {
   CashIcon,
-  ChevronDownIcon,
   PresentationChartLineIcon,
   ScaleIcon,
   ViewListIcon,
 } from '@heroicons/react/outline'
 import clsx from 'clsx'
 import { getUserForStaticProps } from 'common/supabase/users'
-import { buildArray } from 'common/util/array'
 import { removeUndefinedProps } from 'common/util/object'
 import Head from 'next/head'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { useEffect, useState } from 'react'
-import { UserBetsTable } from 'web/components/bet/user-bets-table'
-import { UserSettingButton } from 'web/components/buttons/user-settings-button'
-import { BackButton } from 'web/components/contract/back-button'
+import { useEffect } from 'react'
 import { JsonLd } from 'web/components/JsonLd'
 import { Col } from 'web/components/layout/col'
 import { Page } from 'web/components/layout/page'
 import { Row } from 'web/components/layout/row'
 import { Spacer } from 'web/components/layout/spacer'
 import { QueryUncontrolledTabs } from 'web/components/layout/tabs'
-import { BalanceChangeTable } from 'web/components/portfolio/balance-change-table'
-import { BlockedUser } from 'web/components/profile/blocked-user'
-import { UserContractsList } from 'web/components/profile/user-contracts-list'
+import {
+  MexasProfileMarkets,
+  MexasProfileMovements,
+  MexasProfileOperations,
+  MexasProfileWallet,
+  MexasPublicProfileSummary,
+} from 'web/components/profile/mexas-profile-tabs'
 import { SEO } from 'web/components/SEO'
-import { Avatar } from 'web/components/widgets/avatar'
-import { FullscreenConfetti } from 'web/components/widgets/fullscreen-confetti'
-import ImageWithBlurredShadow from 'web/components/widgets/image-with-blurred-shadow'
-import { Linkify } from 'web/components/widgets/linkify'
 import { Title } from 'web/components/widgets/title'
-import { StackedUserNames, UserLink } from 'web/components/widgets/user-link'
 import { useAdminOrMod } from 'web/hooks/use-admin'
-import { useHeaderIsStuck } from 'web/hooks/use-header-is-stuck'
-import { useIsMobile } from 'web/hooks/use-is-mobile'
 import { useSaveReferral } from 'web/hooks/use-save-referral'
 import { usePrivateUser, useUser } from 'web/hooks/use-user'
-import { useUserBans } from 'web/hooks/use-user-bans'
 import { User } from 'web/lib/firebase/users'
 import { buildPersonProfile } from 'web/lib/json-ld'
 import { db } from 'web/lib/supabase/db'
 import Custom404 from 'web/pages/404'
-import { UserPayments } from 'web/pages/payments'
 
 export const getStaticProps = async (props: {
   params: {
@@ -97,7 +88,14 @@ export default function UserPage(props: {
   else if (user.userDeleted && !isAdminOrMod) return <DeletedUser />
 
   return privateUser && blockedByCurrentUser ? (
-    <BlockedUser user={user} privateUser={privateUser} />
+    <Page trackPageView={'blocked user profile'}>
+      <Col className="mx-auto max-w-2xl gap-4 px-4 py-10">
+        <Title>Wallet bloqueada</Title>
+        <p className="text-ink-600">
+          Has bloqueado esta Wallet. Puedes cambiarlo desde tu configuracion.
+        </p>
+      </Col>
+    </Page>
   ) : (
     <UserProfile user={user} {...profileProps} />
   )
@@ -117,50 +115,6 @@ export const DeletedUser = () => {
   )
 }
 
-function MexasPublicProfileSummary(props: {
-  user: User
-  hasCreatedQuestion: boolean
-  isCurrentUser: boolean
-}) {
-  const { user, hasCreatedQuestion, isCurrentUser } = props
-
-  return (
-    <Col className="border-ink-200 mt-4 gap-4 border-y py-4">
-      <Row className="flex-wrap gap-3">
-        <Col className="min-w-[180px] flex-1 gap-1">
-          <span className="text-ink-500 text-xs font-semibold uppercase">
-            Wallet
-          </span>
-          <span className="text-ink-1000 text-lg font-semibold">
-            @{user.username}
-          </span>
-        </Col>
-        <Col className="min-w-[180px] flex-1 gap-1">
-          <span className="text-ink-500 text-xs font-semibold uppercase">
-            Mercados MEX
-          </span>
-          <span className="text-ink-1000 text-lg font-semibold">
-            {hasCreatedQuestion ? 'Activos' : 'Sin mercados creados'}
-          </span>
-        </Col>
-        <Col className="min-w-[180px] flex-1 gap-1">
-          <span className="text-ink-500 text-xs font-semibold uppercase">
-            Acceso
-          </span>
-          <span className="text-ink-1000 text-lg font-semibold">
-            {isCurrentUser ? 'Tu perfil' : 'Perfil público'}
-          </span>
-        </Col>
-      </Row>
-      <p className="text-ink-600 max-w-3xl text-sm">
-        Las operaciones visibles en esta fork se liquidan en MEX. Usa las
-        pestañas de operaciones, mercados y movimientos para revisar actividad
-        pública de MEXAS.
-      </p>
-    </Col>
-  )
-}
-
 function UserProfile(props: {
   user: User
   rating?: number
@@ -169,36 +123,16 @@ function UserProfile(props: {
   shouldIgnoreUser: boolean
   hasCreatedQuestion: boolean
 }) {
-  const {
-    rating,
-    hasCreatedQuestion,
-    shouldIgnoreUser,
-    reviewCount,
-    averageRating,
-  } = props
+  const { hasCreatedQuestion, shouldIgnoreUser } = props
   const user = props.user
-  const isMobile = useIsMobile()
   const router = useRouter()
   const currentUser = useUser()
   useSaveReferral(currentUser, {
     defaultReferrerUsername: user.username,
   })
   const isCurrentUser = user.id === currentUser?.id
-  const [expandProfileInfo, setExpandProfileInfo] = useState(false)
-  useEffect(() => {
-    // wait for user to load
-    if (currentUser === undefined) return
-    if (!user.isBannedFromPosting && !user.userDeleted && !isCurrentUser) {
-      setExpandProfileInfo(true)
-    }
-  }, [user.isBannedFromPosting, user.userDeleted, currentUser, user.id])
-  const [showConfetti, setShowConfetti] = useState(false)
-  const { bans: userBans } = useUserBans(currentUser ? user.id : undefined)
-  const { ref: titleRef, headerStuck } = useHeaderIsStuck()
 
   useEffect(() => {
-    const claimedMex = router.query['claimed-mex'] === 'yes'
-    setShowConfetti(claimedMex)
     const query = { ...router.query }
     if (query['claimed-mex'] || query.show) {
       const queriesToDelete = ['claimed-mex', 'show', 'badge']
@@ -236,7 +170,7 @@ function UserProfile(props: {
       key={user.id}
       trackPageView={'user page'}
       trackPageProps={{ username: user.username }}
-      className={clsx(isCurrentUser ? 'lg:!mt-0' : 'lg:mt-4')}
+      className={clsx('lg:mt-4')}
     >
       <SEO
         title={`${user.name} (@${user.username})`}
@@ -260,113 +194,32 @@ function UserProfile(props: {
         }
         id="person"
       />
-      {showConfetti && <FullscreenConfetti />}
 
       <Col className="relative">
-        <Row
-          className={
-            'bg-canvas-0 sticky top-0 z-10 h-12 w-full justify-between gap-1 sm:static sm:h-auto'
-          }
-        >
-          {isMobile && (
-            <>
-              <BackButton className="px-6" />
-
-              <div
-                className={clsx(
-                  'self-center opacity-0 transition-opacity first:ml-4',
-                  headerStuck && 'opacity-100'
-                )}
-                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              >
-                <UserLink user={user} noLink />
-              </div>
-
-              <UserSettingButton user={user} />
-            </>
-          )}
-        </Row>
-
-        <Row
-          className={clsx('mx-4 flex-wrap justify-between gap-2 py-1')}
-          ref={titleRef}
-        >
-          {isCurrentUser || shouldIgnoreUser ? (
-            <button
-              className="group flex gap-2 py-1 pr-2"
-              onClick={() => setExpandProfileInfo((v) => !v)}
-            >
-              <Col className={'relative max-h-14'}>
-                <ImageWithBlurredShadow
-                  image={
-                    <Avatar
-                      username={user.username}
-                      avatarUrl={user.avatarUrl}
-                      size={'lg'}
-                      className="bg-ink-1000"
-                      noLink
-                      entitlements={user.entitlements}
-                      displayContext="profile_page"
-                      animateHat={expandProfileInfo}
-                    />
-                  }
-                  size={48}
-                />
-
-                <ChevronDownIcon
-                  className={clsx(
-                    'group-hover:bg-primary-700 bg-primary-600 shadow-primary-300 text-ink-0 absolute bottom-0 right-0 z-20 h-5 w-5 rounded-full p-0.5 shadow-sm transition-all',
-                    expandProfileInfo ? 'rotate-180' : 'rotate-0'
-                  )}
-                />
-              </Col>
-              <StackedUserNames
-                usernameClassName={'sm:text-base'}
-                className={'font-bold sm:mr-0 sm:text-xl'}
-                user={user}
-                displayContext="profile_page"
-                bans={userBans}
-              />
-            </button>
-          ) : (
-            <Row className="group gap-2 py-1">
-              <ImageWithBlurredShadow
-                image={
-                  <Avatar
-                    username={user.username}
-                    avatarUrl={user.avatarUrl}
-                    size={'lg'}
-                    className="bg-ink-1000"
-                    noLink
-                    entitlements={user.entitlements}
-                    displayContext="profile_page"
-                  />
-                }
-                size={48}
-              />
-              <StackedUserNames
-                usernameClassName={'sm:text-base'}
-                className={'font-bold sm:mr-0 sm:text-xl'}
-                user={user}
-                displayContext="profile_page"
-                bans={userBans}
-              />
-            </Row>
-          )}
-
-          <Row className={'items-center gap-1 sm:gap-2'}>
-            {!isMobile && <UserSettingButton user={user} />}
+        <Row className="mx-4 flex-wrap items-start justify-between gap-4 py-2">
+          <Row className="min-w-0 gap-3">
+            <div className="bg-primary-600 text-ink-0 flex h-12 w-12 shrink-0 items-center justify-center rounded text-lg font-bold">
+              {user.name?.[0]?.toUpperCase() ?? user.username[0].toUpperCase()}
+            </div>
+            <Col className="min-w-0 gap-1">
+              <h1 className="text-ink-1000 truncate text-2xl font-bold">
+                {user.name}
+              </h1>
+              <span className="text-ink-500">@{user.username}</span>
+              {user.bio && (
+                <p className="text-ink-600 max-w-3xl text-sm">{user.bio}</p>
+              )}
+            </Col>
           </Row>
+          {isCurrentUser && (
+            <Link
+              href="/wallet"
+              className="border-ink-300 text-ink-900 hover:bg-canvas-50 rounded border px-3 py-2 text-sm font-semibold"
+            >
+              Wallet
+            </Link>
+          )}
         </Row>
-        {expandProfileInfo && (
-          <Col className={'mx-4 mt-1 gap-2'}>
-            {user.bio && (
-              <div className="sm:text-md mt-1 text-sm">
-                <Linkify text={user.bio}></Linkify>
-              </div>
-            )}
-          </Col>
-        )}
 
         <Col className="mx-4">
           <QueryUncontrolledTabs
@@ -376,7 +229,7 @@ function UserProfile(props: {
             saveTabInLocalStorageKey={
               isCurrentUser ? `profile-tabs-v2-${user.id}` : undefined
             }
-            tabs={buildArray(
+            tabs={[
               {
                 title: 'Resumen',
                 queryString: 'summary',
@@ -390,8 +243,9 @@ function UserProfile(props: {
                   />
                 ),
               },
-              !!user.lastBetTime && {
+              {
                 title: 'Operaciones',
+                queryString: 'trades',
                 prerender: true,
                 stackedTabIcon: <ViewListIcon className="h-5 w-5" />,
                 content: (
@@ -401,30 +255,29 @@ function UserProfile(props: {
                       Operaciones
                     </div>
                     <Spacer h={4} />
-                    <UserBetsTable user={user} />
+                    <MexasProfileOperations
+                      user={user}
+                      isCurrentUser={isCurrentUser}
+                    />
                   </>
                 ),
               },
-              hasCreatedQuestion && {
+              {
                 title: 'Mercados',
+                queryString: 'markets',
                 prerender: true,
                 stackedTabIcon: <ScaleIcon className="h-5" />,
                 content: (
                   <>
                     <Spacer h={4} />
-                    <UserContractsList
-                      creator={user}
-                      rating={rating}
-                      reviewCount={reviewCount}
-                      averageRating={averageRating}
-                    />
+                    <MexasProfileMarkets user={user} />
                   </>
                 ),
               },
               {
                 title: 'Movimientos',
                 stackedTabIcon: <ViewListIcon className="h-5" />,
-                content: <BalanceChangeTable user={user} />,
+                content: <MexasProfileMovements user={user} />,
                 queryString: balanceChangesKey,
               },
               {
@@ -434,11 +287,14 @@ function UserProfile(props: {
                 content: (
                   <>
                     <Spacer h={4} />
-                    <UserPayments userId={user.id} />
+                    <MexasProfileWallet
+                      user={user}
+                      isCurrentUser={isCurrentUser}
+                    />
                   </>
                 ),
-              }
-            )}
+              },
+            ]}
           />
         </Col>
       </Col>
