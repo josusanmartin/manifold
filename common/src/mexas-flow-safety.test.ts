@@ -1848,6 +1848,10 @@ describe('MEXAS flow safety guardrails', () => {
       "response.headers.get('x-vercel-mitigated') === 'challenge'",
       'function describeResponseStatus',
       'Vercel Firewall challenge active',
+      'function isVercelChallengeFailure',
+      "result.details.includes('Vercel Firewall challenge active')",
+      'function appendResults',
+      'nextResults.some(isVercelChallengeFailure)',
       'describeResponseStatus(response)',
     ])
     expectMarkersInOrder(readinessSource, [
@@ -1913,7 +1917,7 @@ describe('MEXAS flow safety guardrails', () => {
       'getVercelProductionDeployment(siteUrl)',
       'deployment freshness',
       'await checkSchedulerFreshness(commitInfo)',
-      "site ${path}",
+      'site ${path}',
     ])
 
     expect(docsSource).toContain('scheduler freshness')
@@ -2119,6 +2123,7 @@ describe('MEXAS flow safety guardrails', () => {
       "checkVercelChallengePreflight('/checkout', 'GET')",
       "checkVercelChallengePreflight('/checkout', 'HEAD')",
       "if (challengePreflight.some((result) => result.status === 'fail'))",
+      'appendResults(results, challengePreflight)',
       '/api/v0/bets?contractId=mexwcwin26a&kinds=open-limit',
       'bets mexwcwin26a open-limit',
       '/api/v0/bets?contractSlug=ganara-mexico-la-copa-mundial-2026&kinds=open-limit',
@@ -2134,7 +2139,7 @@ describe('MEXAS flow safety guardrails', () => {
     ])
     expectMarkersInOrder(source, [
       'for (const path of BLOCKED_API_PATHS)',
-      'results.push(await checkBlockedApi(path))',
+      'appendResults(results, await checkBlockedApi(path))',
     ])
     expectMarkersInOrder(source, [
       'local MEXAS portfolio missing user',
@@ -2464,7 +2469,7 @@ describe('MEXAS flow safety guardrails', () => {
     }
     expectMarkersInOrder(source, [
       'for (const path of BLOCKED_API_PATHS)',
-      'results.push(await checkBlockedApi(path))',
+      'appendResults(results, await checkBlockedApi(path))',
     ])
   })
 
@@ -3014,9 +3019,9 @@ describe('MEXAS flow safety guardrails', () => {
       'Matching cannot be ready while escrow capture is disabled.',
       'Paused order placement is missing an operator message.',
       'Resting-only order mode is missing an operator message.',
-      "results.push(await checkOrderReadiness('mexwcwin26a'))",
-      "results.push(await checkOrderReadiness('ukrwarend26a'))",
-      "results.push(await checkBlockedOrderReadiness('not-a-mexas-market'))",
+      "appendResults(results, await checkOrderReadiness('mexwcwin26a'))",
+      "appendResults(results, await checkOrderReadiness('ukrwarend26a'))",
+      "await checkBlockedOrderReadiness('not-a-mexas-market')",
     ])
     expect(helper).toContain("db.rpc('mexas_orderbook_matching_engine_ready')")
     expectMarkersInOrder(migration, [

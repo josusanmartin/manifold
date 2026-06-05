@@ -415,6 +415,22 @@ function describeResponseStatus(response: Response) {
   return `${response.status} Vercel Firewall challenge active. Disable Attack Challenge Mode interactively with "vercel firewall attack-mode disable" or adjust the Vercel WAF challenge rule before launch. If Attack Mode is already disabled, this can be Vercel system mitigation against the probing IP; wait for cooldown, reduce smoke request rate with MEXAS_SMOKE_REQUEST_DELAY_MS, or have a human temporarily run "vercel firewall system-mitigations pause" for QA and resume protection afterwards.`
 }
 
+function isVercelChallengeFailure(result: SmokeResult) {
+  return (
+    result.status === 'fail' &&
+    result.details.includes('Vercel Firewall challenge active')
+  )
+}
+
+function appendResults(
+  results: SmokeResult[],
+  next: SmokeResult | SmokeResult[]
+) {
+  const nextResults = Array.isArray(next) ? next : [next]
+  results.push(...nextResults)
+  return nextResults.some(isVercelChallengeFailure)
+}
+
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms))
 }
@@ -1007,194 +1023,365 @@ async function runSmoke() {
   if (challengePreflight.some((result) => result.status === 'fail')) {
     return challengePreflight
   }
-  results.push(...challengePreflight)
+  appendResults(results, challengePreflight)
 
   for (const page of PAGES) {
-    results.push(...(await checkPage(page.path, page.required)))
-    results.push(await checkPageHeadNotChallenged(page.path))
+    if (appendResults(results, await checkPage(page.path, page.required))) {
+      return results
+    }
+    if (appendResults(results, await checkPageHeadNotChallenged(page.path))) {
+      return results
+    }
   }
 
   for (const file of STATIC_FILES) {
-    results.push(...(await checkStaticFile(file.path, file.required)))
+    if (
+      appendResults(results, await checkStaticFile(file.path, file.required))
+    ) {
+      return results
+    }
   }
 
-  results.push(await checkProductionSourceMapsDisabled())
-  results.push(...(await checkNextDataLegacyRedirects()))
+  if (appendResults(results, await checkProductionSourceMapsDisabled())) {
+    return results
+  }
+  if (appendResults(results, await checkNextDataLegacyRedirects())) {
+    return results
+  }
 
   for (const path of BLOCKED_STATIC_PATHS) {
-    results.push(await checkBlockedStaticFile(path))
+    if (appendResults(results, await checkBlockedStaticFile(path))) {
+      return results
+    }
   }
 
   for (const redirect of REDIRECTS) {
-    results.push(await checkRedirect(redirect.path, redirect.destination))
+    if (
+      appendResults(
+        results,
+        await checkRedirect(redirect.path, redirect.destination)
+      )
+    ) {
+      return results
+    }
   }
 
   for (const path of BLOCKED_API_PATHS) {
-    results.push(await checkBlockedApi(path))
+    if (appendResults(results, await checkBlockedApi(path))) return results
   }
 
-  results.push(await checkOrderBook('mexwcwin26a'))
-  results.push(await checkOrderBook('ukrwarend26a'))
-  results.push(await checkOrderReadiness('mexwcwin26a'))
-  results.push(await checkOrderReadiness('ukrwarend26a'))
-  results.push(
-    await checkExpectedStatus(
-      'auth resolution readiness mexwcwin26a',
-      '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
-      401
-    )
-  )
-  results.push(
-    await checkExpectedStatus(
-      'auth resolution readiness ukrwarend26a',
-      '/api/v0/market/ukrwarend26a/mexas-resolution-readiness',
-      401
-    )
-  )
-  results.push(
-    await checkBetsArray(
-      '/api/v0/bets?contractId=mexwcwin26a&kinds=open-limit',
-      'bets mexwcwin26a open-limit'
-    )
-  )
-  results.push(
-    await checkBetsArray(
-      '/api/v0/bets?contractSlug=ganara-mexico-la-copa-mundial-2026&kinds=open-limit',
-      'bets mexico slug open-limit'
-    )
-  )
-  results.push(
-    await checkExpectedStatus(
-      'blocked broad MEXAS bets history',
-      '/api/v0/bets?contractId=mexwcwin26a',
-      404
-    )
-  )
-  for (const payload of JSON_PAYLOADS) {
-    results.push(await checkJsonPayloadCopy(payload.name, payload.path))
+  if (appendResults(results, await checkOrderBook('mexwcwin26a')))
+    return results
+  if (appendResults(results, await checkOrderBook('ukrwarend26a')))
+    return results
+  if (appendResults(results, await checkOrderReadiness('mexwcwin26a'))) {
+    return results
   }
-  results.push(
-    await checkExpectedStatus(
-      'local MEXAS portfolio missing user',
-      '/api/v0/get-user-portfolio?userId=__missing_user__',
-      404
+  if (appendResults(results, await checkOrderReadiness('ukrwarend26a'))) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'auth resolution readiness mexwcwin26a',
+        '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
+        401
+      )
     )
-  )
-  results.push(await checkBlockedOrderBook('not-a-mexas-market'))
-  results.push(await checkBlockedBets('not-a-mexas-market'))
-  results.push(
-    await checkExpectedStatus(
-      'blocked bets unknown username',
-      '/api/v0/bets?username=__mexas_missing_user__',
-      404
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'auth resolution readiness ukrwarend26a',
+        '/api/v0/market/ukrwarend26a/mexas-resolution-readiness',
+        401
+      )
     )
-  )
-  results.push(await checkBlockedResolutionReadiness('not-a-mexas-market'))
-  results.push(await checkBlockedOrderReadiness('not-a-mexas-market'))
-  results.push(
-    await checkExpectedStatus(
-      'unknown api fail closed',
-      '/api/v0/not-a-real-mexas-api',
-      404
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkBetsArray(
+        '/api/v0/bets?contractId=mexwcwin26a&kinds=open-limit',
+        'bets mexwcwin26a open-limit'
+      )
     )
-  )
-  results.push(
-    await checkExpectedStatus(
-      'blocked api ignores play param',
-      '/api/v0/comment?play=true',
-      404
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkBetsArray(
+        '/api/v0/bets?contractSlug=ganara-mexico-la-copa-mundial-2026&kinds=open-limit',
+        'bets mexico slug open-limit'
+      )
     )
-  )
-  results.push(
-    await checkExpectedStatus(
-      'blocked static ignores play param',
-      '/mana.svg?play=false',
-      404
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'blocked broad MEXAS bets history',
+        '/api/v0/bets?contractId=mexwcwin26a',
+        404
+      )
     )
-  )
-  results.push(
-    await checkExpectedStatus('method bets POST', '/api/v0/bets', 405, {
-      method: 'POST',
-    })
-  )
-  results.push(
-    await checkExpectedStatus(
-      'method orderbook POST',
-      '/api/mexas-order-book?contractId=mexwcwin26a',
-      405,
-      { method: 'POST' }
+  ) {
+    return results
+  }
+  for (const payload of JSON_PAYLOADS) {
+    if (
+      appendResults(
+        results,
+        await checkJsonPayloadCopy(payload.name, payload.path)
+      )
+    ) {
+      return results
+    }
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'local MEXAS portfolio missing user',
+        '/api/v0/get-user-portfolio?userId=__missing_user__',
+        404
+      )
     )
-  )
-  results.push(
-    await checkExpectedStatus(
-      'method order readiness POST',
-      '/api/v0/market/mexwcwin26a/mexas-order-readiness',
-      405,
-      { method: 'POST' }
+  ) {
+    return results
+  }
+  if (
+    appendResults(results, await checkBlockedOrderBook('not-a-mexas-market'))
+  ) {
+    return results
+  }
+  if (appendResults(results, await checkBlockedBets('not-a-mexas-market'))) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'blocked bets unknown username',
+        '/api/v0/bets?username=__mexas_missing_user__',
+        404
+      )
     )
-  )
-  results.push(
-    await checkExpectedStatus(
-      'method resolution readiness POST',
-      '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
-      405,
-      { method: 'POST' }
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkBlockedResolutionReadiness('not-a-mexas-market')
     )
-  )
-  results.push(await checkExpectedStatus('method bet GET', '/api/v0/bet', 405))
-  results.push(
-    await checkExpectedStatus(
-      'method revalidate GET',
-      '/api/v0/revalidate',
-      405
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkBlockedOrderReadiness('not-a-mexas-market')
     )
-  )
-  results.push(
-    await checkExpectedStatus('method privy-user GET', '/api/privy-user', 405)
-  )
-  results.push(
-    await checkExpectedStatus('auth privy-user POST', '/api/privy-user', 401, {
-      method: 'POST',
-    })
-  )
-  results.push(
-    await checkExpectedStatus('auth bet POST', '/api/v0/bet', 401, {
-      method: 'POST',
-    })
-  )
-  results.push(
-    await checkExpectedStatus(
-      'auth revalidate POST',
-      '/api/v0/revalidate',
-      401,
-      {
-        body: JSON.stringify({
-          apiSecret: '__wrong_secret__',
-          pathToRevalidate: '/checkout',
-        }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'unknown api fail closed',
+        '/api/v0/not-a-real-mexas-api',
+        404
+      )
+    )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'blocked api ignores play param',
+        '/api/v0/comment?play=true',
+        404
+      )
+    )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'blocked static ignores play param',
+        '/mana.svg?play=false',
+        404
+      )
+    )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus('method bets POST', '/api/v0/bets', 405, {
         method: 'POST',
-      }
+      })
     )
-  )
-  results.push(
-    await checkExpectedStatus(
-      'auth cancel POST',
-      '/api/v0/bet/cancel/__missing_bet__',
-      401,
-      { method: 'POST' }
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'method orderbook POST',
+        '/api/mexas-order-book?contractId=mexwcwin26a',
+        405,
+        { method: 'POST' }
+      )
     )
-  )
-  results.push(
-    await checkExpectedStatus(
-      'auth resolve POST',
-      '/api/v0/market/mexwcwin26a/resolve',
-      401,
-      { method: 'POST' }
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'method order readiness POST',
+        '/api/v0/market/mexwcwin26a/mexas-order-readiness',
+        405,
+        { method: 'POST' }
+      )
     )
-  )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'method resolution readiness POST',
+        '/api/v0/market/mexwcwin26a/mexas-resolution-readiness',
+        405,
+        { method: 'POST' }
+      )
+    )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus('method bet GET', '/api/v0/bet', 405)
+    )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'method revalidate GET',
+        '/api/v0/revalidate',
+        405
+      )
+    )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus('method privy-user GET', '/api/privy-user', 405)
+    )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'auth privy-user POST',
+        '/api/privy-user',
+        401,
+        {
+          method: 'POST',
+        }
+      )
+    )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus('auth bet POST', '/api/v0/bet', 401, {
+        method: 'POST',
+      })
+    )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'auth revalidate POST',
+        '/api/v0/revalidate',
+        401,
+        {
+          body: JSON.stringify({
+            apiSecret: '__wrong_secret__',
+            pathToRevalidate: '/checkout',
+          }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          method: 'POST',
+        }
+      )
+    )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'auth cancel POST',
+        '/api/v0/bet/cancel/__missing_bet__',
+        401,
+        { method: 'POST' }
+      )
+    )
+  ) {
+    return results
+  }
+  if (
+    appendResults(
+      results,
+      await checkExpectedStatus(
+        'auth resolve POST',
+        '/api/v0/market/mexwcwin26a/resolve',
+        401,
+        { method: 'POST' }
+      )
+    )
+  ) {
+    return results
+  }
   return results
 }
 
