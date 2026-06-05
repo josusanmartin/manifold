@@ -19,15 +19,16 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   encodeFunctionData,
-  isAddress,
   parseUnits,
   type Address,
   type Hex,
 } from 'viem'
 import {
   getMexasWithdrawButtonLabel,
+  getMexasWithdrawDestinationIssue,
   getMexasWithdrawDisabledReason,
 } from 'common/mexas-wallet'
+import { normalizeEvmAddress } from 'common/crypto/mexas-transfer'
 import { Button } from 'web/components/buttons/button'
 import {
   usePrivyLogin,
@@ -312,10 +313,14 @@ function MexasWalletPanelInner() {
     balanceUnits !== null && internalAvailableUnits !== null
       ? minUnits(balanceUnits, internalAvailableUnits)
       : null
+  const withdrawDestinationIssue = getMexasWithdrawDestinationIssue({
+    destinationAddress: withdrawAddress,
+    sourceWalletAddress: walletAddress,
+  })
   const withdrawDisabledReason = getMexasWithdrawDisabledReason({
     amountUnits: parsedWithdrawAmount,
+    destinationIssue: withdrawDestinationIssue,
     hasWallet: !!wallet && !!walletAddress,
-    isDestinationAddressValid: isAddress(withdrawAddress),
     withdrawing,
     withdrawableUnits,
   })
@@ -336,10 +341,13 @@ function MexasWalletPanelInner() {
     setWithdrawError(null)
     setWithdrawHash(null)
 
-    if (!isAddress(withdrawAddress)) {
+    if (withdrawDestinationIssue) {
       setWithdrawError('Ingresa una dirección de destino válida.')
       return
     }
+    const normalizedWithdrawAddress = normalizeEvmAddress(
+      withdrawAddress.trim()
+    ) as Address
     if (!parsedWithdrawAmount || parsedWithdrawAmount <= 0n) {
       setWithdrawError('Ingresa una cantidad mayor que 0 MEX.')
       return
@@ -370,7 +378,7 @@ function MexasWalletPanelInner() {
       const data = encodeFunctionData({
         abi: mexasErc20Abi,
         functionName: 'transfer',
-        args: [withdrawAddress, parsedWithdrawAmount],
+        args: [normalizedWithdrawAddress, parsedWithdrawAmount],
       })
       const hash = (await provider.request({
         method: 'eth_sendTransaction',

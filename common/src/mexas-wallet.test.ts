@@ -1,14 +1,19 @@
 import {
   getMexasWithdrawButtonLabel,
+  getMexasWithdrawDestinationIssue,
   getMexasWithdrawDisabledReason,
 } from './mexas-wallet'
+import { MEXAS_TOKEN } from './crypto/mexas'
+
+const walletAddress = '0x1111111111111111111111111111111111111111'
+const recipientAddress = '0x2222222222222222222222222222222222222222'
 
 describe('MEXAS wallet withdraw validation', () => {
   test('requires a connected wallet before allowing withdrawal', () => {
     const reason = getMexasWithdrawDisabledReason({
       amountUnits: 1n,
+      destinationIssue: undefined,
       hasWallet: false,
-      isDestinationAddressValid: true,
       withdrawing: false,
       withdrawableUnits: 1n,
     })
@@ -18,10 +23,14 @@ describe('MEXAS wallet withdraw validation', () => {
   })
 
   test('requires a valid destination address', () => {
+    const destinationIssue = getMexasWithdrawDestinationIssue({
+      destinationAddress: 'not-an-address',
+      sourceWalletAddress: walletAddress,
+    })
     const reason = getMexasWithdrawDisabledReason({
       amountUnits: 1n,
+      destinationIssue,
       hasWallet: true,
-      isDestinationAddressValid: false,
       withdrawing: false,
       withdrawableUnits: 1n,
     })
@@ -30,12 +39,42 @@ describe('MEXAS wallet withdraw validation', () => {
     expect(getMexasWithdrawButtonLabel(reason)).toBe('Ingresa destino')
   })
 
+  test('blocks unsafe destination addresses', () => {
+    expect(
+      getMexasWithdrawDestinationIssue({
+        destinationAddress: '0x0000000000000000000000000000000000000000',
+        sourceWalletAddress: walletAddress,
+      })
+    ).toBe('zero-address')
+
+    expect(
+      getMexasWithdrawDestinationIssue({
+        destinationAddress: MEXAS_TOKEN.address,
+        sourceWalletAddress: walletAddress,
+      })
+    ).toBe('token-contract')
+
+    const reason = getMexasWithdrawDisabledReason({
+      amountUnits: 1n,
+      destinationIssue: getMexasWithdrawDestinationIssue({
+        destinationAddress: walletAddress.toUpperCase().replace('X', 'x'),
+        sourceWalletAddress: walletAddress,
+      }),
+      hasWallet: true,
+      withdrawing: false,
+      withdrawableUnits: 1n,
+    })
+
+    expect(reason).toBe('same-wallet')
+    expect(getMexasWithdrawButtonLabel(reason)).toBe('Usa otro destino')
+  })
+
   test('requires a positive amount', () => {
     expect(
       getMexasWithdrawDisabledReason({
         amountUnits: undefined,
+        destinationIssue: undefined,
         hasWallet: true,
-        isDestinationAddressValid: true,
         withdrawing: false,
         withdrawableUnits: 1n,
       })
@@ -43,8 +82,8 @@ describe('MEXAS wallet withdraw validation', () => {
 
     const reason = getMexasWithdrawDisabledReason({
       amountUnits: 0n,
+      destinationIssue: undefined,
       hasWallet: true,
-      isDestinationAddressValid: true,
       withdrawing: false,
       withdrawableUnits: 1n,
     })
@@ -56,8 +95,8 @@ describe('MEXAS wallet withdraw validation', () => {
   test('waits for synced withdrawable balance', () => {
     const reason = getMexasWithdrawDisabledReason({
       amountUnits: 1n,
+      destinationIssue: undefined,
       hasWallet: true,
-      isDestinationAddressValid: true,
       withdrawing: false,
       withdrawableUnits: null,
     })
@@ -69,8 +108,8 @@ describe('MEXAS wallet withdraw validation', () => {
   test('blocks amounts above available MEX', () => {
     const reason = getMexasWithdrawDisabledReason({
       amountUnits: 2n,
+      destinationIssue: undefined,
       hasWallet: true,
-      isDestinationAddressValid: true,
       withdrawing: false,
       withdrawableUnits: 1n,
     })
@@ -82,8 +121,11 @@ describe('MEXAS wallet withdraw validation', () => {
   test('allows a valid withdrawal request', () => {
     const reason = getMexasWithdrawDisabledReason({
       amountUnits: 1n,
+      destinationIssue: getMexasWithdrawDestinationIssue({
+        destinationAddress: recipientAddress,
+        sourceWalletAddress: walletAddress,
+      }),
       hasWallet: true,
-      isDestinationAddressValid: true,
       withdrawing: false,
       withdrawableUnits: 1n,
     })
