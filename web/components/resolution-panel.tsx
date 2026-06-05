@@ -30,7 +30,9 @@ type MexasResolutionReadiness = {
   requiresEscrow: boolean
   filledBetCount: number
   filledStake: number
+  escrowedOpenReservationRefund: number
   openReservationRefund: number
+  walletOpenReservationRefund: number
   yesPayout: number
   noPayout: number
   cancelPayout: number
@@ -522,9 +524,9 @@ function MexasResolutionReadinessNotice(props: {
   if (readiness?.requiresEscrow) {
     return (
       <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
-        Este mercado tiene {readiness.filledBetCount} posiciones llenadas y la
-        resolución queda pausada hasta completar la liquidación segura. Esto
-        evita crear saldos internos MEX sin respaldo.
+        Este mercado tiene {readiness.filledBetCount} posiciones llenadas y{' '}
+        {readiness.escrowedOpenReservationRefund} MEX en reservas de tesorería.
+        La resolución queda pausada hasta completar la liquidación segura.
       </div>
     )
   }

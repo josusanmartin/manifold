@@ -1,5 +1,9 @@
 import { Bet } from './bet'
-import { isMexasTestUnwound, type MexasReservedOrderData } from './mexas-market'
+import {
+  isMexasTestUnwound,
+  wasMexasStakeEscrowed,
+  type MexasReservedOrderData,
+} from './mexas-market'
 import {
   getMexasOpenReservationRefund,
   getMexasResolvedBetPayout,
@@ -27,10 +31,12 @@ export const MEXAS_ONCHAIN_ESCROW_IMPLEMENTED = Object.values(
 
 export type MexasSettlementAudit = {
   cancelCredit: number
+  escrowedOpenReservationRefund: number
   filledBetCount: number
   filledStake: number
   noCredit: number
   openReservationRefund: number
+  walletOpenReservationRefund: number
   yesCredit: number
   yesPayout: number
   noPayout: number
@@ -61,10 +67,12 @@ export function hasMexasFilledExposure(bet: Bet) {
 export function getMexasSettlementAudit(bets: Bet[]): MexasSettlementAudit {
   const audit: MexasSettlementAudit = {
     cancelCredit: 0,
+    escrowedOpenReservationRefund: 0,
     filledBetCount: 0,
     filledStake: 0,
     noCredit: 0,
     openReservationRefund: 0,
+    walletOpenReservationRefund: 0,
     yesCredit: 0,
     yesPayout: 0,
     noPayout: 0,
@@ -74,6 +82,13 @@ export function getMexasSettlementAudit(bets: Bet[]): MexasSettlementAudit {
   for (const bet of bets) {
     const openReservationRefund = getMexasOpenReservationRefund(bet)
     audit.openReservationRefund += openReservationRefund
+    if (openReservationRefund > EPSILON) {
+      if (wasMexasStakeEscrowed(bet as MexasReservedOrderData)) {
+        audit.escrowedOpenReservationRefund += openReservationRefund
+      } else {
+        audit.walletOpenReservationRefund += openReservationRefund
+      }
+    }
 
     if (!hasMexasFilledExposure(bet)) continue
 
@@ -90,10 +105,14 @@ export function getMexasSettlementAudit(bets: Bet[]): MexasSettlementAudit {
 
   return {
     cancelCredit: roundAmount(audit.cancelCredit),
+    escrowedOpenReservationRefund: roundAmount(
+      audit.escrowedOpenReservationRefund
+    ),
     filledBetCount: audit.filledBetCount,
     filledStake: roundAmount(audit.filledStake),
     noCredit: roundAmount(audit.noCredit),
     openReservationRefund: roundAmount(audit.openReservationRefund),
+    walletOpenReservationRefund: roundAmount(audit.walletOpenReservationRefund),
     yesCredit: roundAmount(audit.yesCredit),
     yesPayout: roundAmount(audit.yesPayout),
     noPayout: roundAmount(audit.noPayout),
@@ -103,6 +122,12 @@ export function getMexasSettlementAudit(bets: Bet[]): MexasSettlementAudit {
 
 export function hasMexasSettlementExposure(audit: MexasSettlementAudit) {
   return audit.filledBetCount > 0 || audit.openReservationRefund > EPSILON
+}
+
+export function hasMexasEscrowSettlementExposure(audit: MexasSettlementAudit) {
+  return (
+    audit.filledBetCount > 0 || audit.escrowedOpenReservationRefund > EPSILON
+  )
 }
 
 export function hasTransactionalMexasMatchingEngine(

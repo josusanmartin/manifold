@@ -3,6 +3,7 @@ import {
   canMexasAcceptLimitOrders,
   canMexasMatchCrossingOrders,
   canMexasResolveFilledPositions,
+  hasMexasEscrowSettlementExposure,
   hasOperationalMexasEscrow,
   type MexasSettlementAudit,
   type MexasSettlementSettings,
@@ -96,7 +97,7 @@ export async function assertMexasCanResolveFilledPositions(
   db: SupabaseClient,
   audit: MexasSettlementAudit
 ) {
-  if (audit.filledBetCount === 0) return
+  if (!hasMexasEscrowSettlementExposure(audit)) return
   if (canMexasResolveFilledPositions(getMexasSettlementSettings())) {
     const escrowRuntime = await getMexasEscrowRuntimeStatus(db)
     if (escrowRuntime.enabled) return
@@ -104,6 +105,6 @@ export async function assertMexasCanResolveFilledPositions(
 
   throw new APIError(
     503,
-    `La resolución MEXAS tiene ${audit.filledBetCount} posiciones llenadas y queda pausada hasta completar la liquidación segura.`
+    `La resolución MEXAS tiene ${audit.filledBetCount} posiciones llenadas y ${audit.escrowedOpenReservationRefund} MEX en reservas de tesorería; queda pausada hasta completar la liquidación segura.`
   )
 }

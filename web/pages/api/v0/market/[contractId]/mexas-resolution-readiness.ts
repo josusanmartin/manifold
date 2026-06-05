@@ -2,7 +2,10 @@ import { PrivyClient } from '@privy-io/node'
 import { APIError } from 'common/api/utils'
 import { Bet } from 'common/bet'
 import { isMexasOrderBookOnlyContract } from 'common/mexas-market'
-import { getMexasSettlementAudit } from 'common/mexas-settlement'
+import {
+  getMexasSettlementAudit,
+  hasMexasEscrowSettlementExposure,
+} from 'common/mexas-settlement'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
 import {
@@ -25,7 +28,9 @@ type MexasResolutionReadinessResponse = {
   requiresEscrow: boolean
   filledBetCount: number
   filledStake: number
+  escrowedOpenReservationRefund: number
   openReservationRefund: number
+  walletOpenReservationRefund: number
   yesPayout: number
   noPayout: number
   cancelPayout: number
@@ -155,25 +160,29 @@ export default async function handler(
     const audit = getMexasSettlementAudit(
       await loadContractBets(db, contractId)
     )
+    const requiresTreasurySettlement = hasMexasEscrowSettlementExposure(audit)
     const escrowRuntime =
-      audit.filledBetCount > 0
+      requiresTreasurySettlement
         ? await getMexasEscrowRuntimeStatus(db)
         : undefined
-    const canResolve = audit.filledBetCount === 0 || !!escrowRuntime?.enabled
-    const requiresEscrow = !canResolve && audit.filledBetCount > 0
+    const canResolve =
+      !requiresTreasurySettlement || !!escrowRuntime?.enabled
+    const requiresEscrow = !canResolve && requiresTreasurySettlement
 
     return res.status(200).json({
       canResolve,
       requiresEscrow,
       filledBetCount: audit.filledBetCount,
       filledStake: audit.filledStake,
+      escrowedOpenReservationRefund: audit.escrowedOpenReservationRefund,
       openReservationRefund: audit.openReservationRefund,
+      walletOpenReservationRefund: audit.walletOpenReservationRefund,
       yesPayout: audit.yesPayout,
       noPayout: audit.noPayout,
       cancelPayout: audit.cancelPayout,
       message: requiresEscrow
         ? escrowRuntime?.message ??
-          `La resolución MEXAS tiene ${audit.filledBetCount} posiciones llenadas y queda pausada hasta completar la liquidación segura.`
+          `La resolución MEXAS tiene ${audit.filledBetCount} posiciones llenadas y ${audit.escrowedOpenReservationRefund} MEX en reservas de tesorería; queda pausada hasta completar la liquidación segura.`
         : undefined,
     })
   } catch (error) {

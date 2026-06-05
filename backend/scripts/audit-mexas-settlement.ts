@@ -9,6 +9,7 @@ import {
 } from 'common/mexas-resolution'
 import {
   getMexasSettlementAudit,
+  hasMexasEscrowSettlementExposure,
   hasMexasFilledExposure,
 } from 'common/mexas-settlement'
 import { convertBet } from 'common/supabase/bets'
@@ -160,7 +161,7 @@ async function loadSettlementExposure(db: SupabaseClient) {
     const bets = await loadContractBets(db, contract.id)
     const filledBets = bets.filter(hasMexasFilledExposure)
     const audit = getMexasSettlementAudit(bets)
-    if (audit.filledBetCount === 0) continue
+    if (!hasMexasEscrowSettlementExposure(audit)) continue
 
     exposures.push({
       audit,
@@ -300,12 +301,14 @@ function printTestUnwindSql(exposures: ContractExposure[]) {
 
 function printTextReport(exposures: ContractExposure[]) {
   if (!exposures.length) {
-    console.log('PASS No filled MEXAS settlement exposure found.')
+    console.log(
+      'PASS No filled or treasury-escrowed open MEXAS settlement exposure found.'
+    )
     return
   }
 
   console.log(
-    `FAIL ${exposures.length} MEXAS market(s) have filled settlement exposure.`
+    `FAIL ${exposures.length} MEXAS market(s) have filled or treasury-escrowed settlement exposure.`
   )
   console.log(
     'These positions cannot be safely resolved until escrow is operational or the exposure is manually remediated.'
@@ -316,8 +319,13 @@ function printTextReport(exposures: ContractExposure[]) {
     console.log(`${exposure.contractId} ${exposure.slug}`)
     console.log(exposure.question)
     console.log(
-      `  filled=${exposure.audit.filledBetCount} stake=${exposure.audit.filledStake} MEX openRefunds=${exposure.audit.openReservationRefund} MEX totalCredits(YES=${exposure.audit.yesCredit}, NO=${exposure.audit.noCredit}, CANCEL=${exposure.audit.cancelCredit}) MEX`
+      `  filled=${exposure.audit.filledBetCount} stake=${exposure.audit.filledStake} MEX openRefunds=${exposure.audit.openReservationRefund} MEX treasuryOpenRefunds=${exposure.audit.escrowedOpenReservationRefund} MEX walletOpenRefunds=${exposure.audit.walletOpenReservationRefund} MEX totalCredits(YES=${exposure.audit.yesCredit}, NO=${exposure.audit.noCredit}, CANCEL=${exposure.audit.cancelCredit}) MEX`
     )
+    if (!exposure.bets.length) {
+      console.log(
+        '  no filled bets; exposure is an open order refund held by treasury escrow.'
+      )
+    }
     for (const bet of exposure.bets) {
       console.log(
         `  bet=${bet.betId} user=${bet.userId} outcome=${bet.outcome ?? 'n/a'} amount=${bet.amount} shares=${bet.shares} openRefund=${bet.openReservationRefund} payouts(YES=${bet.yesPayout}, NO=${bet.noPayout}, CANCEL=${bet.cancelPayout}) cancelCredit=${bet.cancelCredit}`
@@ -333,6 +341,9 @@ function printTextReport(exposures: ContractExposure[]) {
   )
   console.log(
     '  3. For test-only markets, run again with --print-test-unwind-sql, review the rollback-protected SQL, then manually decide whether to commit.'
+  )
+  console.log(
+    '     That SQL only unwinds filled test positions; open treasury-escrowed orders should be cancelled or released through the order flow.'
   )
   console.log('')
   console.log('Commands:')

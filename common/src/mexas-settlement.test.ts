@@ -5,6 +5,7 @@ import {
   canMexasAcceptLimitOrders,
   canMexasResolveFilledPositions,
   getMissingMexasEscrowCapabilities,
+  hasMexasEscrowSettlementExposure,
   getMexasSettlementAudit,
   hasOperationalMexasEscrow,
   hasMexasFilledExposure,
@@ -93,10 +94,12 @@ describe('MEXAS settlement audit', () => {
 
     expect(audit).toEqual({
       cancelCredit: 6,
+      escrowedOpenReservationRefund: 0,
       filledBetCount: 1,
       filledStake: 6,
       noCredit: 0,
       openReservationRefund: 0,
+      walletOpenReservationRefund: 0,
       yesCredit: 20,
       yesPayout: 20,
       noPayout: 0,
@@ -120,10 +123,12 @@ describe('MEXAS settlement audit', () => {
 
     expect(audit).toEqual({
       cancelCredit: 0,
+      escrowedOpenReservationRefund: 0,
       filledBetCount: 0,
       filledStake: 0,
       noCredit: 0,
       openReservationRefund: 0,
+      walletOpenReservationRefund: 0,
       yesCredit: 0,
       yesPayout: 0,
       noPayout: 0,
@@ -152,10 +157,12 @@ describe('MEXAS settlement audit', () => {
 
     expect(audit).toEqual({
       cancelCredit: 10,
+      escrowedOpenReservationRefund: 0,
       filledBetCount: 2,
       filledStake: 10,
       noCredit: 10,
       openReservationRefund: 0,
+      walletOpenReservationRefund: 0,
       yesCredit: 10,
       yesPayout: 10,
       noPayout: 10,
@@ -177,10 +184,12 @@ describe('MEXAS settlement audit', () => {
 
     expect(audit).toEqual({
       cancelCredit: 5,
+      escrowedOpenReservationRefund: 0,
       filledBetCount: 1,
       filledStake: 2,
       noCredit: 3,
       openReservationRefund: 3,
+      walletOpenReservationRefund: 3,
       yesCredit: 7,
       yesPayout: 4,
       noPayout: 0,
@@ -194,16 +203,43 @@ describe('MEXAS settlement audit', () => {
 
     expect(audit).toEqual({
       cancelCredit: 0,
+      escrowedOpenReservationRefund: 0,
       filledBetCount: 0,
       filledStake: 0,
       noCredit: 0,
       openReservationRefund: 0,
+      walletOpenReservationRefund: 0,
       yesCredit: 0,
       yesPayout: 0,
       noPayout: 0,
       cancelPayout: 0,
     })
     expect(hasMexasSettlementExposure(audit)).toBe(false)
+  })
+
+  test('separates escrowed open refunds from wallet-reserved open refunds', () => {
+    const audit = getMexasSettlementAudit([
+      order({
+        id: 'wallet-open',
+        userId: 'u1',
+        amount: 2,
+        orderAmount: 5,
+      }),
+      {
+        ...order({
+          id: 'escrow-open',
+          userId: 'u2',
+          amount: 1,
+          orderAmount: 4,
+        }),
+        mexasStakeEscrowed: true,
+      } as LimitBet,
+    ])
+
+    expect(audit.openReservationRefund).toBe(6)
+    expect(audit.walletOpenReservationRefund).toBe(3)
+    expect(audit.escrowedOpenReservationRefund).toBe(3)
+    expect(hasMexasEscrowSettlementExposure(audit)).toBe(true)
   })
 
   test('enables live matching only for RPC plus operational escrow', () => {

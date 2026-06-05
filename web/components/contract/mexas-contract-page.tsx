@@ -506,7 +506,9 @@ type MexasResolutionReadiness = {
   requiresEscrow: boolean
   filledBetCount: number
   filledStake: number
+  escrowedOpenReservationRefund: number
   openReservationRefund: number
+  walletOpenReservationRefund: number
   yesPayout: number
   noPayout: number
   cancelPayout: number
@@ -612,6 +614,12 @@ function MexasResolutionControl(props: {
               <span>
                 Reservas abiertas a liberar:{' '}
                 {formatMex(readiness.openReservationRefund)}
+              </span>
+            )}
+            {readiness.escrowedOpenReservationRefund > 0 && (
+              <span>
+                Reservas en tesorería:{' '}
+                {formatMex(readiness.escrowedOpenReservationRefund)}
               </span>
             )}
             {readiness.message && (

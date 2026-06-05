@@ -6,6 +6,7 @@ import { type Bet, type LimitBet } from 'common/bet'
 import {
   getMissingMexasEscrowCapabilities,
   getMexasSettlementAudit,
+  hasMexasEscrowSettlementExposure,
   hasMexasFilledExposure,
   hasOperationalMexasEscrow,
 } from 'common/mexas-settlement'
@@ -1773,10 +1774,10 @@ async function checkMexasSettlementExposure(
         wasMexasStakeEscrowed(entry.bet as MexasReservedOrderData) &&
         !hasMexasEscrowCaptureMetadata(entry.bet as MexasReservedOrderData)
     )
-    if (audit.filledBetCount === 0) {
+    if (!hasMexasEscrowSettlementExposure(audit)) {
       return pass(
         'settlement exposure',
-        'No filled MEXAS positions require resolution payouts yet.'
+        'No filled MEXAS positions or treasury-escrowed open refunds require resolution payouts yet.'
       )
     }
 
@@ -1817,7 +1818,9 @@ async function checkMexasSettlementExposure(
         'settlement exposure',
         `${
           audit.filledBetCount
-        } filled MEXAS positions require escrow before resolution payouts. Filled-market credit exposure: YES ${
+        } filled MEXAS positions and ${
+          audit.escrowedOpenReservationRefund
+        } MEX in treasury-escrowed open refunds require escrow before resolution payouts. Filled-market credit exposure: YES ${
           filledContractAudit.yesCredit
         } MEX, NO ${filledContractAudit.noCredit} MEX, CANCEL ${
           filledContractAudit.cancelCredit
@@ -1833,7 +1836,7 @@ async function checkMexasSettlementExposure(
 
     return pass(
       'settlement exposure',
-      `${audit.filledBetCount} filled MEXAS positions have operational escrow for resolution payouts. Filled-market credit exposure: YES ${filledContractAudit.yesCredit} MEX, NO ${filledContractAudit.noCredit} MEX, CANCEL ${filledContractAudit.cancelCredit} MEX.`
+      `${audit.filledBetCount} filled MEXAS positions and ${audit.escrowedOpenReservationRefund} MEX in treasury-escrowed open refunds have operational escrow for resolution payouts. Filled-market credit exposure: YES ${filledContractAudit.yesCredit} MEX, NO ${filledContractAudit.noCredit} MEX, CANCEL ${filledContractAudit.cancelCredit} MEX.`
     )
   } catch (error) {
     const message = formatDiagnosticError(error)

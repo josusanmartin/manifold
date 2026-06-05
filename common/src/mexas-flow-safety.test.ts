@@ -1620,13 +1620,16 @@ describe('MEXAS flow safety guardrails', () => {
       'requireBalanceRead: true',
       'getMexasSettlementAudit(',
       'await loadContractBets(db, contractId)',
+      'const requiresTreasurySettlement = hasMexasEscrowSettlementExposure(audit)',
       'const escrowRuntime =',
-      'audit.filledBetCount > 0',
+      'requiresTreasurySettlement',
       'await getMexasEscrowRuntimeStatus(db)',
-      'const canResolve = audit.filledBetCount === 0 || !!escrowRuntime?.enabled',
-      'const requiresEscrow = !canResolve && audit.filledBetCount > 0',
+      'const canResolve =',
+      '!requiresTreasurySettlement || !!escrowRuntime?.enabled',
+      'const requiresEscrow = !canResolve && requiresTreasurySettlement',
       'requiresEscrow,',
       'filledBetCount: audit.filledBetCount',
+      'escrowedOpenReservationRefund: audit.escrowedOpenReservationRefund',
     ])
     expect(apiSource).toContain('Market is not available on MEXAS.')
 
@@ -1641,7 +1644,7 @@ describe('MEXAS flow safety guardrails', () => {
       'const resolveDisabled = !outcome || mexasResolutionBlocked',
       'if (!outcome || mexasResolutionBlocked) return',
       'includeMkt={!isMexasOrderBookOnly}',
-      'Este mercado tiene {readiness.filledBetCount} posiciones llenadas',
+      'readiness.escrowedOpenReservationRefund',
       'órdenes abiertas se cancelan y el MEX reservado se devuelve',
     ])
     expect(selectorSource).toContain('includeMkt?: boolean')
@@ -1671,6 +1674,7 @@ describe('MEXAS flow safety guardrails', () => {
     const source = readRepoFile(
       'web/pages/api/v0/market/[contractId]/resolve.ts'
     )
+    const settlementSource = readRepoFile('web/lib/api/mexas-settlement.ts')
 
     expect(
       countOccurrences(source, 'assertMexasCanResolveFilledPositions(')
@@ -1685,6 +1689,9 @@ describe('MEXAS flow safety guardrails', () => {
       'db,',
       'const creditEvents = getMexasResolutionCreditEvents(',
     ])
+    expect(settlementSource).toContain(
+      'hasMexasEscrowSettlementExposure(audit)'
+    )
   })
 
   test('production smoke keeps MEXAS resolution preflight creator-only', () => {
@@ -3734,10 +3741,10 @@ describe('MEXAS flow safety guardrails', () => {
       'const filledEntries = rows',
       'hasMexasFilledExposure',
       'const unescrowedFilledEntries = filledEntries.filter',
-      'if (audit.filledBetCount === 0)',
+      'if (!hasMexasEscrowSettlementExposure(audit))',
       'filled MEXAS position(s) are not escrow-backed',
       'if (!options.hasOperationalEscrow)',
-      'filled MEXAS positions require escrow before resolution payouts',
+      'treasury-escrowed open refunds require escrow before resolution payouts',
       'Filled-market credit exposure',
       'Open reservation refunds across all unresolved MEXAS markets',
       'Markets:',
