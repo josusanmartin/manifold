@@ -26,7 +26,8 @@
     "mailgun-js": "0.22.0",
     "openai": "4.92.1",
     "pg-promise": "11.4.1",
-    "string-similarity": "4.0.4"
+    "string-similarity": "4.0.4",
+    "viem": "^2.40.1"
   },
   "devDependencies": {
     "@types/mailgun-js": "0.22.12",

@@ -468,6 +468,10 @@ describe('MEXAS flow safety guardrails', () => {
 
   test('scheduler releases expired or closed MEXAS reserved orders without user traffic', () => {
     const source = readRepoFile('backend/shared/src/expire-limit-orders.ts')
+    const treasurySource = readRepoFile(
+      'backend/shared/src/mexas-treasury-transfer.ts'
+    )
+    const schedulerPackage = readRepoFile('backend/scheduler/package.json')
 
     expectMarkersInOrder(source, [
       'async function readMexasWalletAmount',
@@ -553,9 +557,50 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'async function releaseExpiredMexasReservedOrders',
       'const candidates = await loadExpiredMexasReleaseCandidates(pg, releasedAt)',
-      'const releases = await prepareBackedMexasReleases(pg, candidates)',
-      'return await pg.tx(async (tx) => applyPreparedMexasReleases(tx, releases))',
+      'const walletReleases =',
+      'prepareBackedMexasReleases(tx, candidates)',
+      'applyPreparedMexasReleases(tx, releases)',
+      'const escrowReleases = await releaseExpiredMexasEscrowReservedOrders(',
+      'return [...walletReleases, ...escrowReleases]',
     ])
+    expectMarkersInOrder(source, [
+      'async function loadExpiredMexasEscrowReleaseCandidates',
+      "coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = true",
+      "coalesce((c.data->>'mexasOrderLock')::boolean, false) = true",
+      "coalesce((c.data->>'mexasResolving')::boolean, false) = true",
+      "and (c.token = 'MEX' or c.data->>'token' = 'MEX')",
+      'or b.expires_at < now()',
+      'or (c.close_time is not null and c.close_time <= now())',
+      ') > 0',
+    ])
+    expectMarkersInOrder(source, [
+      'async function releaseExpiredMexasEscrowReservedOrders',
+      'submitMexasDirectTreasuryTransfer(pg,',
+      "transferType: 'order-release'",
+      'update contract_bets b',
+      "'mexasFundsReleased', true",
+      "'mexasTreasuryReleaseTransferId',",
+      "'mexasTreasuryReleaseTxHash',",
+      "coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = true",
+      'return [...walletReleases, ...escrowReleases]',
+    ])
+    expectMarkersInOrder(treasurySource, [
+      'export async function submitMexasDirectTreasuryTransfer',
+      'claimTreasuryTransfer(',
+      "if (claimed.row.status === 'confirmed') return claimed.row",
+      "if (claimed.row.status === 'submitted')",
+      'getTreasurySignerAccount(treasuryAddress)',
+      'getTreasuryMexasBalanceUnits(treasuryAddress)',
+      'sendTransaction',
+      'markTreasuryTransferSubmitted',
+      'confirmSubmittedTransfer',
+    ])
+    expect(treasurySource).toContain('MEXAS_TREASURY_SIGNER_SECRET')
+    expect(treasurySource).toContain('MEXAS_TREASURY_WALLET_ADDRESS')
+    expect(treasurySource).toContain(
+      'NEXT_PUBLIC_MEXAS_TREASURY_WALLET_ADDRESS'
+    )
+    expect(schedulerPackage).toContain('"viem"')
   })
 
   test('treats market close time as an inclusive trading cutoff', () => {
@@ -3337,9 +3382,7 @@ describe('MEXAS flow safety guardrails', () => {
       'token_address text not null',
       'chain_id integer not null',
     ])
-    expect(migration).toContain(
-      "movement_type in ('deposit', 'withdrawal')"
-    )
+    expect(migration).toContain("movement_type in ('deposit', 'withdrawal')")
     expect(migration).toContain(
       'constraint mexas_wallet_movements_chain_id_check check (chain_id = 42161)'
     )
@@ -3369,8 +3412,8 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(triggerMigration, [
       'or replace function public.mexas_record_wallet_movement_from_user_sync',
       "v_new_units_text text := v_new_data ->> 'mexasWalletBalanceUnitsSynced'",
-      "v_wallet_address := lower",
-      "v_idempotency_key := concat_ws",
+      'v_wallet_address := lower',
+      'v_idempotency_key := concat_ws',
       'insert into public.mexas_wallet_movements',
       "'users-wallet-sync-trigger'",
       'on conflict (idempotency_key) do nothing',
@@ -3393,9 +3436,7 @@ describe('MEXAS flow safety guardrails', () => {
       'await getMexasTotalDepositsAfterObservedWalletSync',
       "[MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'existing-user'",
     ])
-    expect(privySource).toContain(
-      "[MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'new-user'"
-    )
+    expect(privySource).toContain("[MEXAS_WALLET_SYNC_CONTEXT_KEY]: 'new-user'")
     expect(privySource).not.toContain('recordMexasWalletMovement')
     expectMarkersInOrder(betApiSource, [
       'async function syncMexasWalletBalance',
@@ -3415,21 +3456,21 @@ describe('MEXAS flow safety guardrails', () => {
     expect(ordersSource).not.toContain('recordMexasWalletMovement')
     expect(walletSyncSource).toContain(".from('mexas_treasury_transfers')")
     expect(walletSyncSource).toContain(".eq('status', 'confirmed')")
-    expect(walletSyncSource).toContain(".eq('recipient_address', recipientAddress)")
-    expect(walletSyncSource).toContain(".gt('confirmed_time', confirmedAfterIso)")
     expect(walletSyncSource).toContain(
-      'getMexasTotalDepositsAfterWalletSync'
+      ".eq('recipient_address', recipientAddress)"
     )
+    expect(walletSyncSource).toContain(
+      ".gt('confirmed_time', confirmedAfterIso)"
+    )
+    expect(walletSyncSource).toContain('getMexasTotalDepositsAfterWalletSync')
     expect(walletModelSource).toContain('getMexasExternalDepositDelta')
-    expect(walletModelSource).toContain(
-      'walletDeltaAmount -'
-    )
+    expect(walletModelSource).toContain('walletDeltaAmount -')
     expect(balanceHelperSource).toContain('totalDeposits?: number')
-    expect(balanceHelperSource).toContain('total_deposits: options.totalDeposits')
-    expect(profileApiSource).toContain(".from('mexas_wallet_movements')")
-    expect(profileApiSource).toContain(
-      "type: 'mexas_wallet_movement'"
+    expect(balanceHelperSource).toContain(
+      'total_deposits: options.totalDeposits'
     )
+    expect(profileApiSource).toContain(".from('mexas_wallet_movements')")
+    expect(profileApiSource).toContain("type: 'mexas_wallet_movement'")
     expect(profileApiSource).toContain(
       "movementType === 'withdrawal' ? -amount : amount"
     )
@@ -3441,18 +3482,12 @@ describe('MEXAS flow safety guardrails', () => {
     expect(balanceChangesSource).toContain('mexasWalletMovementTitle')
     expect(profileTabsSource).toContain('Deposito en Wallet')
     expect(profileTabsSource).toContain('Retiro de Wallet')
-    expect(applySource).toContain(
-      '2026060501_add_mexas_wallet_movements.sql'
-    )
+    expect(applySource).toContain('2026060501_add_mexas_wallet_movements.sql')
     expect(applySource).toContain(
       '2026060502_add_mexas_wallet_sync_trigger.sql'
     )
-    expect(applySource).toContain(
-      'wallet movements ledger health RPC missing'
-    )
-    expect(applySource).toContain(
-      'wallet movements user sync trigger missing'
-    )
+    expect(applySource).toContain('wallet movements ledger health RPC missing')
+    expect(applySource).toContain('wallet movements user sync trigger missing')
     expect(readinessSource).toContain(
       "db.rpc('mexas_wallet_movements_ledger_ready')"
     )
@@ -3619,7 +3654,9 @@ describe('MEXAS flow safety guardrails', () => {
     expect(helperSource).toContain(
       'This MEXAS escrow transaction was already refunded or queued for refund.'
     )
-    expect(pendingSource).toContain("normalizedMessage.includes('fue devuelta')")
+    expect(pendingSource).toContain(
+      "normalizedMessage.includes('fue devuelta')"
+    )
     expect(pendingSource).toContain(
       "normalizedMessage.includes('queued for refund')"
     )

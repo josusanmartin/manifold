@@ -6,6 +6,7 @@ import { getContractsDirect } from 'shared/supabase/contracts'
 import { LimitBet } from 'common/bet'
 import { MEXAS_PUBLIC_RPC_URL, MEXAS_TOKEN } from 'common/crypto/mexas'
 import { type SupabaseDirectClient } from 'shared/supabase/init'
+import { submitMexasDirectTreasuryTransfer } from 'shared/mexas-treasury-transfer'
 
 const BALANCE_OF_SELECTOR = '0x70a08231'
 const EPSILON = 0.00000001
@@ -65,6 +66,18 @@ type MexasReleaseCandidate = {
   updated_time: string
   user_id: string
   user_balance: number
+  wallet_address: string | null
+}
+
+type MexasEscrowReleaseCandidate = {
+  bet_id: string
+  contract_id: string
+  credit_key: string
+  refund_amount: number
+  release_reason: string
+  released_at: number
+  updated_time: string
+  user_id: string
   wallet_address: string | null
 }
 
@@ -205,6 +218,81 @@ async function loadExpiredMexasReleaseCandidates(
         or b.expires_at < now()
         or (c.close_time is not null and c.close_time <= now())
       )
+    order by b.created_time asc, b.bet_id asc
+    `,
+    [releasedAt]
+  )
+}
+
+async function loadExpiredMexasEscrowReleaseCandidates(
+  pg: SupabaseDirectClient,
+  releasedAt: number
+) {
+  return await pg.manyOrNone<MexasEscrowReleaseCandidate>(
+    `
+    select
+      b.bet_id,
+      b.contract_id,
+      coalesce(
+        b.data->>'mexasReleaseCreditKey',
+        'mexas-order-release:' || b.bet_id
+      ) as credit_key,
+      greatest(
+        0,
+        round(
+          coalesce(
+            (b.data->>'mexasReservedAmount')::numeric,
+            (b.data->>'orderAmount')::numeric,
+            0
+          ) - coalesce(b.amount, 0),
+          8
+        )
+      ) as refund_amount,
+      case
+        when coalesce(b.is_cancelled, false)
+          then coalesce(b.data->>'mexasReleaseReason', 'cancelled')
+        when c.close_time is not null and c.close_time <= now()
+          then 'market-closed'
+        else 'expired'
+      end as release_reason,
+      $1::bigint as released_at,
+      b.updated_time,
+      b.user_id,
+      u.data->>'privyWalletAddress' as wallet_address
+    from contract_bets b
+    join contracts c on c.id = b.contract_id
+    join users u on u.id = b.user_id
+    where coalesce(b.is_filled, false) = false
+      and coalesce((b.data->>'mexasFundsReserved')::boolean, false) = true
+      and coalesce((b.data->>'mexasFundsReleased')::boolean, false) = false
+      and coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = true
+      and not (
+        coalesce((c.data->>'mexasOrderLock')::boolean, false) = true
+        and coalesce((c.data->>'mexasOrderLockSince')::bigint, 0) > $1::bigint - 120000
+      )
+      and not (
+        coalesce((c.data->>'mexasResolving')::boolean, false) = true
+        and coalesce((c.data->>'mexasResolvingSince')::bigint, 0) > $1::bigint - 600000
+      )
+      and (c.token = 'MEX' or c.data->>'token' = 'MEX')
+      and c.data->>'mechanism' = 'cpmm-1'
+      and c.data->>'outcomeType' = 'BINARY'
+      and (
+        coalesce(b.is_cancelled, false) = true
+        or b.expires_at < now()
+        or (c.close_time is not null and c.close_time <= now())
+      )
+      and greatest(
+        0,
+        round(
+          coalesce(
+            (b.data->>'mexasReservedAmount')::numeric,
+            (b.data->>'orderAmount')::numeric,
+            0
+          ) - coalesce(b.amount, 0),
+          8
+        )
+      ) > 0
     order by b.created_time asc, b.bet_id asc
     `,
     [releasedAt]
@@ -505,11 +593,113 @@ async function applyPreparedMexasReleases(
   return released
 }
 
+async function releaseExpiredMexasEscrowReservedOrders(
+  pg: SupabaseDirectClient,
+  releasedAt: number
+) {
+  const candidates = await loadExpiredMexasEscrowReleaseCandidates(
+    pg,
+    releasedAt
+  )
+  const released: MexasReleasedOrder[] = []
+
+  for (const candidate of candidates) {
+    if (!isEvmAddress(candidate.wallet_address)) {
+      console.warn(
+        'Skipping escrowed MEXAS release without valid Privy wallet',
+        {
+          betId: candidate.bet_id,
+          userId: candidate.user_id,
+        }
+      )
+      continue
+    }
+
+    let transfer
+    try {
+      transfer = await submitMexasDirectTreasuryTransfer(pg, {
+        amount: candidate.refund_amount,
+        betId: candidate.bet_id,
+        contractId: candidate.contract_id,
+        idempotencyKey: candidate.credit_key,
+        metadata: {
+          releaseReason: candidate.release_reason,
+          source: 'expire-limit-orders',
+        },
+        recipientAddress: candidate.wallet_address,
+        transferType: 'order-release',
+        userId: candidate.user_id,
+      })
+    } catch (error) {
+      console.warn('Skipping escrowed MEXAS release after transfer failure', {
+        betId: candidate.bet_id,
+        error,
+        userId: candidate.user_id,
+      })
+      continue
+    }
+
+    const updated = await pg.oneOrNone<MexasReleasedOrder>(
+      `
+      update contract_bets b
+      set
+        is_cancelled = true,
+        data = coalesce(b.data, '{}'::jsonb) || jsonb_build_object(
+          'isCancelled', true,
+          'mexasFundsReleased', true,
+          'mexasReleaseCreditKey', $1,
+          'mexasReleaseCreditAmount', $2::numeric,
+          'mexasReleaseReason', $3,
+          'mexasReleasedAt', $4::bigint,
+          'mexasTreasuryReleaseTransferId', $5,
+          'mexasTreasuryReleaseTxHash', $6
+        )
+      where b.bet_id = $7
+        and b.updated_time = $8
+        and coalesce(b.is_filled, false) = false
+        and coalesce((b.data->>'mexasFundsReserved')::boolean, false) = true
+        and coalesce((b.data->>'mexasFundsReleased')::boolean, false) = false
+        and coalesce((b.data->>'mexasStakeEscrowed')::boolean, false) = true
+      returning
+        b.bet_id,
+        $1 as credit_key,
+        $2::numeric as credit_amount,
+        $2::numeric as max_backed_available_amount,
+        $4::bigint as released_at,
+        $3 as release_reason,
+        b.user_id
+      `,
+      [
+        candidate.credit_key,
+        candidate.refund_amount,
+        candidate.release_reason,
+        candidate.released_at,
+        transfer?.id ?? null,
+        transfer?.tx_hash ?? null,
+        candidate.bet_id,
+        candidate.updated_time,
+      ]
+    )
+    if (updated) released.push(updated)
+  }
+
+  return released
+}
+
 async function releaseExpiredMexasReservedOrders(pg: SupabaseDirectClient) {
   const releasedAt = Date.now()
   const candidates = await loadExpiredMexasReleaseCandidates(pg, releasedAt)
-  if (candidates.length === 0) return []
+  const walletReleases =
+    candidates.length === 0
+      ? []
+      : await pg.tx(async (tx) => {
+          const releases = await prepareBackedMexasReleases(tx, candidates)
+          return applyPreparedMexasReleases(tx, releases)
+        })
+  const escrowReleases = await releaseExpiredMexasEscrowReservedOrders(
+    pg,
+    releasedAt
+  )
 
-  const releases = await prepareBackedMexasReleases(pg, candidates)
-  return await pg.tx(async (tx) => applyPreparedMexasReleases(tx, releases))
+  return [...walletReleases, ...escrowReleases]
 }
