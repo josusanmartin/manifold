@@ -44,6 +44,8 @@ type MexasBalanceChange = {
     | 'withdrawal'
   status?: string
   txHash?: string
+  movementType?: 'deposit' | 'withdrawal'
+  walletAddress?: string
   bet?: { outcome?: string; shares?: number }
   contract?: {
     question: string
@@ -593,6 +595,11 @@ function movementTitle(change: MexasBalanceChange) {
       default:
         return 'Movimiento de tesoreria'
     }
+  }
+  if (change.type === 'mexas_wallet_movement') {
+    return change.movementType === 'withdrawal'
+      ? 'Retiro de Wallet'
+      : 'Deposito en Wallet'
   }
   return 'Movimiento MEX'
 }

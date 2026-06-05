@@ -9,6 +9,7 @@ export type AnyBalanceChangeType =
   | BetBalanceChange
   | TxnBalanceChange
   | MexasTreasuryBalanceChange
+  | MexasWalletBalanceChange
 
 export type BalanceChange = {
   type: string
@@ -64,6 +65,16 @@ export type MexasTreasuryBalanceChange = BalanceChange & {
   contract?: MinimalContract
 }
 
+export type MexasWalletBalanceChange = BalanceChange & {
+  type: 'mexas_wallet_movement'
+  token: 'MEX'
+  movementType: 'deposit' | 'withdrawal'
+  walletAddress: string
+  previousWalletAmount: number
+  newWalletAmount: number
+  openReservedAmount: number
+}
+
 export const isBetChange = (
   change: AnyBalanceChangeType
 ): change is BetBalanceChange =>
@@ -74,7 +85,14 @@ export const isMexasTreasuryChange = (
 ): change is MexasTreasuryBalanceChange =>
   change.type === 'mexas_treasury_transfer'
 
+export const isMexasWalletChange = (
+  change: AnyBalanceChangeType
+): change is MexasWalletBalanceChange =>
+  change.type === 'mexas_wallet_movement'
+
 export const isTxnChange = (
   change: AnyBalanceChangeType
 ): change is TxnBalanceChange =>
-  !('bet' in change) && !isMexasTreasuryChange(change)
+  !('bet' in change) &&
+  !isMexasTreasuryChange(change) &&
+  !isMexasWalletChange(change)

@@ -2169,6 +2169,30 @@ async function runChecks() {
           )
     )
 
+    const { data: walletLedgerReady, error: walletLedgerReadyError } =
+      await db.rpc('mexas_wallet_movements_ledger_ready')
+    if (walletLedgerReadyError || walletLedgerReady !== true) {
+      needsLaunchSql = true
+    }
+    checks.push(
+      walletLedgerReadyError
+        ? fail(
+            'wallet movements ledger',
+            `Health RPC is not callable: ${formatDiagnosticError(
+              walletLedgerReadyError
+            )}`
+          )
+        : walletLedgerReady === true
+        ? pass(
+            'wallet movements ledger',
+            'Wallet movements ledger health RPC reports ready.'
+          )
+        : fail(
+            'wallet movements ledger',
+            'Wallet movements ledger health RPC returned false.'
+          )
+    )
+
     const { data: escrowCaptureReady, error: escrowCaptureReadyError } =
       await db.rpc('mexas_escrow_capture_ready')
     if (escrowCaptureReadyError || escrowCaptureReady !== true) {

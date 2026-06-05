@@ -3,6 +3,7 @@ import type {
   AnyBalanceChangeType,
   BetBalanceChange,
   MexasTreasuryBalanceChange,
+  MexasWalletBalanceChange,
 } from 'common/balance-change'
 import type { LimitBet } from 'common/bet'
 import { calculateUpdatedMetricsForContracts } from 'common/calculate-metrics'
@@ -500,16 +501,36 @@ export async function getMexasBalanceChanges(
     transferQuery = transferQuery.lt('updated_time', millisToTs(props.before))
   }
 
+  let walletMovementQuery = db
+    .from('mexas_wallet_movements')
+    .select('*')
+    .eq('user_id', props.userId)
+    .gte('observed_time', afterTs)
+    .order('observed_time', { ascending: false })
+    .limit(500)
+
+  if (props.before) {
+    walletMovementQuery = walletMovementQuery.lt(
+      'observed_time',
+      millisToTs(props.before)
+    )
+  }
+
   const [
     { data: betRowsData, error: betRowsError },
     { data: transferRowsData, error: transferRowsError },
-  ] = await Promise.all([betQuery, transferQuery])
+    { data: walletMovementRowsData, error: walletMovementRowsError },
+  ] = await Promise.all([betQuery, transferQuery, walletMovementQuery])
   if (betRowsError) throw betRowsError
   if (transferRowsError) throw transferRowsError
+  if (walletMovementRowsError) throw walletMovementRowsError
 
   const rows = (betRowsData ?? []) as Row<'contract_bets'>[]
   const transferRows = (transferRowsData ?? []) as Row<
     'mexas_treasury_transfers'
+  >[]
+  const walletMovementRows = (walletMovementRowsData ?? []) as Row<
+    'mexas_wallet_movements'
   >[]
   const contracts = await loadMexasContractsByIds(
     db,
@@ -589,8 +610,38 @@ export async function getMexasBalanceChanges(
       ]
     })
 
+  const walletChanges = walletMovementRows.flatMap(
+    (row): MexasWalletBalanceChange[] => {
+      const amount = Number(row.amount)
+      if (!Number.isFinite(amount) || amount <= 0) return []
+
+      const createdTime = tsToMillis(row.observed_time ?? row.created_time)
+      if (!isInBalanceChangeWindow(createdTime, props)) return []
+
+      const movementType = row.movement_type as 'deposit' | 'withdrawal'
+      return [
+        {
+          key: `mexas-wallet-${row.id}`,
+          type: 'mexas_wallet_movement',
+          amount: movementType === 'withdrawal' ? -amount : amount,
+          createdTime,
+          token: 'MEX',
+          movementType,
+          walletAddress: row.wallet_address,
+          previousWalletAmount: Number(row.previous_wallet_amount),
+          newWalletAmount: Number(row.new_wallet_amount),
+          openReservedAmount: Number(row.open_reserved_amount),
+        } satisfies MexasWalletBalanceChange,
+      ]
+    }
+  )
+
   return orderBy(
-    [...betChanges, ...treasuryChanges] satisfies AnyBalanceChangeType[],
+    [
+      ...betChanges,
+      ...treasuryChanges,
+      ...walletChanges,
+    ] satisfies AnyBalanceChangeType[],
     (change) => change.createdTime,
     'desc'
   )

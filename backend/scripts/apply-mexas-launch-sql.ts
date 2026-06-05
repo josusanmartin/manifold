@@ -15,6 +15,7 @@ const MIGRATION_FILES = [
   'backend/supabase/migrations/2026060402_lock_down_legacy_supabase_surface.sql',
   'backend/supabase/migrations/20260604144518_lock_down_legacy_rpc_surface.sql',
   'backend/supabase/migrations/20260604212354_enforce_mex_contract_token.sql',
+  'backend/supabase/migrations/2026060501_add_mexas_wallet_movements.sql',
 ]
 
 const REQUIRED_CONTRACT_IDS = ['mexwcwin26a', 'ukrwarend26a']
@@ -239,6 +240,32 @@ begin
     v_failures := array_append(v_failures, 'treasury settlement ledger bet_id FK index missing');
   end if;
 
+  if to_regprocedure('public.mexas_wallet_movements_ledger_ready()') is null then
+    v_failures := array_append(v_failures, 'wallet movements ledger health RPC missing');
+  elsif public.mexas_wallet_movements_ledger_ready() is distinct from true then
+    v_failures := array_append(v_failures, 'wallet movements ledger health RPC returned false');
+  end if;
+
+  if to_regclass('public.mexas_wallet_movements') is null then
+    v_failures := array_append(v_failures, 'wallet movements ledger table missing');
+  end if;
+
+  if not exists (
+    select 1
+    from pg_policy p
+    join pg_class c on c.oid = p.polrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'mexas_wallet_movements'
+      and p.polname = 'mexas_wallet_movements_service_role_only'
+  ) then
+    v_failures := array_append(v_failures, 'wallet movements ledger service-role policy missing');
+  end if;
+
+  if to_regclass('public.mexas_wallet_movements_user_observed_idx') is null then
+    v_failures := array_append(v_failures, 'wallet movements ledger user index missing');
+  end if;
+
   if to_regprocedure('public.mexas_legacy_surface_locked_down()') is null then
     v_failures := array_append(v_failures, 'legacy Supabase surface health RPC missing');
   elsif public.mexas_legacy_surface_locked_down() is distinct from true then
@@ -267,6 +294,14 @@ begin
     'execute'
   ) then
     v_failures := array_append(v_failures, 'service_role cannot execute treasury settlement ledger health RPC');
+  end if;
+
+  if not has_function_privilege(
+    'service_role',
+    'public.mexas_wallet_movements_ledger_ready()',
+    'execute'
+  ) then
+    v_failures := array_append(v_failures, 'service_role cannot execute wallet movements ledger health RPC');
   end if;
 
   if not has_function_privilege(

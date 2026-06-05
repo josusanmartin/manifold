@@ -16,8 +16,10 @@ import {
   BetBalanceChange,
   isBetChange,
   isMexasTreasuryChange,
+  isMexasWalletChange,
   isTxnChange,
   MexasTreasuryBalanceChange,
+  MexasWalletBalanceChange,
   TxnBalanceChange,
 } from 'common/balance-change'
 import Link from 'next/link'
@@ -73,6 +75,9 @@ export const BalanceChangeTable = (props: { user: User }) => {
             change
           )}`
         : ''
+      const walletText = isMexasWalletChange(change)
+        ? mexasWalletMovementTitle(change)
+        : ''
       return (
         contractQuestion.toLowerCase().includes(query.toLowerCase()) ||
         changeType.toLowerCase().includes(query.toLowerCase()) ||
@@ -83,6 +88,7 @@ export const BalanceChangeTable = (props: { user: User }) => {
         ((isTxnChange(change) && txnTitle(change)) || '')
           .toLowerCase()
           .includes(query.toLowerCase()) ||
+        walletText.toLowerCase().includes(query.toLowerCase()) ||
         userName.toLowerCase().includes(query.toLowerCase()) ||
         userUsername.toLowerCase().includes(query.toLowerCase()) ||
         betText.toLowerCase().includes(query.toLowerCase()) ||
@@ -215,6 +221,7 @@ export const BalanceChangeTable = (props: { user: User }) => {
 function isMexasBalanceChange(change: AnyBalanceChangeType) {
   if (isBetChange(change)) return change.contract.token === 'MEX'
   if (isMexasTreasuryChange(change)) return true
+  if (isMexasWalletChange(change)) return true
   if (isTxnChange(change)) return change.contract?.token === 'MEX'
   return false
 }
@@ -233,6 +240,8 @@ function RenderBalanceChanges(props: {
     { mana: currManaBalance, cash: currCashBalance, spice: currSpiceBalance },
     ...balanceChanges.map((change) => {
       if (isMexasTreasuryChange(change)) {
+        currManaBalance -= change.amount
+      } else if (isMexasWalletChange(change)) {
         currManaBalance -= change.amount
       } else if (isTxnChange(change) && change.token === 'SPICE') {
         currSpiceBalance -= change.amount
@@ -270,6 +279,16 @@ function RenderBalanceChanges(props: {
         } else if (isMexasTreasuryChange(change)) {
           return (
             <MexasTreasuryBalanceChangeRow
+              key={change.key}
+              change={change}
+              balance={balanceRunningTotals[i]}
+              avatarSize={avatarSize}
+              hideBalance={hideBalance}
+            />
+          )
+        } else if (isMexasWalletChange(change)) {
+          return (
+            <MexasWalletBalanceChangeRow
               key={change.key}
               change={change}
               balance={balanceRunningTotals[i]}
@@ -502,6 +521,63 @@ const MexasTreasuryBalanceChangeRow = (props: {
           <div className={clsx('text-ink-600 line-clamp-1')}>
             {contract?.slug ? title : details}
             {txHash ? ` · ${txHash.slice(0, 8)}...${txHash.slice(-6)}` : ''}
+          </div>
+        </Row>
+        <Row className={'text-ink-600'}>
+          {!hideBalance && (
+            <>
+              {formatWithToken({ amount: balance.mana, token: 'MEX' })}
+              {' · '}
+            </>
+          )}
+          {customFormatTime(change.createdTime)}
+        </Row>
+      </Col>
+    </Row>
+  )
+}
+
+const MexasWalletBalanceChangeRow = (props: {
+  change: MexasWalletBalanceChange
+  balance: { mana: number }
+  avatarSize: 'sm' | 'md'
+  hideBalance?: boolean
+}) => {
+  const { change, balance, avatarSize, hideBalance } = props
+  const { amount, walletAddress } = change
+  const title = mexasWalletMovementTitle(change)
+  const amountText = formatWithToken({
+    amount: Math.abs(amount),
+    token: 'MEX',
+    short: true,
+  })
+
+  return (
+    <Row className={'gap-2'}>
+      <Col className={'mt-0.5'}>
+        <ChangeIcon
+          avatarSize={avatarSize}
+          slug={undefined}
+          symbol={<FaArrowRightArrowLeft className={'h-4 w-4'} />}
+          className={amount >= 0 ? 'bg-teal-500' : 'bg-scarlet-400'}
+        />
+      </Col>
+      <Col className={'w-full overflow-x-hidden'}>
+        <Row className={'justify-between gap-2'}>
+          <div className={clsx('line-clamp-2')}>{title}</div>
+          <span
+            className={clsx(
+              'inline-flex whitespace-nowrap',
+              amount >= 0 ? 'text-teal-700' : 'text-ink-600'
+            )}
+          >
+            {amount >= 0 ? '+' : '-'}
+            {amountText}
+          </span>
+        </Row>
+        <Row>
+          <div className={clsx('text-ink-600 line-clamp-1')}>
+            Wallet {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
           </div>
         </Row>
         <Row className={'text-ink-600'}>
@@ -755,6 +831,11 @@ const mexasTreasuryTransferDescription = (
       : 'pendiente'
   return `${mexasTreasuryTransferTitle(change)} ${status}`
 }
+
+const mexasWalletMovementTitle = (change: MexasWalletBalanceChange) =>
+  change.movementType === 'withdrawal'
+    ? 'Retiro de Wallet'
+    : 'Deposito en Wallet'
 
 const txnTitle = (change: TxnBalanceChange) => {
   const { type, contract, user, questType, charity, answerText } = change

@@ -21,6 +21,7 @@ import {
   releaseExpiredMexasOrders,
   releaseUnbackedMexasOrders,
 } from 'web/lib/api/mexas-orders'
+import { recordMexasWalletMovement } from 'web/lib/api/mexas-wallet-movements'
 import {
   acquireMexasUserBalanceLock,
   releaseMexasUserBalanceLock,
@@ -191,6 +192,31 @@ function mexasUnitsDeltaToAmount(deltaUnits: bigint) {
   return sign * mexasUnitsToAmount(absUnits)
 }
 
+function getWalletMovementAmount(deltaAmount: number) {
+  return Math.round(Math.abs(deltaAmount) * 1e8) / 1e8
+}
+
+function buildWalletMovementIdempotencyKey(params: {
+  context: 'new-user' | 'existing-user'
+  newUnits: bigint
+  previousSyncTime?: unknown
+  previousUnits: bigint
+  userId: string
+  walletAddress: string
+}) {
+  return [
+    'mexas-wallet-sync',
+    params.context,
+    params.userId,
+    params.walletAddress.toLowerCase(),
+    params.previousUnits.toString(),
+    params.newUnits.toString(),
+    typeof params.previousSyncTime === 'number'
+      ? String(params.previousSyncTime)
+      : 'none',
+  ].join(':')
+}
+
 async function readMexasWalletBalance(
   walletAddress: string,
   context: 'new-user' | 'existing-user'
@@ -227,9 +253,8 @@ async function getMexasWalletSync(
     'existing-user'
   )
   const previousUnits = parseSyncedMexasUnits(data)
-  const deltaAmount = mexasUnitsDeltaToAmount(
-    walletBalance.units - previousUnits
-  )
+  const deltaUnits = walletBalance.units - previousUnits
+  const deltaAmount = mexasUnitsDeltaToAmount(deltaUnits)
   await releaseClosedMexasMarketOrders(db, {
     userId: row.id,
     skipUserBalanceLock: true,
@@ -264,6 +289,30 @@ async function getMexasWalletSync(
     },
     balance,
     totalDeposits,
+    movement:
+      deltaUnits !== 0n
+        ? {
+            amount: getWalletMovementAmount(deltaAmount),
+            deltaUnits,
+            idempotencyKey: buildWalletMovementIdempotencyKey({
+              context: 'existing-user',
+              userId: row.id,
+              walletAddress,
+              previousUnits,
+              newUnits: walletBalance.units,
+              previousSyncTime: data[MEXAS_WALLET_SYNC_TIME_KEY],
+            }),
+            internalBalanceBefore: row.balance,
+            internalBalanceAfter: balance,
+            newWalletAmount: walletBalance.amount,
+            newWalletUnits: walletBalance.units,
+            openReservedAmount,
+            previousWalletAmount: mexasUnitsToAmount(previousUnits),
+            previousWalletUnits: previousUnits,
+            userId: row.id,
+            walletAddress,
+          }
+        : undefined,
   }
 }
 
@@ -438,6 +487,9 @@ async function updateExistingUser(params: {
 
       if (userError) throw userError
       if (updatedUser) {
+        if (walletSync?.movement) {
+          await recordMexasWalletMovement(db, walletSync.movement)
+        }
         const updatedPrivateUser = await upsertPrivyPrivateUser({
           db,
           privateUser,
@@ -522,6 +574,29 @@ async function createPrivyManifoldUser(params: {
     .single()
 
   if (userError) throw userError
+
+  if (walletAddress && walletBalance && walletBalance.units > 0n) {
+    await recordMexasWalletMovement(db, {
+      amount: walletBalance.amount,
+      deltaUnits: walletBalance.units,
+      idempotencyKey: buildWalletMovementIdempotencyKey({
+        context: 'new-user',
+        userId: id,
+        walletAddress,
+        previousUnits: 0n,
+        newUnits: walletBalance.units,
+      }),
+      internalBalanceBefore: 0,
+      internalBalanceAfter: walletBalance.amount,
+      newWalletAmount: walletBalance.amount,
+      newWalletUnits: walletBalance.units,
+      openReservedAmount: 0,
+      previousWalletAmount: 0,
+      previousWalletUnits: 0n,
+      userId: id,
+      walletAddress,
+    })
+  }
 
   const privateUserRow = await upsertPrivyPrivateUser({
     db,

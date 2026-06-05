@@ -862,6 +862,80 @@ export type Database = {
           }
         ]
       }
+      mexas_wallet_movements: {
+        Row: {
+          amount: number
+          chain_id: number
+          created_time: string
+          delta_units: string
+          id: string
+          idempotency_key: string
+          internal_balance_after: number
+          internal_balance_before: number
+          metadata: Json
+          movement_type: string
+          new_wallet_amount: number
+          new_wallet_units: string
+          observed_time: string
+          open_reserved_amount: number
+          previous_wallet_amount: number
+          previous_wallet_units: string
+          token_address: string
+          user_id: string
+          wallet_address: string
+        }
+        Insert: {
+          amount: number
+          chain_id: number
+          created_time?: string
+          delta_units: string
+          id: string
+          idempotency_key: string
+          internal_balance_after: number
+          internal_balance_before: number
+          metadata?: Json
+          movement_type: string
+          new_wallet_amount: number
+          new_wallet_units: string
+          observed_time?: string
+          open_reserved_amount?: number
+          previous_wallet_amount: number
+          previous_wallet_units: string
+          token_address: string
+          user_id: string
+          wallet_address: string
+        }
+        Update: {
+          amount?: number
+          chain_id?: number
+          created_time?: string
+          delta_units?: string
+          id?: string
+          idempotency_key?: string
+          internal_balance_after?: number
+          internal_balance_before?: number
+          metadata?: Json
+          movement_type?: string
+          new_wallet_amount?: number
+          new_wallet_units?: string
+          observed_time?: string
+          open_reserved_amount?: number
+          previous_wallet_amount?: number
+          previous_wallet_units?: string
+          token_address?: string
+          user_id?: string
+          wallet_address?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'mexas_wallet_movements_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       creator_portfolio_history: {
         Row: {
           fees_earned: number
@@ -4186,6 +4260,10 @@ export type Database = {
         Returns: boolean
       }
       mexas_treasury_settlement_ledger_ready: {
+        Args: never
+        Returns: boolean
+      }
+      mexas_wallet_movements_ledger_ready: {
         Args: never
         Returns: boolean
       }

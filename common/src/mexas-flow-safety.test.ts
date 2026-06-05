@@ -865,8 +865,11 @@ describe('MEXAS flow safety guardrails', () => {
     expect(balanceChangesSource).toContain('mexasOnly: true')
     expect(balanceChangesSource).toContain('filter(isMexasBalanceChange)')
     expect(balanceChangesSource).toContain('isMexasTreasuryChange(change)')
+    expect(balanceChangesSource).toContain('isMexasWalletChange(change)')
     expect(balanceChangesSource).toContain('MexasTreasuryBalanceChangeRow')
+    expect(balanceChangesSource).toContain('MexasWalletBalanceChangeRow')
     expect(balanceChangesSource).toContain('mexasTreasuryTransferTitle')
+    expect(balanceChangesSource).toContain('mexasWalletMovementTitle')
     expect(balanceChangesSource).toContain('Liberacion de orden')
     expect(balanceChangesSource).toContain('Pago de resolucion')
     expect(balanceChangesSource).toContain('Reembolso por cancelacion')
@@ -878,8 +881,9 @@ describe('MEXAS flow safety guardrails', () => {
       "type: 'mexas_treasury_transfer'"
     )
     expect(balanceChangeModelSource).toContain('isMexasTreasuryChange')
+    expect(balanceChangeModelSource).toContain('isMexasWalletChange')
     expect(balanceChangeModelSource).toContain(
-      "!('bet' in change) && !isMexasTreasuryChange(change)"
+      '!isMexasTreasuryChange(change) &&\n  !isMexasWalletChange(change)'
     )
     expect(portfolioSummarySource).toContain('mexasOnly: true')
     expect(portfolioSummarySource).not.toContain('topicSlug="recent"')
@@ -894,6 +898,7 @@ describe('MEXAS flow safety guardrails', () => {
     )
     expect(mexasProfileApiSource).toContain('getMexasBalanceChanges')
     expect(mexasProfileApiSource).toContain(".from('mexas_treasury_transfers')")
+    expect(mexasProfileApiSource).toContain(".from('mexas_wallet_movements')")
     expect(mexasProfileApiSource).toContain(
       ".in('status', ['submitted', 'confirmed'])"
     )
@@ -901,6 +906,7 @@ describe('MEXAS flow safety guardrails', () => {
     expect(mexasProfileApiSource).toContain('amount: -amount')
     expect(mexasProfileApiSource).toContain('isMexasTestUnwound')
     expect(mexasProfileApiSource).toContain("type: 'mexas_treasury_transfer'")
+    expect(mexasProfileApiSource).toContain("type: 'mexas_wallet_movement'")
     expect(mexasProfileApiSource).toContain(
       "transferType === 'withdrawal' ? -amount : amount"
     )
@@ -3272,6 +3278,111 @@ describe('MEXAS flow safety guardrails', () => {
     )
     expect(sqlTestSource).toContain('treasury bet_id FK index exists')
     expect(sqlTestSource).toContain('treasury service-role policy exists')
+  })
+
+  test('MEXAS direct wallet movements use a private backend-only ledger', () => {
+    const migration = readRepoFile(
+      'backend/supabase/migrations/2026060501_add_mexas_wallet_movements.sql'
+    )
+    const compactMigration = compactWhitespace(migration)
+    const privySource = readRepoFile('web/pages/api/privy-user.ts')
+    const profileApiSource = readRepoFile('web/lib/api/mexas-profile.ts')
+    const balanceChangeModelSource = readRepoFile(
+      'common/src/balance-change.ts'
+    )
+    const balanceChangesSource = readRepoFile(
+      'web/components/portfolio/balance-change-table.tsx'
+    )
+    const profileTabsSource = readRepoFile(
+      'web/components/profile/mexas-profile-tabs.tsx'
+    )
+    const applySource = readRepoFile(
+      'backend/scripts/apply-mexas-launch-sql.ts'
+    )
+    const readinessSource = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+    const schemaSource = readRepoFile('common/src/supabase/schema.ts')
+
+    expectMarkersInOrder(migration, [
+      'create table if not exists',
+      'public.mexas_wallet_movements',
+      'idempotency_key text not null',
+      'movement_type text not null',
+      'user_id text not null references public.users',
+      'wallet_address text not null',
+      'amount numeric(38, 8) not null',
+      'delta_units text not null',
+      'previous_wallet_units text not null',
+      'new_wallet_units text not null',
+      'internal_balance_before numeric(38, 8) not null',
+      'internal_balance_after numeric(38, 8) not null',
+      'token_address text not null',
+      'chain_id integer not null',
+    ])
+    expect(migration).toContain(
+      "movement_type in ('deposit', 'withdrawal')"
+    )
+    expect(migration).toContain(
+      'constraint mexas_wallet_movements_chain_id_check check (chain_id = 42161)'
+    )
+    expect(migration).toContain(
+      'create unique index if not exists mexas_wallet_movements_idempotency_key_idx'
+    )
+    expectMarkersInOrder(migration, [
+      'alter table public.mexas_wallet_movements enable row level security',
+      'revoke all on table public.mexas_wallet_movements',
+      'public,',
+      'anon,',
+      'authenticated',
+      'insert on table public.mexas_wallet_movements to service_role',
+      'create policy mexas_wallet_movements_service_role_only',
+      'to service_role',
+      'or replace function public.mexas_wallet_movements_ledger_ready',
+      "not has_table_privilege('anon', ledger, 'SELECT')",
+      "p.polname = 'mexas_wallet_movements_service_role_only'",
+      "to_regclass('public.mexas_wallet_movements_user_observed_idx') is not null",
+    ])
+    expect(compactMigration).toContain(
+      'grant select , insert on table public.mexas_wallet_movements to service_role'
+    )
+    expect(compactMigration).toContain(
+      'revoke execute on function public.mexas_wallet_movements_ledger_ready () from public, anon, authenticated'
+    )
+    expectMarkersInOrder(privySource, [
+      'const deltaUnits = walletBalance.units - previousUnits',
+      'const deltaAmount = mexasUnitsDeltaToAmount(deltaUnits)',
+      'movement:',
+      'idempotencyKey: buildWalletMovementIdempotencyKey',
+      'await recordMexasWalletMovement(db, walletSync.movement)',
+    ])
+    expect(privySource).toContain('context: \'new-user\'')
+    expect(profileApiSource).toContain(".from('mexas_wallet_movements')")
+    expect(profileApiSource).toContain(
+      "type: 'mexas_wallet_movement'"
+    )
+    expect(profileApiSource).toContain(
+      "movementType === 'withdrawal' ? -amount : amount"
+    )
+    expect(balanceChangeModelSource).toContain(
+      'export type MexasWalletBalanceChange'
+    )
+    expect(balanceChangeModelSource).toContain('isMexasWalletChange')
+    expect(balanceChangesSource).toContain('MexasWalletBalanceChangeRow')
+    expect(balanceChangesSource).toContain('mexasWalletMovementTitle')
+    expect(profileTabsSource).toContain('Deposito en Wallet')
+    expect(profileTabsSource).toContain('Retiro de Wallet')
+    expect(applySource).toContain(
+      '2026060501_add_mexas_wallet_movements.sql'
+    )
+    expect(applySource).toContain(
+      'wallet movements ledger health RPC missing'
+    )
+    expect(readinessSource).toContain(
+      "db.rpc('mexas_wallet_movements_ledger_ready')"
+    )
+    expect(schemaSource).toContain('mexas_wallet_movements')
+    expect(schemaSource).toContain('wallet_address: string')
   })
 
   test('launch SQL locks down legacy Supabase surfaces outside MEXAS', () => {
