@@ -50,7 +50,7 @@ Before enabling live MEXAS matching or treating the fork as launch-ready, run:
 $ yarn --cwd backend/scripts check:mexas-launch
 ```
 
-This script loads local `.env` files, checks production Vercel env names, verifies the Supabase matching health RPC, checks required settlement flags, and smoke-tests the main public MEXAS pages. A failing result means production is not ready to launch with live matching.
+This script loads local `.env` files, checks production Vercel env names, verifies the Supabase matching health RPC, checks required settlement flags, confirms the production scheduler is on the current git revision, and smoke-tests the main public MEXAS pages. A failing result means production is not ready to launch with live matching.
 
 If the readiness script fails, resolve blockers in this order:
 
@@ -127,7 +127,22 @@ If the readiness script fails, resolve blockers in this order:
    ID. Privy rejects generic preview wildcards and browser signup will fail with
    CORS until the exact production origin is allowlisted.
 
-6. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
+6. If `scheduler freshness` fails, deploy the scheduler from the same commit as
+   the frontend. This is required because `expire-limit-orders` releases
+   expired or closed treasury-escrowed MEXAS orders.
+
+   ```shell
+   $ gcloud auth login --no-launch-browser
+   $ gcloud config set project mantic-markets
+   $ cd backend/scheduler
+   $ ./deploy-scheduler.sh prod
+   ```
+
+   The deploy script passes `SCHEDULER_GIT_REVISION` into the container, and
+   the scheduler exposes `/healthz` before basic auth so `check:mexas-launch`
+   can prove the live scheduler revision and the `expire-limit-orders` job.
+
+7. Re-run `check:mexas-launch`. Do not enable crossing orders or resolve filled
    markets unless every launch-readiness line is `PASS`.
 
 As of the 2026-06-04 production readiness pass, the treasury has Arbitrum gas,

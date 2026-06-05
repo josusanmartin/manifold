@@ -86,6 +86,7 @@ const TREASURY_SIGNER_SECRET_PATTERN = /^0x[0-9a-fA-F]{64}$/
 const ZERO_EVM_ADDRESS = '0x0000000000000000000000000000000000000000'
 const ERC20_BALANCE_OF_SELECTOR = '0x70a08231'
 const PRIVY_APP_CONFIG_TIMEOUT_MS = 15_000
+const SCHEDULER_HEALTH_TIMEOUT_MS = 15_000
 const EPSILON = 1e-9
 
 type OpenMexasOrder = {
@@ -214,21 +215,23 @@ function compactDiagnosticText(text: string) {
   return compacted.length > 600 ? `${compacted.slice(0, 600)}...` : compacted
 }
 
-function formatDiagnosticError(error: unknown) {
+function formatDiagnosticError(error: unknown): string {
   if (!error || typeof error !== 'object') {
     return compactDiagnosticText(String(error))
   }
   const fields = error as {
+    cause?: unknown
     code?: string
     details?: string
     hint?: string
     message?: string
   }
-  const message = [
+  const message: string = [
     fields.message,
     fields.details ? `details=${fields.details}` : undefined,
     fields.hint ? `hint=${fields.hint}` : undefined,
     fields.code ? `code=${fields.code}` : undefined,
+    fields.cause ? `cause=${formatDiagnosticError(fields.cause)}` : undefined,
   ]
     .filter(Boolean)
     .join('; ')
@@ -1991,6 +1994,99 @@ async function checkPrivyAllowedOrigin(
   }
 }
 
+type SchedulerHealthResponse = {
+  env?: unknown
+  expireLimitOrders?: unknown
+  ok?: unknown
+  revision?: unknown
+}
+
+async function checkSchedulerFreshness(
+  commitInfo: ReturnType<typeof getCurrentGitCommitInfo>
+) {
+  const schedulerUrl =
+    process.env.MEXAS_SCHEDULER_URL || 'https://scheduler.manifold.markets'
+  const healthUrl = new URL('/healthz', schedulerUrl).toString()
+
+  try {
+    const response = await fetch(healthUrl, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(SCHEDULER_HEALTH_TIMEOUT_MS),
+    })
+
+    if (response.status < 200 || response.status >= 300) {
+      const body = await response.text().catch(() => '')
+      const bodyPreview = body ? ` Body: ${compactDiagnosticText(body)}` : ''
+      return fail(
+        'scheduler freshness',
+        `${healthUrl} returned ${response.status}. Deploy backend/scheduler so /healthz exposes SCHEDULER_GIT_REVISION and expire-limit-orders status.${bodyPreview}`
+      )
+    }
+
+    const health = (await response.json().catch(() => undefined)) as
+      | SchedulerHealthResponse
+      | undefined
+    if (!health || health.ok !== true) {
+      return fail(
+        'scheduler freshness',
+        `${healthUrl} did not return an ok scheduler health payload.`
+      )
+    }
+    if (health.env !== 'prod') {
+      return fail(
+        'scheduler freshness',
+        `Scheduler health reports env=${String(
+          health.env
+        )}; expected prod.`
+      )
+    }
+    if (health.expireLimitOrders !== true) {
+      return fail(
+        'scheduler freshness',
+        'Scheduler health does not confirm the expire-limit-orders job is loaded.'
+      )
+    }
+
+    const revision =
+      typeof health.revision === 'string' ? health.revision.trim() : ''
+    if (!revision) {
+      return fail(
+        'scheduler freshness',
+        'Scheduler health does not expose SCHEDULER_GIT_REVISION. Redeploy with backend/scheduler/deploy-scheduler.sh.'
+      )
+    }
+    if (!commitInfo) {
+      return warn(
+        'scheduler freshness',
+        `Scheduler reports revision ${revision}, but local git HEAD could not be read for comparison.`
+      )
+    }
+    if (
+      revision.length < 7 ||
+      (!commitInfo.hash.startsWith(revision) &&
+        !revision.startsWith(commitInfo.hash))
+    ) {
+      return fail(
+        'scheduler freshness',
+        `Scheduler revision ${revision} does not match HEAD ${commitInfo.hash.slice(
+          0,
+          9
+        )}. Deploy backend/scheduler to prod.`
+      )
+    }
+
+    return pass(
+      'scheduler freshness',
+      `Scheduler is prod, has expire-limit-orders loaded, and reports revision ${revision}.`
+    )
+  } catch (error) {
+    return fail(
+      'scheduler freshness',
+      `Could not verify ${healthUrl}: ${formatDiagnosticError(error)}`
+    )
+  }
+}
+
 async function runChecks() {
   loadEnvFiles()
 
@@ -2423,6 +2519,7 @@ async function runChecks() {
       )
     )
   }
+  checks.push(await checkSchedulerFreshness(commitInfo))
 
   for (const path of [
     '/wallet',

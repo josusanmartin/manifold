@@ -36,6 +36,19 @@ async function start() {
   app.use(express.json())
 
   const prod = isProd()
+  const jobs = createJobs()
+  const jobsByName = Object.fromEntries(jobs.map((j) => [j.name, j]))
+  log.info(`Loaded ${jobs.length} job(s).`, { names: Object.keys(jobsByName) })
+
+  app.get('/healthz', (_req: express.Request, res: express.Response) => {
+    res.status(200).json({
+      env: prod ? 'prod' : 'dev',
+      expireLimitOrders: 'expire-limit-orders' in jobsByName,
+      ok: true,
+      revision: process.env.SCHEDULER_GIT_REVISION ?? null,
+    })
+  })
+
   app.use(
     basicAuth({
       users: { admin: process.env.SCHEDULER_AUTH_PASSWORD ?? '' },
@@ -45,10 +58,6 @@ async function start() {
         : 'scheduler.dev.manifold.markets',
     })
   )
-
-  const jobs = createJobs()
-  const jobsByName = Object.fromEntries(jobs.map((j) => [j.name, j]))
-  log.info(`Loaded ${jobs.length} job(s).`, { names: Object.keys(jobsByName) })
 
   app.get('/', (_req: express.Request, res: express.Response) => {
     const now = Date.now()

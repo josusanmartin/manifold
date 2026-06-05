@@ -1885,6 +1885,42 @@ describe('MEXAS flow safety guardrails', () => {
     ])
   })
 
+  test('launch checks prove production scheduler freshness', () => {
+    const readinessSource = readRepoFile(
+      'backend/scripts/check-mexas-launch-readiness.ts'
+    )
+    const schedulerSource = readRepoFile('backend/scheduler/src/index.ts')
+    const deploySource = readRepoFile('backend/scheduler/deploy-scheduler.sh')
+    const docsSource = readRepoFile('backend/scripts/README.md')
+
+    expect(schedulerSource).toContain("app.get('/healthz'")
+    expect(schedulerSource).toContain('SCHEDULER_GIT_REVISION')
+    expect(schedulerSource).toContain("'expire-limit-orders' in jobsByName")
+    expectMarkersInOrder(schedulerSource, [
+      "app.get('/healthz'",
+      'app.use(',
+      'basicAuth({',
+    ])
+
+    expect(deploySource).toContain('SCHEDULER_GIT_REVISION=${GIT_REVISION}')
+    expect(readinessSource).toContain('checkSchedulerFreshness')
+    expect(readinessSource).toContain('https://scheduler.manifold.markets')
+    expect(readinessSource).toContain('/healthz')
+    expect(readinessSource).toContain('expire-limit-orders job is loaded')
+    expect(readinessSource).toContain('Deploy backend/scheduler to prod')
+    expectMarkersInOrder(readinessSource, [
+      'const commitInfo = getCurrentGitCommitInfo()',
+      'getVercelProductionDeployment(siteUrl)',
+      'deployment freshness',
+      'await checkSchedulerFreshness(commitInfo)',
+      "site ${path}",
+    ])
+
+    expect(docsSource).toContain('scheduler freshness')
+    expect(docsSource).toContain('SCHEDULER_GIT_REVISION')
+    expect(docsSource).toContain('./deploy-scheduler.sh prod')
+  })
+
   test('production smoke covers broad legacy page redirects and rejects legacy redirect destinations', () => {
     const smokeSource = readRepoFile(
       'backend/scripts/check-mexas-production-smoke.ts'

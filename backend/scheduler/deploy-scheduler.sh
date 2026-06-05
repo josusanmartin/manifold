@@ -69,7 +69,7 @@ COMMON_ARGS=(
   --project ${GCLOUD_PROJECT}
   --zone ${ZONE}
   --container-image ${IMAGE_URL}
-  --container-env NEXT_PUBLIC_FIREBASE_ENV=${NEXT_PUBLIC_FIREBASE_ENV},GOOGLE_CLOUD_PROJECT=${GCLOUD_PROJECT}
+  --container-env NEXT_PUBLIC_FIREBASE_ENV=${NEXT_PUBLIC_FIREBASE_ENV},GOOGLE_CLOUD_PROJECT=${GCLOUD_PROJECT},SCHEDULER_GIT_REVISION=${GIT_REVISION}
 )
 
 # If you augment the instance, be sure to increase --max-old-space-size in the Dockerfile
