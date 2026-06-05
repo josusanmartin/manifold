@@ -197,6 +197,7 @@ export async function setMexasUserBalanceCas(
   balance: number,
   options?: {
     dataPatch?: Record<string, unknown>
+    totalDeposits?: number
   }
 ) {
   for (let attempt = 0; attempt < BALANCE_UPDATE_ATTEMPTS; attempt++) {
@@ -219,6 +220,9 @@ export async function setMexasUserBalanceCas(
       .from('users')
       .update({
         balance: nextBalance,
+        ...(options?.totalDeposits !== undefined
+          ? { total_deposits: options.totalDeposits }
+          : {}),
         data: nextData as any,
       })
       .eq('id', userId)

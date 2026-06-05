@@ -384,9 +384,12 @@ describe('MEXAS flow safety guardrails', () => {
     expectMarkersInOrder(source, [
       'async function syncAvailableBalanceFromBacking',
       ".from('users')",
-      ".select('balance')",
+      ".select('id,balance,total_deposits,data')",
+      'const deltaUnits = params.onChainUnits - previousUnits',
+      'const deltaAmount = mexasUnitsDeltaToAmount(deltaUnits)',
       'getMexasSyncedAvailableBalance({',
       'currentBalance: userRow.balance',
+      'onChainDeltaAmount: deltaAmount',
     ])
     expectMarkersInOrder(source, [
       'async function completePreparedMexasOrderRelease',
@@ -1248,13 +1251,17 @@ describe('MEXAS flow safety guardrails', () => {
       'await refreshMexasOpenReservedAmount(db, userId)',
       'const matchedBet = hasCrossingOrders',
     ])
-    expect(ordersSource).toContain(".select('id,balance,data')")
+    expect(ordersSource).toContain(".select('id,balance,total_deposits,data')")
     expectMarkersInOrder(ordersSource, [
       'async function syncAvailableBalanceFromBacking',
-      ".select('balance')",
+      'const deltaUnits = params.onChainUnits - previousUnits',
+      'const deltaAmount = mexasUnitsDeltaToAmount(deltaUnits)',
       'currentBalance: userRow.balance',
+      'onChainDeltaAmount: deltaAmount',
     ])
-    expect(ordersSource).toContain('onChainDeltaAmount: 0')
+    expect(ordersSource).toContain(
+      'await recordMexasWalletMovement(params.db, {'
+    )
   })
 
   test('limits wallet withdrawals to synced MEX and refreshes after the chain receipt', () => {
@@ -3286,6 +3293,9 @@ describe('MEXAS flow safety guardrails', () => {
     )
     const compactMigration = compactWhitespace(migration)
     const privySource = readRepoFile('web/pages/api/privy-user.ts')
+    const betApiSource = readRepoFile('web/pages/api/v0/bet.ts')
+    const ordersSource = readRepoFile('web/lib/api/mexas-orders.ts')
+    const balanceHelperSource = readRepoFile('web/lib/api/mexas-balance.ts')
     const profileApiSource = readRepoFile('web/lib/api/mexas-profile.ts')
     const balanceChangeModelSource = readRepoFile(
       'common/src/balance-change.ts'
@@ -3357,6 +3367,24 @@ describe('MEXAS flow safety guardrails', () => {
       'await recordMexasWalletMovement(db, walletSync.movement)',
     ])
     expect(privySource).toContain('context: \'new-user\'')
+    expectMarkersInOrder(betApiSource, [
+      "import { recordMexasWalletMovement } from 'web/lib/api/mexas-wallet-movements'",
+      'async function syncMexasWalletBalance',
+      'const deltaUnits = currentUnits - previousUnits',
+      'await recordMexasWalletMovement(db, {',
+      "metadata: { context: 'bet-sync' }",
+    ])
+    expectMarkersInOrder(ordersSource, [
+      "import { recordMexasWalletMovement } from './mexas-wallet-movements'",
+      'async function syncAvailableBalanceFromBacking',
+      'const deltaUnits = params.onChainUnits - previousUnits',
+      'const totalDeposits =',
+      'await setMexasUserBalanceCas',
+      'await recordMexasWalletMovement(params.db, {',
+      "metadata: { context: 'backing-sync' }",
+    ])
+    expect(balanceHelperSource).toContain('totalDeposits?: number')
+    expect(balanceHelperSource).toContain('total_deposits: options.totalDeposits')
     expect(profileApiSource).toContain(".from('mexas_wallet_movements')")
     expect(profileApiSource).toContain(
       "type: 'mexas_wallet_movement'"
