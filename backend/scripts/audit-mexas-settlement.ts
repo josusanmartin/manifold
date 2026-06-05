@@ -8,9 +8,12 @@ import {
   getMexasResolvedBetPayout,
 } from 'common/mexas-resolution'
 import {
+  getMissingMexasEscrowCapabilities,
   getMexasSettlementAudit,
   hasMexasEscrowSettlementExposure,
   hasMexasFilledExposure,
+  hasOperationalMexasEscrow,
+  type MexasSettlementSettings,
 } from 'common/mexas-settlement'
 import { convertBet } from 'common/supabase/bets'
 import { convertContract } from 'common/supabase/contracts'
@@ -40,6 +43,12 @@ type FilledExposure = {
   shares: number
   userId: string
   yesPayout: number
+}
+
+type SettlementExposureReportOptions = {
+  hasOperationalEscrow: boolean
+  missingEscrowCapabilities: string[]
+  strict: boolean
 }
 
 function parseEnvAssignment(line: string) {
@@ -95,6 +104,13 @@ function getSupabaseAdminKey() {
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.DEV_ADMIN_SUPABASE_KEY
   )
+}
+
+function getMexasSettlementSettings(): MexasSettlementSettings {
+  return {
+    escrowImplementation: process.env.MEXAS_ESCROW_IMPLEMENTATION,
+    settlementMode: process.env.MEXAS_SETTLEMENT_MODE,
+  }
 }
 
 async function loadMexasOrderbookContracts(db: SupabaseClient) {
@@ -299,7 +315,10 @@ function printTestUnwindSql(exposures: ContractExposure[]) {
   console.log('rollback;')
 }
 
-function printTextReport(exposures: ContractExposure[]) {
+function printTextReport(
+  exposures: ContractExposure[],
+  options: SettlementExposureReportOptions
+) {
   if (!exposures.length) {
     console.log(
       'PASS No filled or treasury-escrowed open MEXAS settlement exposure found.'
@@ -307,12 +326,29 @@ function printTextReport(exposures: ContractExposure[]) {
     return
   }
 
+  const blocked = options.strict || !options.hasOperationalEscrow
   console.log(
-    `FAIL ${exposures.length} MEXAS market(s) have filled or treasury-escrowed settlement exposure.`
+    `${
+      blocked ? 'FAIL' : 'PASS'
+    } ${exposures.length} MEXAS market(s) have filled or treasury-escrowed settlement exposure.`
   )
-  console.log(
-    'These positions cannot be safely resolved until escrow is operational or the exposure is manually remediated.'
-  )
+  if (blocked) {
+    console.log(
+      'These positions cannot be safely resolved until escrow is operational or the exposure is manually remediated.'
+    )
+    if (options.missingEscrowCapabilities.length) {
+      console.log(
+        `Missing escrow capabilities: ${options.missingEscrowCapabilities.join(
+          ', '
+        )}.`
+      )
+    }
+  } else {
+    console.log(
+      'Operational on-chain escrow is configured, so this exposure can remain active and be settled by the normal resolution flow.'
+    )
+    console.log('Pass --strict to fail on any exposure inventory.')
+  }
   console.log('')
 
   for (const exposure of exposures) {
@@ -334,21 +370,37 @@ function printTextReport(exposures: ContractExposure[]) {
     console.log('')
   }
 
-  console.log('Remediation options:')
-  console.log('  1. Implement on-chain escrow and keep these positions active.')
-  console.log(
-    '  2. Resolve only after treasury/escrow can cover the maximum payout exposure.'
-  )
-  console.log(
-    '  3. For test-only markets, run again with --print-test-unwind-sql, review the rollback-protected SQL, then manually decide whether to commit.'
-  )
-  console.log(
-    '     That SQL only unwinds filled test positions; open treasury-escrowed orders should be cancelled or released through the order flow.'
-  )
+  if (blocked) {
+    console.log('Remediation options:')
+    console.log('  1. Implement on-chain escrow and keep these positions active.')
+    console.log(
+      '  2. Resolve only after treasury/escrow can cover the maximum payout exposure.'
+    )
+    console.log(
+      '  3. For test-only markets, run again with --print-test-unwind-sql, review the rollback-protected SQL, then manually decide whether to commit.'
+    )
+    console.log(
+      '     That SQL only unwinds filled test positions; open treasury-escrowed orders should be cancelled or released through the order flow.'
+    )
+  } else {
+    console.log('Operational notes:')
+    console.log(
+      '  1. Keep treasury MEX and ETH backing monitored with check:mexas-launch.'
+    )
+    console.log(
+      '  2. Use --strict only when preparing manual remediation or test-market cleanup.'
+    )
+  }
   console.log('')
   console.log('Commands:')
   console.log(
     '  COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-settlement'
+  )
+  console.log(
+    '  COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-settlement -- --operational-escrow'
+  )
+  console.log(
+    '  COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts audit:mexas-settlement -- --strict'
   )
   console.log(
     '  COREPACK_ENABLE_STRICT=0 corepack yarn --cwd backend/scripts print:mexas-test-unwind-sql > /tmp/mexas-test-unwind.sql'
@@ -363,6 +415,10 @@ async function main() {
 
   const json = process.argv.includes('--json')
   const printUnwindSql = process.argv.includes('--print-test-unwind-sql')
+  const operationalEscrowOverride = process.argv.includes(
+    '--operational-escrow'
+  )
+  const strict = process.argv.includes('--strict')
   const supabaseUrlOrInstanceId = getSupabaseUrlOrInstanceId()
   const supabaseAdminKey = getSupabaseAdminKey()
 
@@ -372,17 +428,29 @@ async function main() {
 
   const db = createClient(supabaseUrlOrInstanceId, supabaseAdminKey)
   const exposures = await loadSettlementExposure(db)
+  const missingEscrowCapabilities = getMissingMexasEscrowCapabilities()
+  const reportOptions: SettlementExposureReportOptions = {
+    hasOperationalEscrow:
+      operationalEscrowOverride ||
+      hasOperationalMexasEscrow(getMexasSettlementSettings()),
+    missingEscrowCapabilities: operationalEscrowOverride
+      ? []
+      : missingEscrowCapabilities,
+    strict,
+  }
 
   if (printUnwindSql) {
     printTestUnwindSql(exposures)
     return
   } else if (json) {
-    console.log(JSON.stringify({ exposures }, null, 2))
+    console.log(JSON.stringify({ exposures, ...reportOptions }, null, 2))
   } else {
-    printTextReport(exposures)
+    printTextReport(exposures, reportOptions)
   }
 
-  if (exposures.length) process.exitCode = 1
+  if (exposures.length && (strict || !reportOptions.hasOperationalEscrow)) {
+    process.exitCode = 1
+  }
 }
 
 main().catch((error) => {

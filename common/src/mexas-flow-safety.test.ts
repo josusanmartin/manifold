@@ -3788,9 +3788,17 @@ describe('MEXAS flow safety guardrails', () => {
       ".is('resolution_time', null)",
       'async function loadContractBets',
       'const filledBets = bets.filter(hasMexasFilledExposure)',
-      'printTextReport(exposures)',
-      'if (exposures.length) process.exitCode = 1',
+      'const operationalEscrowOverride = process.argv.includes',
+      'const strict = process.argv.includes',
+      'const reportOptions',
+      'operationalEscrowOverride ||',
+      'hasOperationalMexasEscrow(getMexasSettlementSettings())',
+      'printTextReport(exposures, reportOptions)',
+      'if (exposures.length && (strict || !reportOptions.hasOperationalEscrow))',
     ])
+    expect(source).toContain('getMissingMexasEscrowCapabilities')
+    expect(source).toContain('--operational-escrow')
+    expect(source).toContain('Pass --strict to fail on any exposure inventory.')
     expect(source).toContain('Remediation options:')
     expect(source).toContain('Implement on-chain escrow')
     expect(source).toContain('Commands:')
@@ -3827,7 +3835,7 @@ describe('MEXAS flow safety guardrails', () => {
       'printTestUnwindSql(exposures)',
       'return',
       '} else if (json)',
-      'if (exposures.length) process.exitCode = 1',
+      'if (exposures.length && (strict || !reportOptions.hasOperationalEscrow))',
     ])
     expectMarkersInOrder(unwindSource, [
       "const TEST_UNWIND_CONTRACT_IDS = ['ukrwarend26a'] as const",
