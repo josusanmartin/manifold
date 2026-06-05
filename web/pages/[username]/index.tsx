@@ -188,7 +188,6 @@ function UserProfile(props: {
                 avatarUrl: user.avatarUrl,
                 bio: user.bio,
                 website: user.website,
-                twitterHandle: user.twitterHandle,
                 createdTime: user.createdTime,
               })
         }

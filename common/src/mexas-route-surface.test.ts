@@ -308,6 +308,48 @@ describe('MEXAS route surface', () => {
     })
   })
 
+  test('keeps the allowed profile page on Spanish MEXAS-only tabs', () => {
+    const profilePage = readRepoFile('web/pages/[username]/index.tsx')
+    const profileTabs = readRepoFile(
+      'web/components/profile/mexas-profile-tabs.tsx'
+    )
+    const tabsStart = profilePage.indexOf('tabs={[')
+    const tabsEnd = profilePage.indexOf(']}\n          />', tabsStart)
+    expect(tabsStart).toBeGreaterThanOrEqual(0)
+    expect(tabsEnd).toBeGreaterThan(tabsStart)
+
+    const renderedTabs = profilePage.slice(tabsStart, tabsEnd)
+
+    for (const tab of [
+      "title: 'Resumen'",
+      "title: 'Operaciones'",
+      "title: 'Mercados'",
+      "title: 'Movimientos'",
+      "title: 'Wallet'",
+    ]) {
+      expect(renderedTabs).toContain(tab)
+    }
+
+    for (const removedProfileSurface of [
+      'comments',
+      'achievements',
+      'Comments',
+      'Achievements',
+      'Twitter',
+      'LinkedIn',
+      'Boost',
+      'Mana',
+      'MANA',
+    ]) {
+      expect(renderedTabs).not.toContain(removedProfileSurface)
+      expect(profileTabs).not.toContain(removedProfileSurface)
+    }
+
+    expect(profilePage).not.toContain('twitterHandle:')
+    expect(profileTabs).not.toContain('/twitter')
+    expect(profileTabs).not.toContain('/linkedin')
+  })
+
   test('every non-API Next page is either a MEXAS page or redirected away', async () => {
     const pageRoutes = listPageFiles(join(__dirname, '..', '..', 'web', 'pages'))
       .map(pageFileToRoute)
